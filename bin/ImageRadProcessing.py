@@ -1,0 +1,112 @@
+from osgeo import gdal
+from PIL import Image
+import logging
+import numpy
+import os
+import utm
+
+class ImageRadProcessing(object):
+    def __init__(self, other):
+        #initialize logger
+        logging.basicConfig(filename='CalibrationController.log', filemode='w'\
+                            , level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+        
+        self.scene_id = other._scene_id
+        self.metadata = other.metadata
+        self.buoy_coor = [other.buoy_latitude, other.buoy_longitude]
+        
+        self.save_dir = os.path.join(other.filepath_base, 'data/landsat')
+        
+        if other.satelite == 8:
+            self.which_landsat = [8,2]
+            self.filename = '%s/%s' % (self.metadata['LANDSAT_SCENE_ID'], \
+                                         self.metadata['FILE_NAME_BAND_10'])
+        else: 
+            self.which_landsat = [7,1]
+            self.filename = '%d/%d.TIF' % (self.metadata['LANDSAT_SCENE_ID'],\
+                                     self.metadata['FILE_NAME_BAND_6_VCID_2'])
+        
+        #strip unwanted characters and make a solid path
+        self.filename = self.filename.translate(None, ''.join('"'))   
+        self.filename = os.path.join(self.save_dir, self.filename)
+        
+    def do_processing(self):
+        image_radiance = []
+        
+        num_bands = self.which_landsat[1]
+        for i in range(num_bands):
+           self.logger.info('do_processing: band %s of %s', i+1, num_bands)
+           
+           poi = ImageRadProcessing._find_roi(self)
+           dc_avg = ImageRadProcessing._calc_dc_avg(self, poi)
+           image_radiance.append(ImageRadProcessing._dc_to_rad(self, dc_avg))
+           
+           if self.which_landsat == [7,1]: break
+           else: 
+               self.which_landsat = [8,1]
+               self.filename = '%s/%s' % (self.metadata['LANDSAT_SCENE_ID'], \
+                                          self.metadata['FILE_NAME_BAND_11'])
+               #strip unwanted characters and make a solid path
+               self.filename = self.filename.translate(None, ''.join('"'))   
+               self.filename = os.path.join(self.save_dir, self.filename)
+            
+        return image_radiance, poi
+        
+    def _calc_dc_avg(self, poi):
+        #open image
+        im = Image.open(self.filename)
+        im_loaded = im.load()
+        
+        roi = poi[0]-1, poi[1]+1   #ROI gives top left pixel location, 
+                                   #POI gives center tap location
+        
+        dc_sum = 0   #allocate for ROI dc_sum
+        #extract ROI DCs
+        for i in range(3):
+            for j in range(3):
+                dc_sum += im_loaded[roi[0]+i, roi[1]+j]
+        
+        dc_avg = dc_sum / 9.0   #calculate dc_avg
+   
+        return dc_avg
+        
+    def _find_roi(self):
+        # open image
+        ds = gdal.Open(self.filename)
+        #get data transform
+        gt = ds.GetGeoTransform()
+        
+        #change lat_lon to utm
+        ret_val = utm.from_latlon(self.buoy_coor[0],self.buoy_coor[1])
+        l_x = ret_val[0]
+        l_y = ret_val[1]
+        
+        #calculate pixel locations- 
+        #source:http://www.gdal.org/gdal_datamodel.html
+        x = int((l_x-gt[0])/gt[1])
+        y = int((l_y-gt[3])/gt[5])
+        
+        return x, y
+    
+    def _dc_to_rad(self, DCavg):
+        """Convert digital count average to radiance.
+        """
+        #load values from metadata for calculation
+        metadata = self.metadata
+        which_landsat = self.which_landsat
+        
+        if which_landsat == [8,2]:
+            L_add = metadata['RADIANCE_ADD_BAND_10']
+            L_mult = metadata['RADIANCE_MULT_BAND_10']
+        if which_landsat == [8,1]:
+            L_add = metadata['RADIANCE_ADD_BAND_11']
+            L_mult = metadata['RADIANCE_MULT_BAND_11']
+        if which_landsat == [7,1]:
+            L_add = metadata['RADIANCE_ADD_BAND_6_VCID_2']
+            L_mult = metadata['RADIANCE_MULT_BAND_6_VCID_2']
+   
+        #calculate LLambda
+        LLambdaaddmult = DCavg * L_mult + L_add
+            
+        return LLambdaaddmult        

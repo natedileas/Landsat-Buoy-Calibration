@@ -22,7 +22,11 @@ class LandsatData(object):
         
         if other._scene_id:
             self.scene_id = other._scene_id
-            self.whichsat = other._scene_id[0:3]
+            
+            if other._scene_id[0:3] == 'LC8':
+                self.whichsat = 8
+            else:
+                self.whichsat = 7
             self.year = other._scene_id[9:13]
             self.julian_day = int(other._scene_id[13:16])
             self.scene_coors = other._scene_id[3:9]
@@ -72,9 +76,11 @@ class LandsatData(object):
             if self.scene_id != landsat_id[0]:
                 self.logger.warning('.start_download: scene_id and landsat_id \
                                     do not match')
-            return -1
-        else:
+                return -1
+            
             self.scene_id = landsat_id[0]
+        else:
+            self.scene_id = landsat_id[0] 
             
         metadata = LandsatData.read_metadata(self)
 
@@ -201,6 +207,7 @@ class DownloadLandsatScene(object):
                         logger.info('main: Product %s already downloaded and unzipped', scene_id)
                         downloaded_ids.append(scene_id)
                         check = 0
+                        break
 
                     elif os.path.isfile(tgzfile):
                         logger.info('main: product %s already downloaded', scene_id)
@@ -340,7 +347,7 @@ class DownloadLandsatScene(object):
             date0 = datetime.datetime(1999, 1, 11)
         elif sat == 'LC8':
             date0 =  datetime.datetime(2013, 5, 1)
-            
+        
         next_day = math.fmod((date1-date0).days - DownloadLandsatScene.cycle_day(self, path) + 1, 16)
         if next_day != 0:
             date_overpass = date1 + datetime.timedelta(16 - next_day)

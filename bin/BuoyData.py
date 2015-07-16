@@ -304,7 +304,7 @@ class BuoyData(object):
 
         a = 0.05 - (0.6 / avg_wspd) + (0.03 * math.log(avg_wspd))
 
-        z = 0.6    # depth in meters TODO get from database
+        z = depth   # depth in meters
 
         # CALCULATE SKIN_TEMPERATURE. sry for the caps
         skin_temp = avg_wtmp + 273.15 - (a * z) - d

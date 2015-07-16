@@ -207,7 +207,7 @@ class DownloadLandsatScene(object):
 
                     else:
                         try:
-                            DownloadLandsatScene.downloadChunks(self, url, str(output_dir), scene_id+'.tgz')
+                            DownloadLandsatScene.downloadChunks(self, url, str(output_dir), scene_id+'.tgz', logger)
                         except KeyboardInterrupt:
                             logger.warning('main: Product %s not found', scene_id)
                             notfound = True
@@ -252,7 +252,7 @@ class DownloadLandsatScene(object):
                 return '%3.1f %s' % (num, x)
             num /= 1024.0
 
-    def downloadChunks(self, url, rep, nom_fic):
+    def downloadChunks(self, url, rep, nom_fic, logger):
         """ Downloads large files in pieces.
         inspired by http://josh.gourneau.com
         """

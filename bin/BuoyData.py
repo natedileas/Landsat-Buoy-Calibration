@@ -298,9 +298,9 @@ class BuoyData(object):
 
         # calculate skin temperature
         if avg_wspd >= 4.5:
-            d = 0.2    # Kelvin
+            d = 0.17   # Kelvin
         else:
-            d = 0.17  # K TODO check franks paper on this
+            d = 0.0    # Kelvin
 
         a = 0.05 - (0.6 / avg_wspd) + (0.03 * math.log(avg_wspd))
 

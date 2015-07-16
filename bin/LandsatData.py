@@ -18,6 +18,8 @@ class LandsatData(object):
                             filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
+        self.scene_id = None   #fix error in start_download
+        
         if other._scene_id:
             self.scene_id = other._scene_id
             self.whichsat = other._scene_id[0:3]
@@ -32,10 +34,10 @@ class LandsatData(object):
                         arguments are required.')
                     sys.exit(-1)
             else:
+                self.whichsat =  other.satelite
                 self.julian_day = int(other.julian_date)
-                self.whichsat = other.satelite
                 self.year = other.year
-                self.scene_coors = [other.WRS2_path, other.WRS2_row]
+                self.scene_coors = other.WRS2_path + other.WRS2_row
 
         if other.cloud_cover:
             self.cloud_cover = other.cloud_cover
@@ -63,14 +65,17 @@ class LandsatData(object):
         landsat_id = dls.main(*args)
 
         if landsat_id == []:
-            self.logger.warning('.start_download: nothing was downloaded')
+            self.logger.warning('.start_download: landsat_id was empty')
             return -1
 
-        if self.scene_id != landsat_id[0]:
-            self.logger.warning('.start_download: scene_id and landsat_id \
-                                do not match')
+        if self.scene_id:
+            if self.scene_id != landsat_id[0]:
+                self.logger.warning('.start_download: scene_id and landsat_id \
+                                    do not match')
             return -1
-
+        else:
+            self.scene_id = landsat_id[0]
+            
         metadata = LandsatData.read_metadata(self)
 
         return landsat_id[0], metadata
@@ -158,21 +163,24 @@ class DownloadLandsatScene(object):
         else:
             date_end = datetime.datetime.now()
 
-        # connect to earthexplorer
-        DownloadLandsatScene.connect_earthexplorer_no_proxy(self, usgs)
+        prefix = ''
 
-        if bird.startswith('LC8'):
+        if bird == 8:
+            prefix = 'LC8'
             repert = '4923'
             stations = ['LGN']
-        if bird.startswith('LE7'):
+        if bird == 7:
+            prefix = 'LE7'
             repert = '3373'
             stations = ['EDC', 'SGS', 'AGS', 'ASN', 'SG1']
 
         check = 1
 
-        curr_date = DownloadLandsatScene.next_overpass(self, date_start,
-                                                       int(path), bird)
-
+        curr_date = DownloadLandsatScene.next_overpass(self, date_start, int(path), prefix)
+        
+        # connect to earthexplorer
+        DownloadLandsatScene.connect_earthexplorer_no_proxy(self, usgs)
+        
         while (curr_date < date_end) and check == 1:
             date_asc = curr_date.strftime('%Y%j')
             notfound = False
@@ -183,7 +191,7 @@ class DownloadLandsatScene(object):
 
             for station in stations:
                 for version in ['00', '01', '02']:
-                    scene_id = bird + scene + date_asc + station + version
+                    scene_id = prefix + scene + date_asc + station + version
                     tgzfile = os.path.join(output_dir, scene_id + '.tgz')
                     unzipdfile = os.path.join(output_dir, scene_id)
 
@@ -202,8 +210,10 @@ class DownloadLandsatScene(object):
                             check = DownloadLandsatScene.check_cloud_limit(self, unzipdfile, clouds)
                             if check == 0:
                                 downloaded_ids.append(scene_id)
+                                break
                         else:
                             downloaded_ids.append(scene_id)
+                            break
 
                     else:
                         try:
@@ -217,10 +227,13 @@ class DownloadLandsatScene(object):
                                 check = DownloadLandsatScene.check_cloud_limit(self, unzipdfile, clouds)
                                 if check == 0:
                                     downloaded_ids.append(scene_id)
+                                    break
                             else:
                                 downloaded_ids.append(scene_id)
+                                break
                         else:
                             downloaded_ids.append(scene_id)
+                            break
         return downloaded_ids
 
     def connect_earthexplorer_no_proxy(self, usgs):
@@ -321,16 +334,13 @@ class DownloadLandsatScene(object):
     def next_overpass(self, date1, path, sat):
         """Provides the next overpass for path after date1.
         """
-        date0_L5 = datetime.datetime(1985, 5, 4)
-        date0_L7 = datetime.datetime(1999, 1, 11)
-        date0_L8 = datetime.datetime(2013, 5, 1)
+        date0 = 0
 
-        if sat == 'LT5':
-            date0 = date0_L5
-        elif sat == 'LE7':
-            date0 = date0_L7
+        if sat == 'LE7':
+            date0 = datetime.datetime(1999, 1, 11)
         elif sat == 'LC8':
-            date0 = date0_L8
+            date0 =  datetime.datetime(2013, 5, 1)
+            
         next_day = math.fmod((date1-date0).days - DownloadLandsatScene.cycle_day(self, path) + 1, 16)
         if next_day != 0:
             date_overpass = date1 + datetime.timedelta(16 - next_day)
@@ -347,8 +357,6 @@ class DownloadLandsatScene(object):
                 if sys.platform.startswith('linux'):
                     subprocess.call('mkdir ' + outputdir + '/' + tgzfile, shell=True)   # Unix
                     subprocess.call('tar zxvf ' + outputdir + '/' + tgzfile + '.tgz -C ' + outputdir+'/'+tgzfile+' >/dev/null', shell=True)   # Unix
-                elif sys.platform.startswith('win'):
-                    subprocess.call('tartool ' + outputdir + '/' + tgzfile + '.tgz ' + outputdir + '/' + tgzfile, shell=True)  # W32
                 success = 1
             except TypeError:
                 print 'Failed to unzip %s' % tgzfile

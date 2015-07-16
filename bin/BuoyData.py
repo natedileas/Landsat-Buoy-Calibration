@@ -71,6 +71,9 @@ class BuoyData(object):
 
                     first_try = buoy_coors.pop(datasets.index(self.buoy))
                     buoy_coors.insert(0, first_try)
+                    
+                    first_try = datasets.pop(datasets.index(self.buoy))
+                    datasets.insert(0, first_try)
                 except ValueError:
                     self.logger.warning('.start_download: Buoy %s was not found \
                                         in landsat scene.', self.buoy)
@@ -113,7 +116,7 @@ class BuoyData(object):
                     self.logger.info('.start_download: used dataset %s, good \
                                      exit.', self.dataset)
                     break
-
+        
         if return_vals:
             return return_vals
         else:

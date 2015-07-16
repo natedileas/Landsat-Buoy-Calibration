@@ -52,7 +52,7 @@ class ModeledRadProcessing(object):
         exe_modtran_bash_path = '.' + modtran_bash_path
         subprocess.check_call('chmod u+x '+ modtran_bash_path,shell=True)   
         subprocess.check_call('./bin/modtran.bash %s' % self.verbose,shell=True) 
-        
+
         return_radiance = []
         radiances = []
         emissivity = .986    # of water
@@ -186,7 +186,8 @@ class ModeledRadProcessing(object):
         return radiance_up, radiance_dn, wavelength, transission
         
     def _read_RSR(self):
-        # read in RSR data 
+        """read in RSR data and return it to the caller.
+        """
         wavelength_RSR = []
         RSR = []
         trans_RSR = []
@@ -269,23 +270,22 @@ class ModeledRadProcessing(object):
     def _interpolate_radiance(self, modeled_rad_list, narr_coor):
         """interpolate radiance of narr points to POI
         """
+        narr_coor = numpy.absolute(narr_coor)
+        buoy_coors = numpy.absolute(self.buoy_coors)
         
-        total_x = 0
-        total_y = 0
+        diffs_x = numpy.absolute(numpy.subtract(narr_coor[:, 0], buoy_coors[0]))
+        diffs_y = numpy.absolute(numpy.subtract(narr_coor[:, 1], buoy_coors[1]))
+        
+        total_x = numpy.sum(diffs_x)
+        total_y = numpy.sum(diffs_y)
+        
         poi_rad_x = 0
         poi_rad_y = 0
         
-        for i in range(4):
-            total_x += abs(self.buoy_coors[0] - float(narr_coor[i][0]))   #lat
-            total_y += abs(self.buoy_coors[1] - float(narr_coor[i][1]))   #lon
-        
         for j in range(4):
-            poi_rad_x += modeled_rad_list[j] * abs(self.buoy_coors[0] - \
-            float(narr_coor[i][0])) / total_x
+            poi_rad_x += modeled_rad_list[j] * (diffs_x[j] / total_x)
+            poi_rad_y += modeled_rad_list[j] * (diffs_y[j] / total_y)
             
-            poi_rad_y += modeled_rad_list[j] * abs(self.buoy_coors[1] - \
-            float(narr_coor[i][1])) / total_y
-
         poi_rad =(poi_rad_x + poi_rad_y) / 2.0
         
         return poi_rad

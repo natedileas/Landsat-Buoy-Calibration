@@ -55,7 +55,7 @@ class LandsatData(object):
         start_date = str(int(date)-1)
         end_date = str(int(date)+1)
 
-        args = ['scene', 'unzip', 'logs/usgs_login.txt', self.save_dir,
+        args = ['scene', 'logs/usgs_login.txt', self.save_dir,
                 self.scene_coors, start_date, end_date, self.whichsat,
                 self.cloud_cover]
 
@@ -118,7 +118,7 @@ class LandsatData(object):
 
 
 class DownloadLandsatScene(object):
-    def main(self, option=None, unzip=None, usgs=None, output=None, scene=None,
+    def main(self, option=None, usgs=None, output=None, scene=None,
              start_date=None, end_date=None, bird=None, clouds=None):
         """Control download process, return id(s) of downloaded scenes.
         """
@@ -185,35 +185,42 @@ class DownloadLandsatScene(object):
                 for version in ['00', '01', '02']:
                     scene_id = bird + scene + date_asc + station + version
                     tgzfile = os.path.join(output_dir, scene_id + '.tgz')
-                    lsdestdir = os.path.join(output_dir, scene_id)
+                    unzipdfile = os.path.join(output_dir, scene_id)
 
                     url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
 
-                    if os.path.exists(lsdestdir):
+                    if os.path.exists(unzipdfile):
                         logger.info('main: Product %s already downloaded and unzipped', scene_id)
                         downloaded_ids.append(scene_id)
                         check = 0
 
                     elif os.path.isfile(tgzfile):
-                        logger.info('main: product %s already downloaded', scene_id)    # TODO change prints to log
-                        if unzip is not None:
-                            p = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
-                            if p == 1 and clouds is not None:
-                                check = DownloadLandsatScene.check_cloud_limit(self, lsdestdir, clouds)
-                                if check == 0:
-                                    downloaded_ids.append(scene_id)
+                        logger.info('main: product %s already downloaded', scene_id)
+
+                        p = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
+                        if p == 1 and clouds is not None:
+                            check = DownloadLandsatScene.check_cloud_limit(self, unzipdfile, clouds)
+                            if check == 0:
+                                downloaded_ids.append(scene_id)
+                        else:
+                            downloaded_ids.append(scene_id)
+
                     else:
                         try:
                             DownloadLandsatScene.downloadChunks(self, url, str(output_dir), scene_id+'.tgz')
-                        except:
+                        except KeyboardInterrupt:
                             logger.warning('main: Product %s not found', scene_id)
                             notfound = True
-                        if notfound and unzip is not None:
+                        if notfound is False:
                             p = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
                             if p == 1 and clouds is not None:
-                                check = DownloadLandsatScene.check_cloud_limit(self, lsdestdir, clouds)
+                                check = DownloadLandsatScene.check_cloud_limit(self, unzipdfile, clouds)
                                 if check == 0:
                                     downloaded_ids.append(scene_id)
+                            else:
+                                downloaded_ids.append(scene_id)
+                        else:
+                            downloaded_ids.append(scene_id)
         return downloaded_ids
 
     def connect_earthexplorer_no_proxy(self, usgs):
@@ -276,7 +283,7 @@ class DownloadLandsatScene(object):
 
             with open(out_file, 'wb') as f:
                 start = time.clock()
-                print('Downloading {0} ({1}):'.format(nom_fic, total_size_fmt))
+                logger.info('download_chunks:  Downloading %s (%s)' % (nom_fic, total_size_fmt))
                 while True:
                     chunk = data.read(chunk_size)
                     if not chunk:
@@ -285,8 +292,6 @@ class DownloadLandsatScene(object):
                     downloaded += len(chunk)
                     done = int(50 * downloaded / total_size)
                     size_dwnld = DownloadLandsatScene.sizeof_fmt(self, (downloaded // (time.clock() - start)) / 8)
-
-                    print 'Landsat Download %2.1f%s Done' % (math.floor((float(downloaded) / total_size) * 100), '%')
                     f.write(chunk)
 
         except urllib2.HTTPError, e:
@@ -333,34 +338,15 @@ class DownloadLandsatScene(object):
             date_overpass = date1
         return(date_overpass)
 
-    def getmetadatafiles(self, destdir, option):
-        """Get metadata files.
-        """
-        print 'Verifying catalog metadata files...'
-        home = 'http://landsat.usgs.gov/metadata_service/bulk_metadata_files/'
-        links = ['LANDSAT_8.csv', 'LANDSAT_ETM.csv', 'LANDSAT_ETM_SLC_OFF.csv', 'LANDSAT_TM-1980-1989.csv', 'LANDSAT_TM-1990-1999.csv', 'LANDSAT_TM-2000-2009.csv', 'LANDSAT_TM-2010-2012.csv']
-
-        for l in links:
-            destfile = os.path.join(destdir, l)
-            url = home + l
-            if option == 'noupdate':
-                if not os.path.exists(destfile):
-                    print 'Downloading %s for the first time...' % (l)
-                    urllib.urlretrieve(url, destfile)
-            elif option == 'update':
-                urllib.urlretrieve(url, destfile)
-
     def unzipimage(self, tgzfile, outputdir):
         """Unzip tgz file.
         """
-
         success = 0
         if os.path.exists(outputdir + '/' + tgzfile + '.tgz'):
-            print "\nunzipping..."
             try:
                 if sys.platform.startswith('linux'):
                     subprocess.call('mkdir ' + outputdir + '/' + tgzfile, shell=True)   # Unix
-                    subprocess.call('tar zxvf ' + outputdir + '/' + tgzfile + '.tgz -C ' + outputdir+'/'+tgzfile, shell=True)   # Unix
+                    subprocess.call('tar zxvf ' + outputdir + '/' + tgzfile + '.tgz -C ' + outputdir+'/'+tgzfile+' >/dev/null', shell=True)   # Unix
                 elif sys.platform.startswith('win'):
                     subprocess.call('tartool ' + outputdir + '/' + tgzfile + '.tgz ' + outputdir + '/' + tgzfile, shell=True)  # W32
                 success = 1
@@ -397,26 +383,3 @@ class DownloadLandsatScene(object):
             print "Image was removed because the cloud cover value of " + str(cloudcover) + " exceeded the limit defined by the user!"
             removed = 1
         return removed
-
-    def find_in_collection_metadata(self, collection_file, cc_limit, date_start, date_end, wr2path, wr2row):
-        """Find image with desired specs in usgs entire collection metadata.
-        """
-        print "Searching for images in catalog..."
-        cloudcoverlist = []
-        cc_values = []
-        with open(collection_file) as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                year_acq = int(row['acquisitionDate'][0:4])
-                month_acq = int(row['acquisitionDate'][5:7])
-                day_acq = int(row['acquisitionDate'][8:10])
-                acqdate = datetime.datetime(year_acq, month_acq, day_acq)
-                if int(row['path']) == int(wr2path) and int(row['row']) == int(wr2row) and row['DATA_TYPE_L1'] != 'PR' and float(row['cloudCoverFull']) <= cc_limit and date_start < acqdate < date_end:
-                    cloudcoverlist.append(row['cloudCoverFull'] + '--' + row['sceneID'])
-                    cc_values.append(float(row['cloudCoverFull']))
-                else:
-                    sceneID = ''
-        for i in cloudcoverlist:
-            if float(i.split('--')[0]) == min(cc_values):
-                sceneID = i.split('--')[1]
-        return sceneID

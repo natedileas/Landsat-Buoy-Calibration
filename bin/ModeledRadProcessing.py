@@ -764,7 +764,7 @@ class MakeTape5s(object):
             command = "cat "+self.directory+"/tail.txt | sed 's/latitu/"+latString+"/' > "+self.directory+"/newTail.txt"
             subprocess.check_call(command, shell=True)
             
-            command = "cat "+self.directory+"/newTail.txt | sed 's/longit/"+lonString+"/' > "+self.directory+"/newTail2.txt"
+            command = "cat "+self.directory+"/newTail.txt | sed 's/longit/"+lonString+"/' > "+self.directory+"/newTail.txt"
             subprocess.check_call(command, shell=True)
             
             # assign julian day
@@ -790,13 +790,13 @@ class MakeTape5s(object):
                 stop = '14.000'
                 step = '0.050'
                 
-            command = "cat "+self.directory+"/newTail2.txt | sed 's/jay/"+jay+"/' > "+self.directory+"/newTail3.txt"
+            command = "cat "+self.directory+"/newTail.txt | sed 's/jay/"+jay+"/' > "+self.directory+"/newTail.txt"
             subprocess.check_call(command, shell=True)
-            command = "cat "+self.directory+"/newTail3.txt | sed 's/startp/"+start+"/' > "+self.directory+"/newTail4.txt" 
+            command = "cat "+self.directory+"/newTail.txt | sed 's/startp/"+start+"/' > "+self.directory+"/newTail.txt" 
             subprocess.check_call(command, shell=True)
-            command = "cat "+self.directory+"/newTail4.txt | sed 's/stoppp/"+stop+"/' > "+self.directory+"/newTail5.txt" 
+            command = "cat "+self.directory+"/newTail.txt | sed 's/stoppp/"+stop+"/' > "+self.directory+"/newTail.txt" 
             subprocess.check_call(command, shell=True)
-            command = "cat "+self.directory+"/newTail5.txt | sed 's/stepp/"+step+"/' > "+self.directory+"/newTail6.txt" 
+            command = "cat "+self.directory+"/newTail.txt | sed 's/stepp/"+step+"/' > "+self.directory+"/newTail.txt" 
             subprocess.check_call(command, shell=True)
       
             delete = numpy.where(hgt < gdalt)
@@ -870,17 +870,17 @@ class MakeTape5s(object):
             command = "cat "+self.directory+"/head.txt | sed 's/nml/"+nml+"/' > "+self.directory+"/newHead.txt"
             subprocess.call(command, shell=True)
             
-            command = "cat "+self.directory+"/newHead.txt | sed 's/gdalt/"+str(gdalt)+"/' > "+self.directory+"/newHead2.txt"
+            command = "cat "+self.directory+"/newHead.txt | sed 's/gdalt/"+str(gdalt)+"/' > "+self.directory+"/newHead.txt"
             subprocess.call(command, shell=True)
 
-            command = "cat "+self.directory+"/newHead2.txt | sed 's/tmp____/"+str(self.skin_temp)+"/' > "+self.directory+"/newHead3.txt"
+            command = "cat "+self.directory+"/newHead.txt | sed 's/tmp____/"+str(self.skin_temp)+"/' > "+self.directory+"/newHead.txt"
             subprocess.call(command, shell=True)
                   
-            command = "cat "+self.directory+"/newHead3.txt | sed 's/albe/1.00/' > "+self.directory+"/newHead4.txt"
+            command = "cat "+self.directory+"/newHead.txt | sed 's/albe/1.00/' > "+self.directory+"/newHead.txt"
             subprocess.call(command, shell=True)
                   
-            headFile = os.path.join(self.directory,'newHead4.txt')
-            tailFile = os.path.join(self.directory, 'newTail6.txt')
+            headFile = os.path.join(self.directory,'newHead.txt')
+            tailFile = os.path.join(self.directory, 'newTail.txt')
             tempLayers = os.path.join(self.directory, 'tempLayers.txt')
             
             newFile = os.path.join(currentPoint, 'tape5')

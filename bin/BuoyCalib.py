@@ -106,6 +106,7 @@ class SensorRadiance(object):
 
         if return_vals:   # make sure return_vals exist and are good returns
             if return_vals == -1:
+                self.logger.warning('.download_img_data: something went wrong')
                 sys.exit(-1)
             else:          # otherwise, assign values
                 self.satelite = int(return_vals[0][2:3])

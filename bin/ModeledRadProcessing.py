@@ -5,7 +5,6 @@ import math
 import numpy
 import re
 import subprocess
-import test_plot
 import utm
 
 
@@ -71,7 +70,6 @@ class ModeledRadProcessing(object):
                 
                 # interpolate RSR to match wavelengths
                 RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
-                #test_plot.plot(wavelengths, downwell_rad, upwell_rad, transmission)
 
                 # calculate temperature array
                 Lt = ModeledRadProcessing._calc_temperature_array(self, wavelengths)
@@ -82,8 +80,6 @@ class ModeledRadProcessing(object):
                 term1_2 = numpy.add(term1,term2)
                 term3 = numpy.multiply(transmission, term1_2)
                 Ltoa = numpy.add(upwell_rad, term3)
-                
-                #test_plot.modrad_plot(wavelengths,  upwell_rad, downwell_rad, transmission, Ltoa)
                 
                 # calculate observed radiance
                 numerator = ModeledRadProcessing._integrate(self, wavelengths, numpy.multiply(Ltoa, RSR))
@@ -850,8 +846,6 @@ class MakeTape5s(object):
             dewpoint_k = tempTemp - ((100 - tempRelHum) / 5)   #kelvin
             #source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
             
-            test_plot.plot(tempGeoHeight, tempTemp, x2=tempGeoHeight, y2=dewpoint_k, flip=True)
-
             with open(filename, 'w') as f:
                 for k in range(numpy.shape(tempGeoHeight)[0]):
                     line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%16s\n' % \

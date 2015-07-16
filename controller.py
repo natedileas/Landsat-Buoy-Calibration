@@ -12,13 +12,10 @@ if __name__=='__main__':
          a landsat image to the radiance of a NOAA buoy. ')
         
         parser.add_argument('input', help='Choose one of the options. "ids" \
-        indicates you will provide landsat and buoy ids in this file. "file" indicates you \
-        will provide a file containing a list of ids.to all be processed. \
+        indicates you will provide landsat and buoy ids in this file. "list" indicates you \
+        will enter a list of ids to be processed in id_list.py (instuctions in README). \
         "piece" indicates you will provide the options -satelite, -WRS2, and -date.\
-        ', choices = ['ids','file','piece'])
-        
-        #file
-        parser.add_argument('--file', help="file path to list of ids and buoy ids. Format in README")
+        ', choices = ['ids','list','piece'])
         
         #ids
         parser.add_argument('-scene_id', help='LANDSAT scene ID. Example: LC80330412013145LGN00')
@@ -38,16 +35,11 @@ if __name__=='__main__':
         scene_IDs = []
         buoy_IDs = []
     
-        if args.input == 'file':
+        if args.input == 'list':
             # read from file #TODO decide standard file
-            filename = args.f
-            with open(filename, 'r') as f:
-                for line in f:
-                    pass
-                    # do something w/ line
-            
-            scene_IDs = []   #TODO assign from file
-            buoy_IDs = []
+            from id_list import id_list
+
+            scene_IDs, buoy_IDs = id_list()
                 
             #start runs
             for i in range(len(scene_IDs)):
@@ -103,5 +95,6 @@ if __name__=='__main__':
             
             __=cc.cleanup(True)
             __=cc.output()
+            
     except KeyboardInterrupt:
         __cc.cleanup(True)

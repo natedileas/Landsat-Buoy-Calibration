@@ -38,16 +38,21 @@ class ModeledRadiance(object):
         self.logger.info('calc_mod_radiance: Calculating Modeled Radiance')
 
         mrp = ModeledRadProcessing.ModeledRadProcessing(self)   # initialize
-        self.modeled_radiance, caselist = mrp.do_processing()   # make call
+        return_vals = mrp.do_processing()   # make call
+        
+        if return_vals == -1:
+            self.logger.info('calc_mod_radiance: Division by zero error')
+            return -1
+        else:
+            self.modeled_radiance, caselist = return_vals
 
-        CalibrationController.cleanup(self, False, 'data/modtran/newHead.txt',
+            CalibrationController.cleanup(self, False, 'data/modtran/newHead.txt',
                                             'data/modtran/newTail.txt',
                                             'data/modtran/tempLayers.txt',
                                             'data/modtran/'+caselist[0],
                                             'data/modtran/'+caselist[1],
                                             'data/modtran/'+caselist[2],
                                             'data/modtran/'+caselist[3])
-
         return 0
 
 
@@ -79,7 +84,7 @@ class SensorRadiance(object):
             import re
             chars = ['\n', ' ', '"', '\\', '/']   # unwanted characters
             new_id = new_id.translate(None, ''.join(chars))
-            match = re.match(new_id, '\w\w[78]\d*\w\w\w00')
+            match = re.match('L[CE][78]\d*\w\w\w0[0-5]', new_id)
 
             if match:   # if it matches the pattern
                 self._scene_id = match.group()
@@ -99,7 +104,7 @@ class SensorRadiance(object):
 
         import LandsatData
 
-        self.logger.info('.download_img_data: Downloading Landsat Data')
+        self.logger.info('.download_img_data: Dealing with Landsat Data')
 
         ld = LandsatData.LandsatData(self)   # initialize
         return_vals = ld.start_download()   # make call
@@ -208,13 +213,13 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
 
         if self.output_txt:
             outfile = './logs/output.txt'
-            line = '%21s%7s%10s%7s  %4.4f' % (self.scene_id, self.buoy_latitude,
-            self.buoy_longitude, self.buoy_id, float(self.buoy_temperature))
-            radiances = '  %2.6f   %2.6f  %2.6f   %2.6f' % (self.image_radiance[0], self.modeled_radiance[0], self.image_radiance[1], self.modeled_radiance[1])
-            timestamp = '   '+datetime.datetime.now().strftime('%m/%d/%y-%H:%M:%S')
+            #other = '%21s%7s%10s%7s' % (self.scene_id, self.buoy_latitude, self.buoy_longitude, self.buoy_id)
+            radiances = ' %2.6f %2.6f %2.6f %2.6f' % (self.image_radiance[0], self.modeled_radiance[0], self.image_radiance[1], self.modeled_radiance[1])
+            buoy_temp = ' %4.4f' % float(self.buoy_temperature)
+            #timestamp = '   '+datetime.datetime.now().strftime('%m/%d/%y-%H:%M:%S')
 
             with open(outfile, 'a') as f:
-                f.write(line + radiances + timestamp + '\n')
+                f.write(radiances + buoy_temp + '\n')
         else:
             print 'Scene ID: ', self.scene_id
             if self.buoy_latitude: print 'Buoy Latitude:', self.buoy_latitude

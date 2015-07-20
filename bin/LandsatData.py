@@ -27,8 +27,7 @@ class LandsatData(object):
                 self.whichsat = 8
             else:
                 self.whichsat = 7
-            self.year = other._scene_id[9:13]
-            self.julian_day = int(other._scene_id[13:16])
+            self.date = datetime.datetime.strptime(other._scene_id[9:16], '%Y%j')
             self.scene_coors = other._scene_id[3:9]
 
         else:
@@ -39,10 +38,9 @@ class LandsatData(object):
                     sys.exit(-1)
             else:
                 self.whichsat =  other.satelite
-                self.julian_day = int(other.julian_date)
-                self.year = other.year
                 self.scene_coors = other.WRS2_path + other.WRS2_row
-
+                self.date = datetime.datetime.strptime(other.year+other.julian_date, '%Y%j').timetuple()
+        
         if other.cloud_cover:
             self.cloud_cover = other.cloud_cover
         else:
@@ -53,38 +51,30 @@ class LandsatData(object):
     def start_download(self):
         """download landsat data and parse metadata.
         """
-        month = str(datetime.datetime.strptime(str(self.julian_day),
-                    '%j'))[5:7]
-        day = str(datetime.datetime.strptime(str(self.julian_day), '%j'))[8:10]
-        date = self.year + month + day
-
-        start_date = str(int(date)-1)
-        end_date = str(int(date)+1)
-
-        args = ['scene', 'logs/usgs_login.txt', self.save_dir,
-                self.scene_coors, start_date, end_date, self.whichsat,
-                self.cloud_cover]
+        args = ['logs/usgs_login.txt', self.save_dir, self.scene_coors, self.date, self.whichsat, self.cloud_cover]
+                
+        if self.scene_id:
+            args.append(self.scene_id)
 
         dls = DownloadLandsatScene()
         landsat_id = dls.main(*args)
 
-        if landsat_id == []:
-            self.logger.warning('.start_download: landsat_id was empty')
+        if landsat_id == -1:
+            self.logger.warning('.start_download: landsat_id was -1')
             return -1
 
         if self.scene_id:
-            if self.scene_id != landsat_id[0]:
+            if self.scene_id != landsat_id:
                 self.logger.warning('.start_download: scene_id and landsat_id \
                                     do not match')
-                return -1
             
-            self.scene_id = landsat_id[0]
+            self.scene_id = landsat_id
         else:
-            self.scene_id = landsat_id[0] 
+            self.scene_id = landsat_id
             
         metadata = LandsatData.read_metadata(self)
 
-        return landsat_id[0], metadata
+        return self.scene_id, metadata
 
     def read_metadata(self):
         """read and parse landsat metadata.
@@ -105,7 +95,7 @@ class LandsatData(object):
         filename = os.path.join(self.save_dir, '%s/%s_MTL.txt' %
                                 (self.scene_id, self.scene_id))
         info = []*2
-        chars = ['\n', '"']    # characters to remove from lines
+        chars = ['\n', '"', '\'']    # characters to remove from lines
         desc = []
         data = []
 
@@ -129,16 +119,14 @@ class LandsatData(object):
 
 
 class DownloadLandsatScene(object):
-    def main(self, option=None, usgs=None, output=None, scene=None,
-             start_date=None, end_date=None, bird=None, clouds=None):
-        """Control download process, return id(s) of downloaded scenes.
+    def main(self, usgs=None, output=None, scene=None, date=None, bird=None, clouds=None, scene_id=None):
+        """Control download process, return id of downloaded scenes.
         """
         logging.basicConfig(filename='CalibrationController.log',
                             filemode='w', level=logging.INFO)
-        logger = logging.getLogger(__name__)
-        downloaded_ids = []
+        self.logger = logging.getLogger(__name__)
 
-        output_dir = '%s' % (output)
+        output_dir = str(output)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -149,26 +137,12 @@ class DownloadLandsatScene(object):
             passwd = passwd.replace('\n', '')
             usgs = {'account': account, 'passwd': passwd}
         except:
-            logger.warning('main: error with usgs password file')
+            self.logger.warning('main: error with usgs password file')
             sys.exit(-1)
 
         path = scene[0:3]
         row = scene[3:6]
-
-        year_start = int(start_date[0:4])
-        month_start = int(start_date[4:6])
-        day_start = int(start_date[6:8])
-
-        date_start = datetime.datetime(year_start, month_start, day_start)
-
-        if end_date is not None:
-            year_end = int(end_date[0:4])
-            month_end = int(end_date[4:6])
-            day_end = int(end_date[6:8])
-            date_end = datetime.datetime(year_end, month_end, day_end)
-        else:
-            date_end = datetime.datetime.now()
-
+        
         prefix = ''
 
         if bird == 8:
@@ -179,70 +153,98 @@ class DownloadLandsatScene(object):
             prefix = 'LE7'
             repert = '3373'
             stations = ['EDC', 'SGS', 'AGS', 'ASN', 'SG1']
-
-        check = 1
-
-        curr_date = DownloadLandsatScene.next_overpass(self, date_start, int(path), prefix)
+            
+        #assign dates
+        sixteen_days = datetime.timedelta(16)
+        search_date = DownloadLandsatScene.next_overpass(self, date, int(path), prefix)
+        dates = [datetime.datetime.strftime(search_date, '%Y%j'), 
+                 datetime.datetime.strftime(search_date + sixteen_days, '%Y%j'),
+                 datetime.datetime.strftime(search_date - sixteen_days, '%Y%j')]
+            
+        scene_ids = [scene_id]
+        
+        for date in dates:
+            for station in stations:
+                for version in ['00', '01', '02', '03', '04']:
+                    scene_ids.append(prefix + scene + date + station + version)
+                   
+        scene_ids = filter(None, scene_ids)
         
         # connect to earthexplorer
         DownloadLandsatScene.connect_earthexplorer_no_proxy(self, usgs)
         
-        while (curr_date < date_end) and check == 1:
-            date_asc = curr_date.strftime('%Y%j')
-            notfound = False
+        for scene_id in scene_ids:
+            url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
+            
+            zip_check = 0   # to hold return values
+            down_check = 0
+            
+            status = DownloadLandsatScene.get_status(self, scene_id, output_dir, url)
+                    
+            if status == 1:
+                self.logger.info('main: Product %s already downloaded and unzipped ', scene_id)
+                return scene_id
+            elif status == 2:
+                self.logger.info('main: product %s already downloaded ', scene_id)
+                zip_check = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
+            elif status == 3:
+                self.logger.info('main: product %s not already downloaded ', scene_id)
+                down_check = DownloadLandsatScene.downloadChunks(self, url, str(output_dir), scene_id+'.tgz')
+                zip_check = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
+            elif status == 4:
+                self.logger.info('main: product %s not already downloaded, other error issues ', scene_id)
+                return -1
+                    
+            if zip_check == 0 and down_check == 0 and clouds is not None:
+                check = DownloadLandsatScene.check_cloud_limit(self, os.path.join(output_dir, scene_id), clouds)
+                return scene_id
+            elif zip_check == 0 and down_check == 0 and clouds is None:
+                return scene_id
+            else:
+                print zip_check
+                print down_check
+            
+        return -1
 
-            logger.info('main: Searching for images: ' + date_asc + '...')
+        
+    def get_status(self, scene_id, output_dir, url):
+        tgzfile = os.path.join(output_dir, scene_id + '.tgz')
+        unzipdfile = os.path.join(output_dir, scene_id)
+    
+        if os.path.exists(unzipdfile):   #downloaded and unzipped
+            return 1
+        elif os.path.isfile(tgzfile):    #downloaded, not unzipped
+            return 2
+        else:    #not downloaded
+            try:
+                data = urllib2.urlopen(url)
+            except urllib2.HTTPError, e:
+                if e.code == 500:
+                    self.logger.error('download_chunks:  file does not exist!')
+                else:
+                    self.logger.error('download_chunks: HTTP Error: %s %s' % (e.code, e.reason))
+                return 4
+            except urllib2.URLError, e:
+                self.logger.error('URL Error: %s %s' % (e.reason, url))
+                return 4
+            lines = data.read()
 
-            curr_date = curr_date+datetime.timedelta(16)
+            if (data.info().gettype() == 'text/html'):
+                self.logger.error("Error : the file is in html format")
+                return 4
 
-            for station in stations:
-                for version in ['00', '01', '02']:
-                    scene_id = prefix + scene + date_asc + station + version
-                    tgzfile = os.path.join(output_dir, scene_id + '.tgz')
-                    unzipdfile = os.path.join(output_dir, scene_id)
+            if lines.find('Download Not Found') > 0:
+                self.logger.error("Error: Download Not Found!", url)
+                return 4
 
-                    url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
+            total_size = int(data.info().getheader('Content-Length').strip())
 
-                    if os.path.exists(unzipdfile):
-                        logger.info('main: Product %s already downloaded and unzipped', scene_id)
-                        downloaded_ids.append(scene_id)
-                        check = 0
-                        break
-
-                    elif os.path.isfile(tgzfile):
-                        logger.info('main: product %s already downloaded', scene_id)
-
-                        p = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
-                        if p == 1 and clouds is not None:
-                            check = DownloadLandsatScene.check_cloud_limit(self, unzipdfile, clouds)
-                            if check == 0:
-                                downloaded_ids.append(scene_id)
-                                break
-                        else:
-                            downloaded_ids.append(scene_id)
-                            break
-
-                    else:
-                        try:
-                            DownloadLandsatScene.downloadChunks(self, url, str(output_dir), scene_id+'.tgz', logger)
-                        except KeyboardInterrupt:
-                            logger.warning('main: Product %s not found', scene_id)
-                            notfound = True
-                        if notfound is False:
-                            p = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
-                            if p == 1 and clouds is not None:
-                                check = DownloadLandsatScene.check_cloud_limit(self, unzipdfile, clouds)
-                                if check == 0:
-                                    downloaded_ids.append(scene_id)
-                                    break
-                            else:
-                                downloaded_ids.append(scene_id)
-                                break
-                        else:
-                            downloaded_ids.append(scene_id)
-                            break
-        return downloaded_ids
-
+            if (total_size < 50000):
+                self.logger.error("Error: The file is too small to be a Landsat Image", url)
+                return 4
+                
+            return 3
+    
     def connect_earthexplorer_no_proxy(self, usgs):
         try:
             opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
@@ -257,14 +259,13 @@ class DownloadLandsatScene(object):
             return
         except urllib2.HTTPError, e:
             if e.code == 500:
-                pass   # file does not exist
+                self.logger.error('download_chunks:  file does not exist!')
             else:
-                print 'HTTP Error:', e.code, e.reason
-                pass
-            return False
+                self.logger.error('download_chunks: HTTP Error: %s %s' % (e.code, e.reason))
+            return -1
         except urllib2.URLError, e:
-            print 'URL Error:', e.code, e.reason
-            return False
+            self.logger.error('URL Error: %s %s' % (e.reason, url))
+            return -1
 
     def sizeof_fmt(self, num):
         for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
@@ -272,28 +273,11 @@ class DownloadLandsatScene(object):
                 return '%3.1f %s' % (num, x)
             num /= 1024.0
 
-    def downloadChunks(self, url, rep, nom_fic, logger):
+    def downloadChunks(self, url, rep, nom_fic):
         """ Downloads large files in pieces.
         inspired by http://josh.gourneau.com
         """
-
         try:
-            data = urllib2.urlopen(url)
-            lines = data.read()
-
-            if (data.info().gettype() == 'text/html'):
-                print "Error : the file is in html format"
-
-            if lines.find('Download Not Found') > 0:
-                raise TypeError
-
-            total_size = int(data.info().getheader('Content-Length').strip())
-
-            if (total_size < 50000):
-                print "Error: The file is too small to be a Landsat Image", url
-
-            total_size_fmt = DownloadLandsatScene.sizeof_fmt(self, total_size)
-
             downloaded = 0
             chunk_size = 1024 * 1024 * 8
 
@@ -301,28 +285,33 @@ class DownloadLandsatScene(object):
 
             data = urllib2.urlopen(url)   # ND reopen url, previous stuff read entire file, caused error
 
+            total_size = int(data.info().getheader('Content-Length').strip())
+            total_size_fmt = DownloadLandsatScene.sizeof_fmt(self, total_size)
+
             with open(out_file, 'wb') as f:
                 start = time.clock()
-                logger.info('download_chunks:  Downloading %s (%s)' % (nom_fic, total_size_fmt))
+                self.logger.info(  'download_chunks:  Downloading %s (%s)' % (nom_fic, total_size_fmt))
                 while True:
                     chunk = data.read(chunk_size)
+
                     if not chunk:
                         break
 
                     downloaded += len(chunk)
-                    done = int(50 * downloaded / total_size)
-                    size_dwnld = DownloadLandsatScene.sizeof_fmt(self, (downloaded // (time.clock() - start)) / 8)
+
                     f.write(chunk)
+
+            return 0
 
         except urllib2.HTTPError, e:
             if e.code == 500:
-                pass   # file does not exist
+                self.logger.error('download_chunks:  file does not exist!')
             else:
-                print "HTTP Error:", e.code, url
-            return False
+                self.logger.error('download_chunks: HTTP Error: %s %s' % (e.code, e.reason))
+            return -1
         except urllib2.URLError, e:
-            print "URL Error:", e.reason, url
-            return False
+            self.logger.error('URL Error: %s %s' % (e.reason, url))
+            return -1
 
         return rep, nom_fic
 
@@ -336,6 +325,7 @@ class DownloadLandsatScene(object):
         cycle_day_path = math.fmod(nb_days_after_day1, 16)
         if path >= 98:   # change date line
             cycle_day_path += 1
+            
         return(cycle_day_path)
 
     def next_overpass(self, date1, path, sat):
@@ -355,20 +345,25 @@ class DownloadLandsatScene(object):
             date_overpass = date1
         return(date_overpass)
 
-    def unzipimage(self, tgzfile, outputdir):
+    def unzipimage(self, scene_id, outputdir):
         """Unzip tgz file.
         """
-        success = 0
-        if os.path.exists(outputdir + '/' + tgzfile + '.tgz'):
+        tgz_file = os.path.join(outputdir, scene_id + '.tgz')
+        out_dir = os.path.join(outputdir, scene_id)
+        
+        if os.path.exists(tgz_file):
             try:
-                if sys.platform.startswith('linux'):
-                    subprocess.call('mkdir ' + outputdir + '/' + tgzfile, shell=True)   # Unix
-                    subprocess.call('tar zxvf ' + outputdir + '/' + tgzfile + '.tgz -C ' + outputdir+'/'+tgzfile+' >/dev/null', shell=True)   # Unix
-                success = 1
-            except TypeError:
-                print 'Failed to unzip %s' % tgzfile
-            os.remove(outputdir + '/' + tgzfile + '.tgz')
-        return success
+                os.mkdir(out_dir)
+                subprocess.check_call('tar zxvf ' + tgz_file + ' -C ' + out_dir + ' >/dev/null', shell=True)
+                os.remove(tgz_file)
+            except OSError:
+                self.logger.error('unzipimage: OSError')
+                return -1
+        else: 
+            self.logger.error('unzipimage: File does not exist.')
+            return -1
+            
+        return 0
 
     def read_cloudcover_in_metadata(self, image_path):
         """Read image metadata.
@@ -391,10 +386,10 @@ class DownloadLandsatScene(object):
     def check_cloud_limit(self, imagepath, limit):
         """check cloud limit provided by user.
         """
-        removed = 0
         cloudcover = DownloadLandsatScene.read_cloudcover_in_metadata(self, imagepath)
         if cloudcover > limit:
             shutil.rmtree(imagepath)
-            print "Image was removed because the cloud cover value of " + str(cloudcover) + " exceeded the limit defined by the user!"
-            removed = 1
-        return removed
+            self.logger.info('check_cloud_limit: Image exceeds cloud cover value of " + str(cloudcover) + " defined by the user!')
+            return -1
+
+        return 0

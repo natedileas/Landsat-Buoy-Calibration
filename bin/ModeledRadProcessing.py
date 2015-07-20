@@ -5,6 +5,7 @@ import math
 import numpy
 import re
 import subprocess
+import sys
 import utm
 
 
@@ -84,8 +85,10 @@ class ModeledRadProcessing(object):
                 # calculate observed radiance
                 numerator = ModeledRadProcessing._integrate(self, wavelengths, numpy.multiply(Ltoa, RSR))
                 denominator = ModeledRadProcessing._integrate(self, wavelengths, RSR)
-                modeled_rad = numerator / denominator
-
+                try:
+                    modeled_rad = numerator / denominator
+                except ZeroDivisionError:
+                    return -1
                 # append to list for interpolation
                 modeled_rad_list.append(modeled_rad)
             
@@ -798,7 +801,7 @@ class MakeTape5s(object):
             delete = numpy.where(hgt < gdalt)
             
             indexBelow = 0
-            indexAbove = 0
+            indexAbove = 1
 
             if delete[0] != []:
                 indexBelow = delete[0][0] - 1
@@ -811,7 +814,7 @@ class MakeTape5s(object):
                 tempRelHum = rh[indexAbove:maxLevel]
             else:
                 newPressure = numpy.add(p[indexBelow], (((p[indexAbove]-p[indexBelow])*gdalt-hgt[indexBelow])/(hgt[indexAbove]-hgt[indexBelow])))
-                    
+
                 newTemperature = t[indexBelow]+(gdalt-hgt[indexBelow])*((t[indexAbove]-t[indexBelow])/(hgt[indexAbove]-hgt[indexBelow]))          
                 newRelativeHumidity = rh[indexBelow]+(gdalt-hgt[indexBelow])*((rh[indexAbove]-rh[indexBelow])/(hgt[indexAbove]-hgt[indexBelow]))
                   

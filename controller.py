@@ -12,7 +12,7 @@ if __name__=='__main__':
          a landsat image to the radiance of a NOAA buoy. ')
         
         parser.add_argument('input', help='Choose one of the options. "ids" \
-        indicates you will provide landsat and buoy ids in this file. "list" indicates you \
+        indicates you will provide landsat and buoy ids on the cmd line. "list" indicates you \
         will enter a list of ids to be processed in id_list.py (instuctions in README). \
         "piece" indicates you will provide the options -satelite, -WRS2, and -date.\
         ', choices = ['ids','list','piece'])
@@ -40,7 +40,8 @@ if __name__=='__main__':
             from id_list import id_list
 
             scene_IDs, buoy_IDs = id_list()
-                
+            
+            start_time = time.time()
             #start runs
             for i in range(len(scene_IDs)):
                 cc = bin.BuoyCalib.CalibrationController()
@@ -59,11 +60,13 @@ if __name__=='__main__':
                 __=cc.calc_img_radiance()
                 
                 __=cc.download_mod_data()
-                __=cc.calc_mod_radiance()
-                __=cc.calc_brightness_temperature()
                 
+                __=cc.calc_mod_radiance()
+                if __ != -1:
+                    __=cc.output()
                 __=cc.cleanup(True)
-                __=cc.output()
+                
+                print '[ %s / %s ] Completed. Elapsed Time: %2.1 mins %s' % (i+1,len(scene_IDs), (time.time()-start_time)/60, scene_IDs[i])
         else:
             cc = bin.BuoyCalib.CalibrationController()
             
@@ -91,10 +94,10 @@ if __name__=='__main__':
             
             __=cc.download_mod_data()
             __=cc.calc_mod_radiance()
-            __=cc.calc_brightness_temperature()
+            #__=cc.calc_brightness_temperature()
             
             __=cc.cleanup(True)
             __=cc.output()
             
     except KeyboardInterrupt:
-        __cc.cleanup(True)
+        __ = cc.cleanup(True)

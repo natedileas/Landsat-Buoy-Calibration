@@ -56,17 +56,23 @@ if __name__=='__main__':
                 cc.buoy_id = buoy_IDs[i]
             
                 __=cc.download_img_data()
-                __=cc.calculate_buoy_information()
-                __=cc.calc_img_radiance()
                 
-                __=cc.download_mod_data()
-                
-                __=cc.calc_mod_radiance()
                 if __ != -1:
-                    __=cc.output()
-                __=cc.cleanup(True)
+                    __=cc.calculate_buoy_information()
+
+                    __=cc.calc_img_radiance()
+
+                    __=cc.download_mod_data()
+
+                    __=cc.calc_mod_radiance()
+                    
+                    if __ != -1:
+                        __=cc.output()
+                    else:
+                        print cc.image_radiance
+                    __=cc.cleanup(True)
                 
-                print '[ %s / %s ] Completed. Elapsed Time: %2.1 mins %s' % (i+1,len(scene_IDs), (time.time()-start_time)/60, scene_IDs[i])
+                print '[ %s / %s ] Completed. Elapsed Time: %2.1f mins %s' % (i+1,len(scene_IDs), (time.time()-start_time)/60, scene_IDs[i])
         else:
             cc = bin.BuoyCalib.CalibrationController()
             
@@ -90,11 +96,12 @@ if __name__=='__main__':
         
             __=cc.download_img_data()
             __=cc.calculate_buoy_information()
+
             __=cc.calc_img_radiance()
-            
+
             __=cc.download_mod_data()
             __=cc.calc_mod_radiance()
-            #__=cc.calc_brightness_temperature()
+            __=cc.calc_brightness_temperature()
             
             __=cc.cleanup(True)
             __=cc.output()

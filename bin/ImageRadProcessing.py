@@ -1,4 +1,4 @@
-from osgeo import gdal
+from osgeo import gdal, osr
 from PIL import Image
 import logging
 import numpy
@@ -15,7 +15,6 @@ class ImageRadProcessing(object):
         self.scene_id = other._scene_id
         self.metadata = other.metadata
         self.buoy_coor = [other.buoy_latitude, other.buoy_longitude]
-        
         self.save_dir = os.path.join(other.filepath_base, 'data/landsat')
         
         if other.satelite == 8:
@@ -39,6 +38,7 @@ class ImageRadProcessing(object):
            self.logger.info('do_processing: band %s of %s', i+1, num_bands)
            
            poi = ImageRadProcessing._find_roi(self)
+
            dc_avg = ImageRadProcessing._calc_dc_avg(self, poi)
            image_radiance.append(ImageRadProcessing._dc_to_rad(self, dc_avg))
            
@@ -60,7 +60,7 @@ class ImageRadProcessing(object):
         
         roi = poi[0]-1, poi[1]+1   #ROI gives top left pixel location, 
                                    #POI gives center tap location
-        
+
         dc_sum = 0   #allocate for ROI dc_sum
         #extract ROI DCs
         for i in range(3):
@@ -77,17 +77,46 @@ class ImageRadProcessing(object):
         #get data transform
         gt = ds.GetGeoTransform()
         
-        #change lat_lon to utm
-        ret_val = utm.from_latlon(self.buoy_coor[0],self.buoy_coor[1])
+        #change lat_lon to same projection
+        ret_val = utm.from_latlon(self.buoy_coor[0], self.buoy_coor[1])
+        
         l_x = ret_val[0]
         l_y = ret_val[1]
+            
+        if self.metadata['UTM_ZONE'] != ret_val[2]:
+            l_x, l_y = ImageRadProcessing._convert_utm_zones(self, l_x, l_y, ret_val[2], self.metadata['UTM_ZONE'])
         
         #calculate pixel locations- 
         #source:http://www.gdal.org/gdal_datamodel.html
-        x = int((l_x-gt[0])/gt[1])
-        y = int((l_y-gt[3])/gt[5])
+        x = int((l_x - gt[0]) / gt[1])
+        y = int((l_y - gt[3]) / gt[5])
         
         return x, y
+        
+    def _convert_utm_zones(self, x, y, zone_from, zone_to):
+        import ogr, osr
+    
+        # Spatial Reference System
+        inputEPSG = int(float('326' + str(zone_from)))
+        outputEPSG = int(float('326' + str(zone_to)))
+    
+        # create a geometry from coordinates
+        point = ogr.Geometry(ogr.wkbPoint)
+        point.AddPoint(x, y)
+    
+        # create coordinate transformation
+        inSpatialRef = osr.SpatialReference()
+        inSpatialRef.ImportFromEPSG(inputEPSG)
+    
+        outSpatialRef = osr.SpatialReference()
+        outSpatialRef.ImportFromEPSG(outputEPSG)
+    
+        coordTransform = osr.CoordinateTransformation(inSpatialRef, outSpatialRef)
+    
+        # transform point
+        point.Transform(coordTransform)
+    
+        return point.GetX(), point.GetY()
     
     def _dc_to_rad(self, DCavg):
         """Convert digital count average to radiance.

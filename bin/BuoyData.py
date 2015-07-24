@@ -43,12 +43,18 @@ class BuoyData(object):
         month = date[5:7]
 
         urls = []
-
-        if datasets == [] or buoy_coors == []:
+        if datasets == [] or buoy_coors == [] or depths == []:
+            self.logger.warning('.start_download: No buoys in scene...')
             if self.buoy:
                 urls.append(url_base[0] + self.buoy + 'h' + year + '.txt.gz')
                 urls.append(url_base[1] + mon_str[int(month) - 1] + self.buoy +
                             str(int(month)) + '2015.txt.gz')
+                ret_vals = BuoyData._save_buoy_data(self, self.buoy)
+                if ret_vals != -1:
+                    datasets, buoy_coors, depths = ret_vals
+                else: 
+                    self.logger.error('.start_download: _save_buoy_data failed')
+                    return -1
             else:
                 self.logger.error('.start_download: No buoys in chosen landsat\
                                   scene and no buoy ID provided.')
@@ -116,42 +122,23 @@ class BuoyData(object):
                     self.logger.info('.start_download: used dataset %s, good \
                                      exit.', self.dataset)
                     break
-        
+
         if return_vals:
             return return_vals
         else:
             self.logger.error('.start_download: No usable datasets were found')
-
             return -1
 
     def _find_datasets(self):
         # define names
         filename = os.path.join(self.save_dir, 'station_table.txt')
-        url = "http://www.ndbc.noaa.gov/data/stations/station_table.txt"
-
-        if not os.path.exists(filename):
-            try:
-                # open url
-                f = urllib2.urlopen(url)
-
-                # write data to file
-                with open(filename, "wb") as local_file:
-                    local_file.write(f.read())
-
-            except urllib2.HTTPError, e:
-                print "HTTP Error:", e.code, url
-                return -1
-            except urllib2.URLError, e:
-                print "URL Error:", e.reason, url
-                return -1
-            except OSError, e:
-                print 'OSError: ', e.reason
-                return -1
+        
+        __ = BuoyData._get_stationtable(self)
 
         # read in and zip coordinates and buoy SIDs
         # use reg expressions to find matching strings in lines
         # search for lat/lon
-        lat_lon_search = re.compile('\d\d\.\d\d\d [NS] \d\d\.\d\d\d [WE]')
+        lat_lon_search = re.compile('\d\d\.\d\d\d [NS] \d?\d\d\.\d\d\d [WE]')
         # search for SID (station ID)
         sid_search = re.compile('\A\w*')
         buoy_stations = []
@@ -213,7 +200,83 @@ class BuoyData(object):
                         depths.append(buoy_stations[i][2])
 
         return datasets, coordinates, depths
+        
+    def _save_buoy_data(self, sid):
+    
+        filename = os.path.join(self.save_dir, 'station_table.txt')
+        __ = BuoyData._get_stationtable(self)
+        
+        sid = str(sid)
+        # read in and zip coordinates and buoy SIDs
+        # use reg expressions to find matching strings in lines
+        # search for lat/lon
+        lat_lon_search = re.compile('\d\d\.\d\d\d [NS] \d?\d\d\.\d\d\d [WE]')
 
+        with open(filename, 'r') as f:
+            f.readline()
+            f.readline()
+
+            for line in f:
+                if sid in line:
+                    lat_lon = lat_lon_search.search(line)  # latitude and longitude
+
+                    if lat_lon:
+                        lat_lon = lat_lon.group()
+                        lat_lon = lat_lon.split()
+    
+                        if lat_lon[3] == 'W':
+                            lat_lon[2] = float(lat_lon[2]) * (-1)
+                        else:
+                            lat_lon[2] = float(lat_lon[2])
+    
+                        if lat_lon[1] == 'S':
+                            lat_lon[0] = float(lat_lon[0]) * (-1)
+                        else:
+                            lat_lon[0] = float(lat_lon[0])
+    
+                        if 'ARES' in line:
+                            depth = 1.0
+                        elif 'AMPS' in line:   # TODO add more payload options
+                            depth = 0.6
+                        else:
+                            depth = 0.8
+                        
+                        
+                        return sid, [lat_lon[0], lat_lon[2]], depth
+                    else:
+                        self.logger.warning('lat_lon search returned none')
+                        return -1
+            return -1
+            
+    def _get_stationtable(self):
+        # define names
+        filename = os.path.join(self.save_dir, 'station_table.txt')
+        url = "http://www.ndbc.noaa.gov/data/stations/station_table.txt"
+
+        if not os.path.exists(filename):
+            try:
+                # open url
+                f = urllib2.urlopen(url)
+
+                data = f.read()
+                
+                # write data to file
+                with open(filename, "wb") as local_file:
+                    local_file.write(data)
+                    
+                return 0
+                
+            except urllib2.HTTPError, e:
+                self.logger.error("HTTP Error:", e.code, url)
+                return -1
+            except urllib2.URLError, e:
+                self.logger.error("URL Error:", e.reason, url)
+                return -1
+            except OSError, e:
+                self.logger.error('OSError: ', e.reason)
+                return -1
+        else:
+            return 0
     def _get_buoy_data(self, url):
         # download/ unzip appripriate buoy data
 

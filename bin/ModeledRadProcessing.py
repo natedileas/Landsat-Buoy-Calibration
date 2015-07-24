@@ -55,46 +55,60 @@ class ModeledRadProcessing(object):
 
         return_radiance = []
         radiances = []
+        
+        
         emissivity = .986    # of water
         reflectivity = 1 - emissivity   
 
         num_bands = self.which_landsat[1]
         for i in range(num_bands):
+            upwell_rad = []
+            downwell_rad = []
+            wavelengths = []
+            transmission = []
+            
             self.logger.info('do_processing: band %s of %s', i+1, num_bands)
-            modeled_rad_list = []
+            
             for i in range(4):
                 # read relevant tape6 files
                 caseList_p = caseList[i]
-                upwell_rad, downwell_rad, wavelengths, transmission = ModeledRadProcessing._read_tape6(self, caseList_p)
-            
-                RSR, RSR_wavelengths = ModeledRadProcessing._read_RSR(self)
+                ret_vals = ModeledRadProcessing._read_tape6(self, caseList_p)
                 
-                # interpolate RSR to match wavelengths
-                RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
+                upwell_rad = numpy.append(upwell_rad, ret_vals[0])
+                downwell_rad = numpy.append(downwell_rad, ret_vals[1])
+                wavelengths = ret_vals[2]
+                transmission = numpy.append(transmission, ret_vals[3])
+                
+            upwell_rad = ModeledRadProcessing._interpolate_params(self, upwell_rad, narr_coor)
+            downwell_rad= ModeledRadProcessing._interpolate_params(self, downwell_rad, narr_coor)
+            transmission = ModeledRadProcessing._interpolate_params(self, transmission, narr_coor)
+            
+            RSR, RSR_wavelengths = ModeledRadProcessing._read_RSR(self)
+                
+            # interpolate RSR to match wavelengths
+            RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
 
-                # calculate temperature array
-                Lt = ModeledRadProcessing._calc_temperature_array(self, wavelengths)
+            # calculate temperature array
+            Lt = ModeledRadProcessing._calc_temperature_array(self, wavelengths)
                 
-                # calculate top of atmosphere radiance
-                term1 = numpy.multiply(Lt, emissivity)
-                term2 = numpy.multiply(downwell_rad, reflectivity)
-                term1_2 = numpy.add(term1,term2)
-                term3 = numpy.multiply(transmission, term1_2)
-                Ltoa = numpy.add(upwell_rad, term3)
+            # calculate top of atmosphere radiance
+            term1 = numpy.multiply(Lt, emissivity)
+            term2 = numpy.multiply(downwell_rad, reflectivity)
+            term1_2 = numpy.add(term1,term2)
+            term3 = numpy.multiply(transmission, term1_2)
+            Ltoa = numpy.add(upwell_rad, term3)
                 
-                # calculate observed radiance
-                numerator = ModeledRadProcessing._integrate(self, wavelengths, numpy.multiply(Ltoa, RSR))
-                denominator = ModeledRadProcessing._integrate(self, wavelengths, RSR)
-                try:
-                    modeled_rad = numerator / denominator
-                except ZeroDivisionError:
-                    return -1
-                # append to list for interpolation
-                modeled_rad_list.append(modeled_rad)
+            # calculate observed radiance
+            numerator = ModeledRadProcessing._integrate(self, wavelengths, numpy.multiply(Ltoa, RSR))
+            denominator = ModeledRadProcessing._integrate(self, wavelengths, RSR)
             
-            # interpolate the radiance to the correct point
-            poi_radiance = ModeledRadProcessing._interpolate_radiance(self, modeled_rad_list, narr_coor)
-            return_radiance.append(poi_radiance)
+            try:
+                modeled_rad = numerator / denominator
+            except ZeroDivisionError:
+                self.logger.error('ZeroDivisionError, modeled_rad_procssing')
+                return -1
+                
+            return_radiance.append(modeled_rad)
             
             if self.which_landsat == [8,2]: self.which_landsat = [8,1]
             else: break
@@ -183,6 +197,27 @@ class ModeledRadProcessing(object):
         transission = transission[0]
         
         return radiance_up, radiance_dn, wavelength, transission
+        
+    def _interpolate_params(self, array, narr_coor):
+        narr_coor = numpy.absolute(narr_coor)
+        buoy_coors = numpy.absolute(self.buoy_coors)
+        array = numpy.reshape(array, (4, 411))
+        
+        diffs_x = numpy.absolute(numpy.subtract(narr_coor[:, 0], buoy_coors[0]))
+        diffs_y = numpy.absolute(numpy.subtract(narr_coor[:, 1], buoy_coors[1]))
+        
+        total_x = numpy.sum(diffs_x)
+        total_y = numpy.sum(diffs_y)
+        
+        weights_x = numpy.reshape(diffs_x / total_x, (4, -1))
+        weights_y = numpy.reshape(diffs_y / total_y, (4, -1))
+        
+        array_x = numpy.sum(array * weights_x, axis=0)
+        array_y = numpy.sum(array * weights_y, axis=0)
+        
+        array_interp = (array_x + array_y) / 2.0
+
+        return array_interp
         
     def _read_RSR(self):
         """read in RSR data and return it to the caller.
@@ -531,10 +566,10 @@ class MakeTape5s(object):
     
         narrLon= [coordinates[x][3] for x in range(len(coordinates)-1)]
         east = numpy.where(narrLon > 180.0)
-        for x in range(len(east[0])-1):
+        for x in range(len(east[0])):
             narrLon[east[0][x]] = 360.0 - float(narrLon[east[0][x]])
         west = numpy.where(narrLon < 180.0)
-        for x in range(len(east[0])-1):
+        for x in range(len(west[0])):
             narrLon[west[0][x]] = (-1)*float(narrLon[west[0][x]])
         lon = numpy.reshape(narrLon,(277,349)).astype(float)
     
@@ -543,13 +578,13 @@ class MakeTape5s(object):
         else: 
             landsatHemi = 7        
     
-        UL_utm = utm.from_latlon(self.metadata['CORNER_UL_LAT_PRODUCT'] + 0.5,self.metadata['CORNER_UL_LON_PRODUCT'] - 0.5)
-        LR_utm = utm.from_latlon(self.metadata['CORNER_LR_LAT_PRODUCT'] - 0.5,self.metadata['CORNER_LR_LON_PRODUCT'] + 0.5)
+        #UL_utm = utm.from_latlon(self.metadata['CORNER_UL_LAT_PRODUCT'] + 0.5,self.metadata['CORNER_UL_LON_PRODUCT'] - 0.5)
+        #LR_utm = utm.from_latlon(self.metadata['CORNER_LR_LAT_PRODUCT'] - 0.5,self.metadata['CORNER_LR_LON_PRODUCT'] + 0.5)
         
-        UL_X = UL_utm[0]
-        UL_Y = UL_utm[1]
-        LR_X = LR_utm[0]
-        LR_Y = LR_utm[1]
+        UL_X = self.metadata['CORNER_UL_LAT_PRODUCT'] + 0.5
+        UL_Y = self.metadata['CORNER_UL_LON_PRODUCT'] - 0.5
+        LR_X = self.metadata['CORNER_LR_LAT_PRODUCT'] - 0.5
+        LR_Y = self.metadata['CORNER_LR_LON_PRODUCT'] + 0.5
         
     
         inLandsat = numpy.asarray([[None,None],[None,None]])
@@ -567,12 +602,15 @@ class MakeTape5s(object):
                         lat[k,l] = 84
                         
                     curr_utm_point = utm.from_latlon(lat[k,l], lon[k,l])
-                    if curr_utm_point[2] == float(self.metadata['UTM_ZONE']):
-                        if curr_utm_point[0] > UL_X:
-                            if curr_utm_point[0] < LR_X:     
-                                if curr_utm_point[1] < UL_Y:
-                                    if curr_utm_point[1] > LR_Y:
-                                        inLandsat = numpy.append(inLandsat, [[k,l]], axis=0)
+                    
+                    if curr_utm_point[2] <= float(self.metadata['UTM_ZONE']) + 1 and curr_utm_point[2] >= float(self.metadata['UTM_ZONE']) - 1:
+                        curr_utm_point = MakeTape5s._convert_utm_zones(self, lat[k,l], lon[k,l], curr_utm_point[2], self.metadata['UTM_ZONE'])
+                    
+                        if curr_utm_point[0] < UL_X:
+                            if curr_utm_point[0] > LR_X:
+                               if curr_utm_point[1] > UL_Y:
+                                   if curr_utm_point[1] < LR_Y:
+                                       inLandsat = numpy.append(inLandsat, [[k,l]], axis=0)
                     
             except IndexError:
                 print 'IndexError', i
@@ -643,6 +681,31 @@ class MakeTape5s(object):
         num_points = 4    # do not remove, important
         
         return NARRindices, num_points, lat, lon
+        
+    def _convert_utm_zones(self, x, y, zone_from, zone_to):
+        import ogr, osr
+    
+        # Spatial Reference System
+        inputEPSG = int(float('326' + str(zone_from)))
+        outputEPSG = int(float('326' + str(zone_to)))
+    
+        # create a geometry from coordinates
+        point = ogr.Geometry(ogr.wkbPoint)
+        point.AddPoint(x, y)
+    
+        # create coordinate transformation
+        inSpatialRef = osr.SpatialReference()
+        inSpatialRef.ImportFromEPSG(inputEPSG)
+    
+        outSpatialRef = osr.SpatialReference()
+        outSpatialRef.ImportFromEPSG(outputEPSG)
+    
+        coordTransform = osr.CoordinateTransformation(inSpatialRef, outSpatialRef)
+    
+        # transform point
+        point.Transform(coordTransform)
+    
+        return point.GetX(), point.GetY()
         
     def _distance_in_utm(self, e1, n1, e2, n2):
         """Calculate distances between UTM coordinates.

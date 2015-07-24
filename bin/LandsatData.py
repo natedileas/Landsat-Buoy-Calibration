@@ -176,16 +176,19 @@ class DownloadLandsatScene(object):
         for scene_id in scene_ids:
             url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
             
-            zip_check = 0   # to hold return values
-            down_check = 0
+            zip_check = 1   # to hold return values
+            down_check = 1
             
             status = DownloadLandsatScene.get_status(self, scene_id, output_dir, url)
                     
             if status == 1:
                 self.logger.info('main: Product %s already downloaded and unzipped ', scene_id)
+                down_check = 0
+                zip_check = 0
                 return scene_id
             elif status == 2:
                 self.logger.info('main: product %s already downloaded ', scene_id)
+                down_check = 0
                 zip_check = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
             elif status == 3:
                 self.logger.info('main: product %s not already downloaded ', scene_id)
@@ -193,16 +196,14 @@ class DownloadLandsatScene(object):
                 zip_check = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
             elif status == 4:
                 self.logger.info('main: product %s not already downloaded, other error issues ', scene_id)
-                return -1
+                down_check = 1
+                zip_check = 1
                     
             if zip_check == 0 and down_check == 0 and clouds is not None:
                 check = DownloadLandsatScene.check_cloud_limit(self, os.path.join(output_dir, scene_id), clouds)
                 return scene_id
             elif zip_check == 0 and down_check == 0 and clouds is None:
                 return scene_id
-            else:
-                print zip_check
-                print down_check
             
         return -1
 
@@ -220,9 +221,9 @@ class DownloadLandsatScene(object):
                 data = urllib2.urlopen(url)
             except urllib2.HTTPError, e:
                 if e.code == 500:
-                    self.logger.error('download_chunks:  file does not exist!')
+                    self.logger.error('get_status:  file does not exist!')
                 else:
-                    self.logger.error('download_chunks: HTTP Error: %s %s' % (e.code, e.reason))
+                    self.logger.error('get_status: HTTP Error: %s %s' % (e.code, e.reason))
                 return 4
             except urllib2.URLError, e:
                 self.logger.error('URL Error: %s %s' % (e.reason, url))

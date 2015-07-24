@@ -41,7 +41,12 @@ class ModeledRadProcessing(object):
          
         # read in narr data and generate tape5 files and caseList
         mt5 = MakeTape5s(self.metadata, self.buoy_coors, self.skin_temp, self.which_landsat, self.verbose)
-        caseList, narr_coor = mt5.main()   # first_files equivalent
+        ret_vals = mt5.main()   # first_files equivalent
+        
+        if ret_vals != -1:
+            caseList, narr_coor = ret_vals
+        else:
+            return -1
         
         self.logger = logging.getLogger(__name__)
 
@@ -327,6 +332,9 @@ class ModeledRadProcessing(object):
 
 class MakeTape5s(object):
     def __init__(self, metadata, buoy_coor, skin_temp, whichLandsat, verbose):
+        logging.basicConfig(filename='CalibrationController.log', filemode='w', level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+        
         self.metadata = metadata
         self.buoy_coors = buoy_coor
         self.skin_temp = skin_temp
@@ -375,6 +383,9 @@ class MakeTape5s(object):
         # read in NARR data
         pressures = MakeTape5s._narr_read(self, narr_indices, lat)
         
+        if pressures == -1:
+            return -1
+        
         # interplolate in time and load standard atmo
         MakeTape5s._interpolate_time(self)
         
@@ -414,6 +425,12 @@ class MakeTape5s(object):
         pressures = numpy.reshape([p]*4, (4,29))
 
         # read in NARR data
+        if os.path.exists('./data/narr/HGT_1/1000.txt'):
+            self.logger.info('NARR Data Successful Download')
+        else:
+            self.logger.error('NARR data not downloaded, no wgrib?')
+            return -1
+
         for i in xrange(0,29):
             hgt_1[:,i] = MakeTape5s._narr_read_read(self, './data/narr/HGT_1/'+str(p[i]) + '.txt')
             if self.verbose == 0:

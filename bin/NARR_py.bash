@@ -89,17 +89,17 @@ mv $destination/$fileSHUM1 $grib_dest/script_SHUM
 #  change to appropriate GRIB directory and run scripts
 cd $grib_dest
 
-./script_HGT >/dev/null
+./script_HGT >/dev/null 2>>$home/logs/CalibrationController.log
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [1 / 12] \r'; fi
-./script_SHUM >/dev/null
+./script_SHUM >/dev/null 2>>$home/logs/CalibrationController.log
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [2 / 12] \r'; fi
-./script_TMP >/dev/null
+./script_TMP >/dev/null 2>>$home/logs/CalibrationController.log
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [3 / 12] \r'; fi
-./HGT_grb2txt >/dev/null
+./HGT_grb2txt >/dev/null 2>/dev/null
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [4 / 12] \r'; fi
-./SHUM_grb2txt >/dev/null
+./SHUM_grb2txt >/dev/null 2>/dev/null
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [5 / 12] \r'; fi
-./TMP_grb2txt >/dev/null
+./TMP_grb2txt >/dev/null 2>/dev/null
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [6 / 12] \r'; fi
 
 #  change back to home directory
@@ -130,17 +130,17 @@ mv $destination/$fileSHUM2 $grib_dest/script_SHUM
 
 #  change to appropriate GRIB directory and run scripts
 cd $grib_dest
-./script_HGT >/dev/null
+./script_HGT >/dev/null 2>>$home/logs/CalibrationController.log
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [7 / 12] \r'; fi
-./script_SHUM >/dev/null
+./script_SHUM >/dev/null 2>>$home/logs/CalibrationController.log
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [8 / 12] \r'; fi
-./script_TMP >/dev/null
+./script_TMP >/dev/null 2>>$home/logs/CalibrationController.log
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [9 / 12] \r'; fi
-./HGT_grb2txt >/dev/null
+./HGT_grb2txt >/dev/null 2>/dev/null
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [10 / 12] \r'; fi
-./SHUM_grb2txt >/dev/null
+./SHUM_grb2txt >/dev/null 2>/dev/null
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [11 / 12] \r'; fi
-./TMP_grb2txt >/dev/null
+./TMP_grb2txt >/dev/null 2>/dev/null
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [12 / 12] \r'; fi
 
 #  change back to home directory

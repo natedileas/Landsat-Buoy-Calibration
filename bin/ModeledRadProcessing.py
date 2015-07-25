@@ -383,9 +383,6 @@ class MakeTape5s(object):
         # read in NARR data
         pressures = MakeTape5s._narr_read(self, narr_indices, lat)
         
-        if pressures == -1:
-            return -1
-        
         # interplolate in time and load standard atmo
         MakeTape5s._interpolate_time(self)
         

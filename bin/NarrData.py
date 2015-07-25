@@ -19,8 +19,11 @@ class NarrData(object):
             # TODO have intelligent paths
             narr_py_path = os.path.join(self.filepath_base, 'bin/NARR_py.bash')
             subprocess.check_call('chmod u+x '+narr_py_path, shell=True)
-            subprocess.call('./bin/NARR_py.bash %s %s' % (self.scene_id,
+            ret_val = subprocess.call('./bin/NARR_py.bash %s %s' % (self.scene_id,
                             self.verbose), shell=True)
+            if ret_val == 1:
+                return -1
+
         except KeyboardInterrupt:
             return -1
         else:

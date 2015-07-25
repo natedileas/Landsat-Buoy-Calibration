@@ -91,6 +91,12 @@ cd $grib_dest
 
 ./script_HGT >/dev/null 2>>$home/logs/CalibrationController.log
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [1 / 12] \r'; fi
+
+#check if 'missing wgrib inventory' is in log file
+if grep -q "missing wgrib inventory" $home/logs/CalibrationController.log; then
+    exit 1
+fi
+
 ./script_SHUM >/dev/null 2>>$home/logs/CalibrationController.log
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [2 / 12] \r'; fi
 ./script_TMP >/dev/null 2>>$home/logs/CalibrationController.log
@@ -107,16 +113,18 @@ cd $destination
 
 # make directories to contain results for this specific landsat image
 if [ ! -d  $destination/HGT_1 ]; then
-mkdir $destination/HGT_1
-mkdir $destination/TMP_1
-mkdir $destination/SHUM_1
+    mkdir $destination/HGT_1
+    mkdir $destination/TMP_1
+    mkdir $destination/SHUM_1
 fi
 
 
 # 'move results from GRIB directory to directory for this specific Landsat image'
-mv $grib_dest/HGT/* $destination/HGT_1
-mv $grib_dest/TMP/* $destination/TMP_1
-mv $grib_dest/SHUM/* $destination/SHUM_1
+if [ "$(ls -A $grib_dest/HGT)" ]; then
+    mv $grib_dest/HGT/* $destination/HGT_1
+    mv $grib_dest/TMP/* $destination/TMP_1
+    mv $grib_dest/SHUM/* $destination/SHUM_1
+fi
 
 #  change permissions on script files
 chmod 755 $destination/$fileHGT2

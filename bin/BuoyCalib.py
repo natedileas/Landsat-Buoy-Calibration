@@ -20,7 +20,9 @@ class ModeledRadiance(object):
         self.logger.info('download_mod_data: Downloading NARR Data')
 
         nd = NarrData.NarrData(self)   # initialize
-        __ = nd.start_download()   # make call
+        ret_val = nd.start_download()   # make call
+        if ret_val == -1:
+            return -1
         CalibrationController.cleanup(self, False, 'data/narr/HGT_1',
                                      'data/narr/HGT_2', 'data/narr/SHUM_1',
                                      'data/narr/SHUM_2', 'data/narr/TMP_1',
@@ -41,7 +43,7 @@ class ModeledRadiance(object):
         return_vals = mrp.do_processing()   # make call
         
         if return_vals == -1:
-            self.logger.info('calc_mod_radiance: Division by zero error')
+            self.logger.info('calc_mod_radiance: return_vals were -1')
             return -1
         else:
             self.modeled_radiance, caselist = return_vals

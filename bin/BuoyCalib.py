@@ -49,12 +49,11 @@ class ModeledRadiance(object):
             self.modeled_radiance, caselist = return_vals
 
             CalibrationController.cleanup(self, False, 'data/modtran/newHead.txt',
-                                            'data/modtran/newTail.txt',
-                                            'data/modtran/tempLayers.txt',
-                                            'data/modtran/'+caselist[0],
-                                            'data/modtran/'+caselist[1],
-                                            'data/modtran/'+caselist[2],
-                                            'data/modtran/'+caselist[3])
+                                          'data/modtran/newHead2.txt', 'data/modtran/newHead3.txt',
+                                          'data/modtran/newHead4.txt', 'data/modtran/tempLayers.txt',
+                                          'data/modtran/newTail.txt', 'data/modtran/newTail2.txt',
+                                          'data/modtran/newTail3.txt', 'data/modtran/newTail5.txt',
+                                          'data/modtran/newTail4.txt', 'data/modtran/newTail6.txt',)
         return 0
 
 

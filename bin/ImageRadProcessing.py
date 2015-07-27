@@ -6,6 +6,10 @@ import os
 import utm
 
 class ImageRadProcessing(object):
+    """ Calculate Image Radiance.
+    
+    
+    """
     def __init__(self, other):
         #initialize logger
         logging.basicConfig(filename='CalibrationController.log', filemode='w'\

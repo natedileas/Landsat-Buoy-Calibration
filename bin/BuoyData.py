@@ -9,7 +9,30 @@ import logging
 
 
 class BuoyData(object):
+    """ Pick buoy, download dataet, and calculate skin_temp.
+    
+    Attributes:
+        logger: logging object used to hold non-verbose output.
+        metadata: dict of landsat metadata values
+        corners: upper right and lower left corners of landsat scene, lat-lon
+        buoy: buoy_id from CalibrationController object, can be None
+        save_dir: directory in which to save datasets.
+        dataset: base of url, used in trying multiple datasets.
+
+    Methods:
+        __init__(self, other): initialize using a CalibrationController object
+        start_download(self): run one iteration of trying to download buoy data
+            and compute skin_temp
+        _find_datasets(self): find all datasets that lie within corners.
+            Returns: datasets, buoy_coors, depths (lists).
+        _save_buoy_data(self, sid): copy of _find_datasets tuned to a single id.
+        _get_stationtable(self): download and unzip stationtable.txt
+        _get_buoy_data(self, url): download specific dataset form url.
+        _find_skin_temp(self, url, depth): compute skin temperature from 
+            self.buoy dataset and depth.
+    """
     def __init__(self, other):
+        """ initialize using a CalibrationController object. """
         log_file = os.path.join(other.filepath_base, 'logs/CalibrationController.log')
         logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
@@ -28,8 +51,7 @@ class BuoyData(object):
         self.dataset = None
 
     def start_download(self):
-        """download and process buoy data.
-        """
+        """ download and process buoy data. """
         datasets, buoy_coors, depths = BuoyData._find_datasets(self)
         return_vals = None
 
@@ -130,6 +152,7 @@ class BuoyData(object):
             return -1
 
     def _find_datasets(self):
+        """ get list of possible datasets. """
         # define names
         filename = os.path.join(self.save_dir, 'station_table.txt')
         
@@ -202,7 +225,7 @@ class BuoyData(object):
         return datasets, coordinates, depths
         
     def _save_buoy_data(self, sid):
-    
+        """ last-ditch attempt at getting buoy data. """
         filename = os.path.join(self.save_dir, 'station_table.txt')
         __ = BuoyData._get_stationtable(self)
         
@@ -249,6 +272,7 @@ class BuoyData(object):
             return -1
             
     def _get_stationtable(self):
+        """ download and unzip station_table.txt. """
         # define names
         filename = os.path.join(self.save_dir, 'station_table.txt')
         url = "http://www.ndbc.noaa.gov/data/stations/station_table.txt"
@@ -277,8 +301,9 @@ class BuoyData(object):
                 return -1
         else:
             return 0
+
     def _get_buoy_data(self, url):
-        # download/ unzip appripriate buoy data
+        """ download/ unzip appripriate buoy data from url. """
 
         try:
             # open url
@@ -313,6 +338,7 @@ class BuoyData(object):
         return 0
 
     def _find_skin_temp(self, url, depth):
+        """ compute skin temperature. """
         import math
 
         # define filename

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import utm
 
+from test_plot import *
 
 class ModeledRadProcessing(object):
     def __init__(self, other):
@@ -59,13 +60,11 @@ class ModeledRadProcessing(object):
         
         # change access to prevent errors
         modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
-        exe_modtran_bash_path = '.' + modtran_bash_path
-        subprocess.check_call('chmod u+x '+ modtran_bash_path,shell=True)   
-        subprocess.check_call('./bin/modtran.bash %s' % self.verbose,shell=True) 
+        os.chmod(modtran_bash_path, 0755)   
+        subprocess.check_call('./bin/modtran.bash %s' % self.verbose, shell=True)
 
         return_radiance = []
         radiances = []
-        
         
         emissivity = .986    # of water
         reflectivity = 1 - emissivity   
@@ -107,6 +106,8 @@ class ModeledRadProcessing(object):
             term1_2 = numpy.add(term1,term2)
             term3 = numpy.multiply(transmission, term1_2)
             Ltoa = numpy.add(upwell_rad, term3)
+            
+            #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
                 
             # calculate observed radiance
             numerator = ModeledRadProcessing._integrate(self, wavelengths, numpy.multiply(Ltoa, RSR))

@@ -8,14 +8,30 @@ import re
 
 
 class ModeledRadiance(object):
+    """ Attributes and methods to calculate the modeled radiance.
+    
+    Attributes:
+        modeled_temperature: empty array for modeled temperatures, list
+        modeled_radiance: empty array for modeled radiances, list
+    
+    Methods:
+        __init__(self): initializes the object.
+        download_mod_data(self): launcher for NarrData.start_download(),
+            downloads NARR data.
+            Returns: 0 if good, -1 if bad
+        calc_mod_radiance(self): Calculate  modeled band 10 and 11 radiance.
+            Launcher for ModeledRadProcessing.do_processing().
+            Returns: 0 if good, -1 if bad
+            
+    Intended to be subclassed, but can be used alone.
+    """
     def __init__(self):
-        self.modeled_temperature = []   # empty array for modeled temps
-        self.modeled_radiance = []   # empty array for modeled radiances
+        """ initialize the object. """
+        self.modeled_temperature = []
+        self.modeled_radiance = []
 
     def download_mod_data(self):
-        """launcher for NarrData.start_download().
-        """
-
+        """ doenload NARR data. """
         import NarrData
 
         self.logger.info('download_mod_data: Downloading NARR Data')
@@ -31,11 +47,7 @@ class ModeledRadiance(object):
         return 0
 
     def calc_mod_radiance(self):
-        """Calculate  modeled band 10 and 11 radiance.
-
-        Launcher for ModeledRadProcessing.do_processing().
-        """
-
+        """ calculate modeled radiance. """
         import ModeledRadProcessing
 
         self.logger.info('calc_mod_radiance: Calculating Modeled Radiance')
@@ -59,21 +71,49 @@ class ModeledRadiance(object):
 
 
 class SensorRadiance(object):
+    """ Attributes and methods to calculate the sensor radiance.
+    
+    Attributes:
+        image_temperature: empty array for image temperature, list
+        image_radiance: empty array for image radaiances, list
+        _scene_id: landsat id, has setter and getter, string
+        satelite: landsat version, options(8, 7), int
+        WRS2_path: path for landsat id construction, string
+        WRS2_row: row for landsat id construction, string
+        year: year for landsat id construction, string
+        julian_date: day of year, for landsat id construction, string
+        cloud_cover: cloud cover, optional argument, range(0-100), string
+        poi: pixel of interest, assigned from calc_rad call, list
+    
+    Methods:
+        __init__(self): initializes the object.
+        scene_id(self): getter, returns: self._scene_id.
+        scene_id(self, new_id): setter, checks for proper format.
+        download_img_data(self): download image data for the appropriate 
+            scene_id or parts whereof.
+        calc_img_radiance(self): calculate image radiance, launcher for 
+            LandsatData.start_download().
+        download_img_data(self): Launcher for ImageRadProcessing.do_processing
+            , depends on a BuoyData call and a LandsatData call.
+            Returns: self.image_radiance.
+            
+    Intended to be subclassed, but can be used alone.
+    """
     def __init__(self):
-        self.image_temperature = []   # empty array for image temp (from rad)
-        self.image_radiance = []   # empty array for image radaiances
+        """ initialize the object. """
+        self.image_temperature = []
+        self.image_radiance = []
 
-        self._scene_id = None   # landsat id
+        self._scene_id = None
 
-        self.satelite = None   # landsat version: format: 8 or 7
-        self.WRS2_path = None   # path for landsat id construction
-        self.WRS2_row = None   # row for landsat id construction
-        self.year = None   # year for landsat id construction
-        self.julian_date = None   # day of year, for landsat id construction
+        self.satelite = None
+        self.WRS2_path = None
+        self.WRS2_row = None
+        self.year = None
+        self.julian_date = None
 
-        self.cloud_cover = None  # cloud cover, optional argument
-
-        self.poi = None   # pixel of interest, assigned from calc_rad call
+        self.cloud_cover = None
+        self.poi = None
 
     @property
     def scene_id(self):
@@ -81,6 +121,7 @@ class SensorRadiance(object):
 
     @scene_id.setter
     def scene_id(self, new_id):
+        """ check for correct format in landsat id. """
         if new_id is not None:
             chars = ['\n', ' ', '"', '\\', '/']   # unwanted characters
             new_id = new_id.translate(None, ''.join(chars))
@@ -99,9 +140,7 @@ class SensorRadiance(object):
             return 0
 
     def download_img_data(self):
-        """launcher for LandsatData.start_download().
-        """
-
+        """ download landsat image and parse metadata. """
         import LandsatData
 
         self.logger.info('.download_img_data: Dealing with Landsat Data')
@@ -122,12 +161,7 @@ class SensorRadiance(object):
             return -1
 
     def calc_img_radiance(self):
-        """Launcher for ImageRadProcessing.do_processing().
-
-        Depends on a BuoyData call and a LandsatData call.
-        Functions: calculate_buoy_information, download_img_data.
-        """
-
+        """ calculate image radiance. """
         import ImageRadProcessing
 
         self.logger.info('.calc_img_radiance: Calculating Image Radiance')
@@ -140,8 +174,38 @@ class SensorRadiance(object):
 
 
 class CalibrationController(ModeledRadiance, SensorRadiance):
+    """ Provides wrappers for BuoyData, cleanup, and output functionality.
+    
+    Attributes:
+        filepath_base: smart path object.
+        self.logger: logging object used by super and sub classes.
+        _buoy_id: assigned by user initially, after buoy_info call it is the
+            actual dataset used, int
+        buoy_latitude: calculated from stationtable.txt, float
+        buoy_longitude: calculated from stationtable.txt, float
+        buoy_temperature: calculated from buoy dataset, float
+        metadata: landsat metadata, dict
+        output_txt: option to for output, string
+        verbose: option for command line output, int
+        cleanup_list: files to remove, list
+        
+    Methods:
+        __init__(self): initialize the object
+        buoy_id(self): getter
+        buoy_id(self, new_id): setter, check for correct format
+        calculate_buoy_information(self): Launcher for BuoyData.start_download,
+             does all buoy calculations.
+        calc_brightness_temperature(self): Depends on image_radiance
+             and modeled_radiance being calculated already, will return -1 if
+             not.
+        output(self): Output calculated values to command line or txt file.
+        cleanup(self, execute=False, *args): remove temporary files, if
+            execute is false then append input args to the list. 
+        
+    Subclasses ModeledRadiance and SensorRadiance.
+    """
     def __init__(self):
-
+        """ initialize the object. """
         # standardize file paths in modules
         self.filepath_base = os.path.realpath(__file__)
         match = re.search('/bin/BuoyCalib.pyc?', self.filepath_base)
@@ -174,6 +238,7 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
 
     @buoy_id.setter
     def buoy_id(self, new_id):
+        """ check for correct format in buoy_id. """
         if new_id is not None:
             chars = ['\n', ' ', '"', '\\', '/']   # unwanted characters
             new_id = new_id.translate(None, ''.join(chars))   #rm chars
@@ -192,9 +257,7 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
             return 0
 
     def calculate_buoy_information(self):
-        """Launcher for BuoyData.start_download, does all buoy calculations.
-        """
-
+        """pick buoy dataset, download, and calculate skin_temp. """
         import BuoyData
 
         self.logger.info('calculate_buoy_information: Downloading Buoy Data')
@@ -217,10 +280,7 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
         return 0
 
     def calc_brightness_temperature(self):
-        """translate radiance to temperature.
-
-        Depends on image_radiance, modeled_radiance being calculated already.
-        """
+        """ translate radiance to temperature. """
 
         K1 = self.metadata['K1_CONSTANT_BAND_10'], \
              self.metadata['K1_CONSTANT_BAND_11']
@@ -237,9 +297,7 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
         return 0
 
     def output(self):
-        """Output calculated values to command line or txt file.
-        """
-
+        """ Output calculated values to command line or txt file. """
         if self.output_txt:
             outfile = os.path.join(self.filepath_base, 'logs/output.txt')
             #other = '%21s%7s%10s%7s' % (self.scene_id, self.buoy_latitude, self.buoy_longitude, self.buoy_id)
@@ -262,9 +320,7 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
         return 0
 
     def cleanup(self, execute=False, *args):
-        """Remove temporary files.
-        """
-
+        """ Remove temporary files. """
         import shutil
 
         if execute is True:

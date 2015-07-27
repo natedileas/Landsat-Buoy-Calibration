@@ -71,7 +71,6 @@ class SensorRadiance(object):
         self.year = None   # year for landsat id construction
         self.julian_date = None   # day of year, for landsat id construction
 
-        # TODO check implementation
         self.cloud_cover = None  # cloud cover, optional argument
 
         self.poi = None   # pixel of interest, assigned from calc_rad call

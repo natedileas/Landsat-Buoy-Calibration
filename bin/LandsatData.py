@@ -14,8 +14,11 @@ class LandsatData(object):
     def __init__(self, other):
         """initializer of LandsatData.
         """
-        logging.basicConfig(filename='CalibrationController.log',
-                            filemode='w', level=logging.INFO)
+        self.filepath_base = other.filepath_base
+        self.save_dir = os.path.join(self.filepath_base, 'data/landsat')
+        
+        log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
+        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
         self.scene_id = None   #fix error in start_download
@@ -46,12 +49,11 @@ class LandsatData(object):
         else:
             self.cloud_cover = 100
 
-        self.save_dir = os.path.join(other.filepath_base, 'data/landsat')
-
     def start_download(self):
         """download landsat data and parse metadata.
         """
-        args = ['logs/usgs_login.txt', self.save_dir, self.scene_coors, self.date, self.whichsat, self.cloud_cover]
+        usgs = os.path.join(self.filepath_base, 'logs/usgs_login.txt')
+        args = [usgs, self.save_dir, self.scene_coors, self.date, self.whichsat, self.cloud_cover]
                 
         if self.scene_id:
             args.append(self.scene_id)

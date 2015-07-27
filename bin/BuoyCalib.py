@@ -4,6 +4,7 @@ import subprocess
 import sys
 import datetime
 import math
+import re
 
 
 class ModeledRadiance(object):
@@ -82,7 +83,6 @@ class SensorRadiance(object):
     @scene_id.setter
     def scene_id(self, new_id):
         if new_id is not None:
-            import re
             chars = ['\n', ' ', '"', '\\', '/']   # unwanted characters
             new_id = new_id.translate(None, ''.join(chars))
             match = re.match('L[CE][78]\d*\w\w\w0[0-5]', new_id)
@@ -142,12 +142,19 @@ class SensorRadiance(object):
 
 class CalibrationController(ModeledRadiance, SensorRadiance):
     def __init__(self):
-        logging.basicConfig(filename='./logs/CalibrationController.log',
-                            filemode='w', level=logging.INFO)
+
+        # standardize file paths in modules
+        self.filepath_base = os.path.realpath(__file__)
+        match = re.search('/bin/BuoyCalib.pyc?', self.filepath_base)
+        if match:
+            self.filepath_base = self.filepath_base.replace(match.group(), '')
+
+        log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
+        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
         # buoy id- assigned by user initially, after
-        self.buoy_id = None  # buoy_info call it is the actual dataset used
+        self._buoy_id = None  # buoy_info call it is the actual dataset used
         self.buoy_latitude = None  # calculated from stationtable.txt
         self.buoy_longitude = None   # calculated from stationtable.txt
         self.buoy_temperature = None   # calculated from buoy dataset
@@ -156,12 +163,34 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
 
         self.output_txt = True   # option to for output
         self.verbose = False   # option for command line output
-
-        self.filepath_base = os.getcwd()   # standardize file paths in modules
+        
         self.cleanup_list = ['data/modtran/points']   # list of files to remove
 
         ModeledRadiance.__init__(self)   # initializers to utilize attributes
         SensorRadiance.__init__(self)    # from parent classes
+        
+    @property
+    def buoy_id(self):
+        return self._buoy_id
+
+    @buoy_id.setter
+    def buoy_id(self, new_id):
+        if new_id is not None:
+            chars = ['\n', ' ', '"', '\\', '/']   # unwanted characters
+            new_id = new_id.translate(None, ''.join(chars))   #rm chars
+            match = re.match('\d\d\d\d\d', new_id)
+
+            if match:   # if it matches the pattern
+                self._buoy_id = match.group()
+                return 0
+            else:
+                self._buoy_id = new_id
+                self.logger.warning('.buoy_id: @buoy_id.setter: \
+                                    the given buoy id is the wrong format')
+                return -1
+        else:
+            self._buoy_id = None
+            return 0
 
     def calculate_buoy_information(self):
         """Launcher for BuoyData.start_download, does all buoy calculations.
@@ -213,7 +242,7 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
         """
 
         if self.output_txt:
-            outfile = './logs/output.txt'
+            outfile = os.path.join(self.filepath_base, 'logs/output.txt')
             #other = '%21s%7s%10s%7s' % (self.scene_id, self.buoy_latitude, self.buoy_longitude, self.buoy_id)
             radiances = ' %2.6f %2.6f %2.6f %2.6f' % (self.image_radiance[0], self.modeled_radiance[0], self.image_radiance[1], self.modeled_radiance[1])
             buoy_temp = ' %4.4f' % float(self.buoy_temperature)
@@ -251,6 +280,6 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
                     self.logger.warning('cleanup: OSError: %s: %s: %s' % (e.errno, e.strerror, rm_file))
         else:
             for add_file in args:
-                self.cleanup_list.append(add_file)
+                self.cleanup_list.append(os.path.join(self.filepath_base, add_file))
 
         return 0

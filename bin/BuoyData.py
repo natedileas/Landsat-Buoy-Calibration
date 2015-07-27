@@ -10,8 +10,8 @@ import logging
 
 class BuoyData(object):
     def __init__(self, other):
-        logging.basicConfig(filename='CalibrationController.log',
-                            filemode='w', level=logging.INFO)
+        log_file = os.path.join(other.filepath_base, 'logs/CalibrationController.log')
+        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
         self.metadata = other.metadata
@@ -24,7 +24,7 @@ class BuoyData(object):
 
         self.buoy = other.buoy_id
 
-        self.save_dir = os.path.join(os.getcwd(), 'data/buoy/')
+        self.save_dir = os.path.join(other.filepath_base, 'data/buoy/')
         self.dataset = None
 
     def start_download(self):

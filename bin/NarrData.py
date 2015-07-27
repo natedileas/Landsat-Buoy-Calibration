@@ -1,7 +1,6 @@
 import subprocess
 import os
 
-
 class NarrData(object):
     def __init__(self, other):
         self.scene_id = other._scene_id
@@ -16,11 +15,15 @@ class NarrData(object):
     def start_download(self):
         try:
             # begin download of NARR data
-            # TODO have intelligent paths
-            narr_py_path = os.path.join(self.filepath_base, 'bin/NARR_py.bash')
-            subprocess.check_call('chmod u+x '+narr_py_path, shell=True)
+            current_dir = os.getcwd()
+            #bin_path = os.path.join(self.filepath_base, 'bin')
+            os.chdir(self.filepath_base)
+            os.chmod('./bin/NARR_py.bash', 0755)
+            subprocess.check_call('chmod u+x ./bin/NARR_py.bash', shell=True)
             ret_val = subprocess.call('./bin/NARR_py.bash %s %s' % (self.scene_id,
                             self.verbose), shell=True)
+            os.chdir(current_dir)
+            
             if ret_val == 1:
                 return -1
 

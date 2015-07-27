@@ -11,7 +11,10 @@ import utm
 
 class ModeledRadProcessing(object):
     def __init__(self, other):
-        logging.basicConfig(filename='CalibrationController.log', filemode='w', level=logging.INFO)
+        self.filepath_base = other.filepath_base
+
+        log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
+        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
         # for tape5 generation 
@@ -40,7 +43,9 @@ class ModeledRadProcessing(object):
         logging.captureWarnings(True)
          
         # read in narr data and generate tape5 files and caseList
-        mt5 = MakeTape5s(self.metadata, self.buoy_coors, self.skin_temp, self.which_landsat, self.verbose)
+        current_dir = os.getcwd()
+        os.chdir(self.filepath_base)
+        mt5 = MakeTape5s(self.metadata, self.buoy_coors, self.skin_temp, self.which_landsat, self.filepath_base, self.verbose)
         ret_vals = mt5.main()   # first_files equivalent
         
         if ret_vals != -1:
@@ -117,7 +122,8 @@ class ModeledRadProcessing(object):
             
             if self.which_landsat == [8,2]: self.which_landsat = [8,1]
             else: break
-            
+
+        os.chdir(current_dir)
         return return_radiance, caseList
 
     def _read_tape6(self, case):
@@ -331,16 +337,19 @@ class ModeledRadProcessing(object):
 
 
 class MakeTape5s(object):
-    def __init__(self, metadata, buoy_coor, skin_temp, whichLandsat, verbose):
-        logging.basicConfig(filename='CalibrationController.log', filemode='w', level=logging.INFO)
+    def __init__(self, metadata, buoy_coor, skin_temp, whichLandsat, filepath_base, verbose):
+        self.filepath_base = filepath_base
+
+        log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
+        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         
         self.metadata = metadata
         self.buoy_coors = buoy_coor
         self.skin_temp = skin_temp
         self.whichLandsat = whichLandsat
-        self.directory = './data/modtran/'
-        self.home = './data'
+        self.directory = os.path.join(self.filepath_base, 'data/modtran/')
+        self.home = os.path.join(self.filepath_base, 'data')
         self.skin_temp = '%3.3f' % (skin_temp)
         self.verbose = verbose
 
@@ -422,7 +431,7 @@ class MakeTape5s(object):
         pressures = numpy.reshape([p]*4, (4,29))
 
         # read in NARR data
-        if os.path.exists('./data/narr/HGT_1/1000.txt'):
+        if os.path.exists(os.path.join(self.filepath_base, 'data/narr/HGT_1/1000.txt')):
             self.logger.info('NARR Data Successful Download')
         else:
             self.logger.error('NARR data not downloaded, no wgrib?')
@@ -549,7 +558,7 @@ class MakeTape5s(object):
             distance_in_utm: exactly what it sounds like
         """
         # open coordinates.txt
-        filename = './data/narr/coordinates.txt'
+        filename = os.path.join(self.filepath_base, './data/narr/coordinates.txt')
         coordinates = []
         data = ' '
         i = 0

@@ -11,9 +11,27 @@ import sys
 
 
 class LandsatData(object):
+    """ Download Landsat Images and Metadata.
+    
+    Attributes:
+        filepath_base: parent directory, base of all other paths.
+        save_dir: directory to save landsat images in.
+        logger: logger object for non-verbose output.
+        scene_id: scene_id to download, string
+        whichsat: which landsat version, (7 or 8), int
+        date: date on which the image was captured
+        scene_coors: WRS2 path and row
+        cloud_cover: max acceptable cloud cover, in percent.
+    
+    Methods:
+        __init__(self, other): initialize the attributes using a CalibrationController object
+        start_download(self): download landsat data and parse metadata.
+        read_metadata(self): read and parse landsat metadata, return dict
+        
+    Utilizes Subclass DownloadLandsatScene(object).
+    """
     def __init__(self, other):
-        """initializer of LandsatData.
-        """
+        """ initialize the attributes using a CalibrationController object. """
         self.filepath_base = other.filepath_base
         self.save_dir = os.path.join(self.filepath_base, 'data/landsat')
         
@@ -50,8 +68,7 @@ class LandsatData(object):
             self.cloud_cover = 100
 
     def start_download(self):
-        """download landsat data and parse metadata.
-        """
+        """ download landsat data and parse metadata. """
         usgs = os.path.join(self.filepath_base, 'logs/usgs_login.txt')
         args = [usgs, self.save_dir, self.scene_coors, self.date, self.whichsat, self.cloud_cover]
                 
@@ -79,7 +96,7 @@ class LandsatData(object):
         return self.scene_id, metadata
 
     def read_metadata(self):
-        """read and parse landsat metadata.
+        """ read and parse landsat metadata.
 
         Should only be called on a valid LandsatData instance.
 
@@ -121,9 +138,25 @@ class LandsatData(object):
 
 
 class DownloadLandsatScene(object):
+    """ Control download process, return id of downloaded scenes. 
+        
+    Attributes:
+        logger: logging object for non-verbose output
+        
+    Methods:
+        main: use this class.
+        get_status: find out what the status of the file is.
+        connect_earthexplorer_no_proxy: connect to earth explorer.
+        sizeof_fmt: calc size fo file in bytes to MB
+        downloadChunks: actually download file.
+        cycle_day: find day when landsat passes over.
+        next_overpass: find next day when landsat passes over.
+        unzipimage: exactly what it sounds like.
+        check_cloud_limit: check cloud limit using the helper function.
+        read_cloudcover_in_metadata: read cloud percentage in metadata.
+    """
     def main(self, usgs=None, output=None, scene=None, date=None, bird=None, clouds=None, scene_id=None):
-        """Control download process, return id of downloaded scenes.
-        """
+        
         logging.basicConfig(filename='CalibrationController.log',
                             filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
@@ -211,6 +244,7 @@ class DownloadLandsatScene(object):
 
         
     def get_status(self, scene_id, output_dir, url):
+        """ get status of file. """
         tgzfile = os.path.join(output_dir, scene_id + '.tgz')
         unzipdfile = os.path.join(output_dir, scene_id)
     
@@ -249,6 +283,7 @@ class DownloadLandsatScene(object):
             return 3
     
     def connect_earthexplorer_no_proxy(self, usgs):
+        """ connect to earthexplorer without a proxy. """
         try:
             opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
             urllib2.install_opener(opener)
@@ -319,8 +354,7 @@ class DownloadLandsatScene(object):
         return rep, nom_fic
 
     def cycle_day(self, path):
-        """provides the day in cycle given the path number.
-        """
+        """ provides the day in cycle given the path number. """
         cycle_day_path1 = 5
         cycle_day_increment = 7
         nb_days_after_day1 = cycle_day_path1 + cycle_day_increment * (path - 1)
@@ -332,8 +366,7 @@ class DownloadLandsatScene(object):
         return(cycle_day_path)
 
     def next_overpass(self, date1, path, sat):
-        """Provides the next overpass for path after date1.
-        """
+        """ Provides the next overpass for path after date1. """
         date0 = 0
 
         if sat == 'LE7':
@@ -349,8 +382,7 @@ class DownloadLandsatScene(object):
         return(date_overpass)
 
     def unzipimage(self, scene_id, outputdir):
-        """Unzip tgz file.
-        """
+        """ Unzip tgz file. """
         tgz_file = os.path.join(outputdir, scene_id + '.tgz')
         out_dir = os.path.join(outputdir, scene_id)
         
@@ -369,8 +401,7 @@ class DownloadLandsatScene(object):
         return 0
 
     def read_cloudcover_in_metadata(self, image_path):
-        """Read image metadata.
-        """
+        """ Read cloud cover from image metadata. """
         output_list = []
         fields = ['CLOUD_COVER']
         cloud_cover = 0
@@ -387,8 +418,7 @@ class DownloadLandsatScene(object):
         return float(cloud_cover)
 
     def check_cloud_limit(self, imagepath, limit):
-        """check cloud limit provided by user.
-        """
+        """ check cloud limit provided by user. """
         cloudcover = DownloadLandsatScene.read_cloudcover_in_metadata(self, imagepath)
         if cloudcover > limit:
             shutil.rmtree(imagepath)

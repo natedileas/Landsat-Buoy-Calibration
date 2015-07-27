@@ -184,8 +184,8 @@ class ModeledRadProcessing(object):
         check = numpy.subtract(radiance_dn, radiance_dn_check)
         
         if numpy.sum(numpy.absolute(check)) >= .05:
-           print 'Error in modtran module. Total Radiance minus upwelled radianc \
-           e is not (approximately) equal to downwelled radiance*transmission' #TODO log error
+           self.logger.error('Error in modtran module. Total Radiance minus upwelled radianc \
+           e is not (approximately) equal to downwelled radiance*transmission')
            sys.exit()
 
         wavelength = numpy.asarray(wavelength)
@@ -641,8 +641,6 @@ class MakeTape5s(object):
                 
         inLandsat = numpy.delete(inLandsat, 0, 0)
         inLandsat = numpy.delete(inLandsat, 0, 0)
-        
-        # TODO chose points to use, put result in NARRindices
         
         num_points = numpy.shape(inLandsat)[0]
         

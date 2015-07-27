@@ -1,5 +1,4 @@
-#!/bin/bash 
-
+#!/bin/bash
 #NARR_py.bash
 
 home=`pwd`
@@ -22,7 +21,6 @@ day=`echo ${DATE_ACQUIRED} | awk -F'-' '{print $3}'`
 hour=`echo ${SCENE_CENTER_TIME} | awk -F':' '{print $1}'`
 
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [0 / 12] \r'; fi
-
 
 #  determine three hour increment before and after acquisition time
 rem1=$(($hour % 3))
@@ -117,7 +115,6 @@ if [ ! -d  $destination/HGT_1 ]; then
     mkdir $destination/TMP_1
     mkdir $destination/SHUM_1
 fi
-
 
 # 'move results from GRIB directory to directory for this specific Landsat image'
 if [ "$(ls -A $grib_dest/HGT)" ]; then

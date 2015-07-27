@@ -22,4 +22,4 @@ Notes:
 Log information can be found in ./logs/calibrationController.log, ./logs/modtran.log
 
 Developed by Nathan Dileas
-Bugs: nid4986@rit.edu, subject line: "Landsat Vic. Calib. Bug"
+Bugs: nid4986@rit.edu, subject line: "Landsat Vicarious Calibration Bug"

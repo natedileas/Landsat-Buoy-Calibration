@@ -11,6 +11,13 @@ import utm
 from test_plot import *
 
 class ModeledRadProcessing(object):
+    """ Calculate the modeled radiance of a landsat scene.
+    
+    Attributes:
+    
+    Methods:
+    
+    """
     def __init__(self, other):
         self.filepath_base = other.filepath_base
 

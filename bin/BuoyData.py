@@ -52,7 +52,7 @@ class BuoyData(object):
 
     def start_download(self):
         """ download and process buoy data. """
-        datasets, buoy_coors, depths = BuoyData._find_datasets(self)
+        datasets, buoy_coors, depths = self.__find_datasets()
         return_vals = None
 
         url_base = ['http://www.ndbc.noaa.gov/data/historical/stdmet/',
@@ -71,7 +71,7 @@ class BuoyData(object):
                 urls.append(url_base[0] + self.buoy + 'h' + year + '.txt.gz')
                 urls.append(url_base[1] + mon_str[int(month) - 1] + self.buoy +
                             str(int(month)) + '2015.txt.gz')
-                ret_vals = BuoyData._save_buoy_data(self, self.buoy)
+                ret_vals = self.__save_buoy_data(self.buoy)
                 if ret_vals != -1:
                     datasets, buoy_coors, depths = ret_vals
                 else: 
@@ -110,7 +110,7 @@ class BuoyData(object):
             self.dataset = os.path.basename(url)
             zipped_file = os.path.join(self.save_dir, self.dataset)
             unzipped_file = zipped_file.replace('.gz', '')
-            return_val = BuoyData._get_buoy_data(self, url)
+            return_val = self.__get_buoy_data(url)
 
             if return_val == -1:
                 self.logger.warning('.start_download: Dataset %s not found. \
@@ -119,8 +119,8 @@ class BuoyData(object):
                 if os.path.exists(unzipped_file):
                     subprocess.Popen('rm '+unzipped_file, shell=True)
             else:
-                skin_temp = BuoyData._find_skin_temp(self, url,
-                                                     depths[urls.index(url)])
+                skin_temp = self.__find_skin_temp(url, depths[urls.index(url)])
+
                 if skin_temp == -1:
                     self.logger.warning('.start_download: The date range \
                     requested was not found in the data set %s.', self.dataset)
@@ -151,12 +151,12 @@ class BuoyData(object):
             self.logger.error('.start_download: No usable datasets were found')
             return -1
 
-    def _find_datasets(self):
+    def __find_datasets(self):
         """ get list of possible datasets. """
         # define names
         filename = os.path.join(self.save_dir, 'station_table.txt')
         
-        __ = BuoyData._get_stationtable(self)
+        __ = self.__get_stationtable()
 
         # read in and zip coordinates and buoy SIDs
         # use reg expressions to find matching strings in lines
@@ -224,10 +224,10 @@ class BuoyData(object):
 
         return datasets, coordinates, depths
         
-    def _save_buoy_data(self, sid):
+    def __save_buoy_data(self, sid):
         """ last-ditch attempt at getting buoy data. """
         filename = os.path.join(self.save_dir, 'station_table.txt')
-        __ = BuoyData._get_stationtable(self)
+        __ = self.__get_stationtable()
         
         sid = str(sid)
         # read in and zip coordinates and buoy SIDs
@@ -271,7 +271,7 @@ class BuoyData(object):
                         return -1
             return -1
             
-    def _get_stationtable(self):
+    def __get_stationtable(self):
         """ download and unzip station_table.txt. """
         # define names
         filename = os.path.join(self.save_dir, 'station_table.txt')
@@ -302,7 +302,7 @@ class BuoyData(object):
         else:
             return 0
 
-    def _get_buoy_data(self, url):
+    def __get_buoy_data(self, url):
         """ download/ unzip appripriate buoy data from url. """
 
         try:
@@ -337,7 +337,7 @@ class BuoyData(object):
 
         return 0
 
-    def _find_skin_temp(self, url, depth):
+    def __find_skin_temp(self, url, depth):
         """ compute skin temperature. """
         import math
 

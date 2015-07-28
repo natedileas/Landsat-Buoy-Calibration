@@ -8,7 +8,6 @@ import subprocess
 import sys
 import utm
 
-from test_plot import *
 
 class ModeledRadProcessing(object):
     """ Calculate the modeled radiance of a landsat scene.
@@ -56,6 +55,8 @@ class ModeledRadProcessing(object):
         mt5 = MakeTape5s(self.metadata, self.buoy_coors, self.skin_temp, self.which_landsat, self.filepath_base, self.verbose)
         ret_vals = mt5.main()   # first_files equivalent
         
+        __ = raw_input('Press any key when done modifying the tape5 files...')
+        
         if ret_vals != -1:
             caseList, narr_coor = ret_vals
         else:
@@ -88,24 +89,24 @@ class ModeledRadProcessing(object):
             for i in range(4):
                 # read relevant tape6 files
                 caseList_p = caseList[i]
-                ret_vals = ModeledRadProcessing._read_tape6(self, caseList_p)
+                ret_vals = self.__read_tape6(caseList_p)
                 
                 upwell_rad = numpy.append(upwell_rad, ret_vals[0])
                 downwell_rad = numpy.append(downwell_rad, ret_vals[1])
                 wavelengths = ret_vals[2]
                 transmission = numpy.append(transmission, ret_vals[3])
                 
-            upwell_rad = ModeledRadProcessing._interpolate_params(self, upwell_rad, narr_coor)
-            downwell_rad= ModeledRadProcessing._interpolate_params(self, downwell_rad, narr_coor)
-            transmission = ModeledRadProcessing._interpolate_params(self, transmission, narr_coor)
+            upwell_rad = self.__interpolate_params(upwell_rad, narr_coor)
+            downwell_rad= self.__interpolate_params(downwell_rad, narr_coor)
+            transmission = self.__interpolate_params(transmission, narr_coor)
             
-            RSR, RSR_wavelengths = ModeledRadProcessing._read_RSR(self)
+            RSR, RSR_wavelengths = self.__read_RSR()
                 
             # interpolate RSR to match wavelengths
             RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
 
             # calculate temperature array
-            Lt = ModeledRadProcessing._calc_temperature_array(self, wavelengths)
+            Lt = self.__calc_temperature_array(wavelengths)
                 
             # calculate top of atmosphere radiance
             term1 = numpy.multiply(Lt, emissivity)
@@ -117,8 +118,8 @@ class ModeledRadProcessing(object):
             #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
                 
             # calculate observed radiance
-            numerator = ModeledRadProcessing._integrate(self, wavelengths, numpy.multiply(Ltoa, RSR))
-            denominator = ModeledRadProcessing._integrate(self, wavelengths, RSR)
+            numerator = self.__integrate(wavelengths, numpy.multiply(Ltoa, RSR))
+            denominator = self.__integrate(wavelengths, RSR)
             
             try:
                 modeled_rad = numerator / denominator
@@ -134,7 +135,7 @@ class ModeledRadProcessing(object):
         os.chdir(current_dir)
         return return_radiance, caseList
 
-    def _read_tape6(self, case):
+    def __read_tape6(self, case):
         """read in tape6 files and return values
         
         read in parsed files, parse relative spectral response files, etc.
@@ -217,7 +218,7 @@ class ModeledRadProcessing(object):
         
         return radiance_up, radiance_dn, wavelength, transission
         
-    def _interpolate_params(self, array, narr_coor):
+    def __interpolate_params(self, array, narr_coor):
         narr_coor = numpy.absolute(narr_coor)
         buoy_coors = numpy.absolute(self.buoy_coors)
         array = numpy.reshape(array, (4, 411))
@@ -238,7 +239,7 @@ class ModeledRadProcessing(object):
 
         return array_interp
         
-    def _read_RSR(self):
+    def __read_RSR(self):
         """read in RSR data and return it to the caller.
         """
         wavelength_RSR = []
@@ -264,25 +265,25 @@ class ModeledRadProcessing(object):
         
         return RSR, wavelength_RSR
         
-    def _find_nearest(self, array,value):
+    def __find_nearest(self, array,value):
         """Find nearest element to value in array.
         """
         if array != []:
             index = numpy.argmin(numpy.abs(numpy.subtract(array,value)))
             return index
     
-    def _calc_temperature_array(self, wavelengths):
+    def __calc_temperature_array(self, wavelengths):
         """make array of blackbody radiances.
         """
         Lt= []
     
         for i in wavelengths:
-            x = ModeledRadProcessing._radiance(self, i)
+            x = self.__radiance(i)
             Lt.append(x)
             
         return Lt
         
-    def _radiance(self, wvlen):
+    def __radiance(self, wvlen):
         """calculate blackbody radiance given wavelength and temperature.
         """
         
@@ -295,7 +296,7 @@ class ModeledRadProcessing(object):
         
         return rad
         
-    def _integrate(self, x, y, method='trap'):
+    def __integrate(self, x, y, method='trap'):
         """approximate integration given two arrays.
         """
         total = 0
@@ -320,7 +321,7 @@ class ModeledRadProcessing(object):
                     
         return total
     
-    def _interpolate_radiance(self, modeled_rad_list, narr_coor):
+    def __interpolate_radiance(self, modeled_rad_list, narr_coor):
         """interpolate radiance of narr points to POI
         """
         narr_coor = numpy.absolute(narr_coor)
@@ -391,24 +392,24 @@ class MakeTape5s(object):
         """
     
         # choose narr points
-        narr_indices, num_points, lat, lon = MakeTape5s._choose_points(self)
+        narr_indices, num_points, lat, lon = self.__choose_points()
                 
         narr_coor = []
         for i in range(4):
             narr_coor.append([lat[narr_indices[i,0], narr_indices[i,1]],lon[narr_indices[i,0], narr_indices[i,1]]])
             
         # read in NARR data
-        pressures = MakeTape5s._narr_read(self, narr_indices, lat)
+        pressures = self.__narr_read(narr_indices, lat)
         
         # interplolate in time and load standard atmo
-        MakeTape5s._interpolate_time(self)
+        self.__interpolate_time()
         
         # actually generate tape5 files
-        case_list = MakeTape5s._generate_tape5s(self, num_points, narr_indices, lat, lon, pressures)
+        case_list = self.__generate_tape5s(num_points, narr_indices, lat, lon, pressures)
     
         return case_list, narr_coor
     
-    def _narr_read(self, narr_indices, lat):
+    def __narr_read(self, narr_indices, lat):
         """Read in downloaded narr data, perform processing and return.
         
         Args:
@@ -446,27 +447,27 @@ class MakeTape5s(object):
             return -1
 
         for i in xrange(0,29):
-            hgt_1[:,i] = MakeTape5s._narr_read_read(self, './data/narr/HGT_1/'+str(p[i]) + '.txt')
+            hgt_1[:,i] = self.__narr_read_read('./data/narr/HGT_1/'+str(p[i]) + '.txt')
             if self.verbose == 0:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 1),
 
-            shum_1[:,i] = MakeTape5s._narr_read_read(self, './data/narr/SHUM_1/'+str(p[i]) + '.txt')
+            shum_1[:,i] = self.__narr_read_read('./data/narr/SHUM_1/'+str(p[i]) + '.txt')
             if self.verbose == 0:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 2),
 
-            tmp_1[:,i] = MakeTape5s._narr_read_read(self, './data/narr/TMP_1/'+str(p[i]) + '.txt')
+            tmp_1[:,i] = self.__narr_read_read('./data/narr/TMP_1/'+str(p[i]) + '.txt')
             if self.verbose == 0:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 3),
 
-            hgt_2[:,i] = MakeTape5s._narr_read_read(self, './data/narr/HGT_2/'+str(p[i]) + '.txt')
+            hgt_2[:,i] = self.__narr_read_read('./data/narr/HGT_2/'+str(p[i]) + '.txt')
             if self.verbose == 0:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 4),
 
-            shum_2[:,i] = MakeTape5s._narr_read_read(self, './data/narr/SHUM_2/'+str(p[i]) + '.txt')
+            shum_2[:,i] = self.__narr_read_read('./data/narr/SHUM_2/'+str(p[i]) + '.txt')
             if self.verbose == 0:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 5),
 
-            tmp_2[:,i] = MakeTape5s._narr_read_read(self, './data/narr/TMP_2/'+str(p[i]) + '.txt')
+            tmp_2[:,i] = self.__narr_read_read('./data/narr/TMP_2/'+str(p[i]) + '.txt')
             if self.verbose == 0:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 6),
 
@@ -483,15 +484,15 @@ class MakeTape5s(object):
         self.temperature_1 = numpy.reshape(tmp_1, (277,349, 29))[narr_indices[:,0],narr_indices[:,1],:]
         self.temperature_2 = numpy.reshape(tmp_2, (277,349, 29))[narr_indices[:,0],narr_indices[:,1],:]
 
-        self.relativeHumidity_1 = MakeTape5s._convert_sh_rh(self, landsatSHUM_1, self.temperature_1, pressures)
-        self.relativeHumidity_2 = MakeTape5s._convert_sh_rh(self, landsatSHUM_2, self.temperature_2, pressures)
+        self.relativeHumidity_1 = self.__convert_sh_rh(landsatSHUM_1, self.temperature_1, pressures)
+        self.relativeHumidity_2 = self.__convert_sh_rh(landsatSHUM_2, self.temperature_2, pressures)
 
         self.geometricHeight_1 = numpy.divide(landsatHGT_1, 1000.0)   # convert m to km
         self.geometricHeight_2 = numpy.divide(landsatHGT_2, 1000.0)   # convert m to km
 
         return pressures
 
-    def _narr_read_read(self, filename):
+    def __narr_read_read(self, filename):
         data = []
      
         with open(filename, 'r') as f:
@@ -501,7 +502,7 @@ class MakeTape5s(object):
                 
         return data
         
-    def _convert_sh_rh(self, specHum, T_k, pressure):
+    def __convert_sh_rh(self, specHum, T_k, pressure):
         # Given array of specific humidities, temperature, and pressure, generate array of relative humidities
         # source: http://earthscience.stackexchange.com/questions/2360/how-do-i-convert-specific-humidity-to-relative-humidity
         
@@ -518,7 +519,7 @@ class MakeTape5s(object):
         
         return RH
         
-    def _convert_geopotential_geometric(self, geopotential, lat):
+    def __convert_geopotential_geometric(self, geopotential, lat):
         """Convert array of geopotential heightsto geometric heights.
         """
         # source: http://www.ofcm.gov/fmh3/pdf/12-app-d.pdf
@@ -550,7 +551,7 @@ class MakeTape5s(object):
         
         return numpy.asarray(geometric_height)
     
-    def _choose_points(self):
+    def __choose_points(self):
         """Read in coordinates.txt, choose points within scene corners.
         
         Args:
@@ -635,7 +636,7 @@ class MakeTape5s(object):
                     curr_utm_point = utm.from_latlon(lat[k,l], lon[k,l])
                     
                     if curr_utm_point[2] <= float(self.metadata['UTM_ZONE']) + 1 and curr_utm_point[2] >= float(self.metadata['UTM_ZONE']) - 1:
-                        curr_utm_point = MakeTape5s._convert_utm_zones(self, lat[k,l], lon[k,l], curr_utm_point[2], self.metadata['UTM_ZONE'])
+                        curr_utm_point = self.__convert_utm_zones(lat[k,l], lon[k,l], curr_utm_point[2], self.metadata['UTM_ZONE'])
                     
                         if curr_utm_point[0] < UL_X:
                             if curr_utm_point[0] > LR_X:
@@ -687,7 +688,7 @@ class MakeTape5s(object):
     
         for g in range(num_points):
             try:
-                dist = MakeTape5s._distance_in_utm(self, eastvector[g],northvector[g],buoy_x,buoy_y)
+                dist = self.__distance_in_utm(eastvector[g],northvector[g],buoy_x,buoy_y)
                 if dist > 0:
                     distances.append(dist) 
                     dist_idx.append(g)
@@ -711,7 +712,7 @@ class MakeTape5s(object):
         
         return NARRindices, num_points, lat, lon
         
-    def _convert_utm_zones(self, x, y, zone_from, zone_to):
+    def __convert_utm_zones(self, x, y, zone_from, zone_to):
         import ogr, osr
     
         # Spatial Reference System
@@ -736,7 +737,7 @@ class MakeTape5s(object):
     
         return point.GetX(), point.GetY()
         
-    def _distance_in_utm(self, e1, n1, e2, n2):
+    def __distance_in_utm(self, e1, n1, e2, n2):
         """Calculate distances between UTM coordinates.
         """
         
@@ -753,7 +754,7 @@ class MakeTape5s(object):
         
         return d
     
-    def _interpolate_time(self):
+    def __interpolate_time(self):
         # determine three hour-increment before and after scene center scan time
         chars = ['"']
         time = self.metadata['SCENE_CENTER_TIME'].replace('"', '')
@@ -807,7 +808,7 @@ class MakeTape5s(object):
 
         return 0
     
-    def _generate_tape5s(self, num_points, NARRindices, lat, lon, pressures):
+    def __generate_tape5s(self, num_points, NARRindices, lat, lon, pressures):
         """do the messy work of generating the tape5 files and caselist.
         
         Args:

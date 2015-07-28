@@ -91,7 +91,7 @@ class LandsatData(object):
         else:
             self.scene_id = landsat_id
             
-        metadata = LandsatData.read_metadata(self)
+        metadata = self.read_metadata()
 
         return self.scene_id, metadata
 
@@ -191,7 +191,7 @@ class DownloadLandsatScene(object):
             
         #assign dates
         sixteen_days = datetime.timedelta(16)
-        search_date = DownloadLandsatScene.next_overpass(self, date, int(path), prefix)
+        search_date = self.__next_overpass(date, int(path), prefix)
         dates = [datetime.datetime.strftime(search_date, '%Y%j'), 
                  datetime.datetime.strftime(search_date + sixteen_days, '%Y%j'),
                  datetime.datetime.strftime(search_date - sixteen_days, '%Y%j')]
@@ -206,7 +206,7 @@ class DownloadLandsatScene(object):
         scene_ids = filter(None, scene_ids)
         
         # connect to earthexplorer
-        DownloadLandsatScene.connect_earthexplorer_no_proxy(self, usgs)
+        self.__connect_earthexplorer_no_proxy(usgs)
         
         for scene_id in scene_ids:
             url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
@@ -214,7 +214,7 @@ class DownloadLandsatScene(object):
             zip_check = 1   # to hold return values
             down_check = 1
             
-            status = DownloadLandsatScene.get_status(self, scene_id, output_dir, url)
+            status = self.__get_status(scene_id, output_dir, url)
                     
             if status == 1:
                 self.logger.info('main: Product %s already downloaded and unzipped ', scene_id)
@@ -224,18 +224,18 @@ class DownloadLandsatScene(object):
             elif status == 2:
                 self.logger.info('main: product %s already downloaded ', scene_id)
                 down_check = 0
-                zip_check = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
+                zip_check = self.__unzipimage(scene_id, output_dir)
             elif status == 3:
                 self.logger.info('main: product %s not already downloaded ', scene_id)
-                down_check = DownloadLandsatScene.downloadChunks(self, url, str(output_dir), scene_id+'.tgz')
-                zip_check = DownloadLandsatScene.unzipimage(self, scene_id, output_dir)
+                down_check = self.__downloadChunks(url, str(output_dir), scene_id+'.tgz')
+                zip_check = self.__unzipimage(scene_id, output_dir)
             elif status == 4:
                 self.logger.info('main: product %s not already downloaded, other error issues ', scene_id)
                 down_check = 1
                 zip_check = 1
                     
             if zip_check == 0 and down_check == 0 and clouds is not None:
-                check = DownloadLandsatScene.check_cloud_limit(self, os.path.join(output_dir, scene_id), clouds)
+                check = self.__check_cloud_limit(os.path.join(output_dir, scene_id), clouds)
                 return scene_id
             elif zip_check == 0 and down_check == 0 and clouds is None:
                 return scene_id
@@ -243,7 +243,7 @@ class DownloadLandsatScene(object):
         return -1
 
         
-    def get_status(self, scene_id, output_dir, url):
+    def __get_status(self, scene_id, output_dir, url):
         """ get status of file. """
         tgzfile = os.path.join(output_dir, scene_id + '.tgz')
         unzipdfile = os.path.join(output_dir, scene_id)
@@ -282,7 +282,7 @@ class DownloadLandsatScene(object):
                 
             return 3
     
-    def connect_earthexplorer_no_proxy(self, usgs):
+    def __connect_earthexplorer_no_proxy(self, usgs):
         """ connect to earthexplorer without a proxy. """
         try:
             opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
@@ -305,13 +305,13 @@ class DownloadLandsatScene(object):
             self.logger.error('URL Error: %s %s' % (e.reason, url))
             return -1
 
-    def sizeof_fmt(self, num):
+    def __sizeof_fmt(self, num):
         for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
             if num < 1024.0:
                 return '%3.1f %s' % (num, x)
             num /= 1024.0
 
-    def downloadChunks(self, url, rep, nom_fic):
+    def __downloadChunks(self, url, rep, nom_fic):
         """ Downloads large files in pieces.
         inspired by http://josh.gourneau.com
         """
@@ -324,7 +324,7 @@ class DownloadLandsatScene(object):
             data = urllib2.urlopen(url)   # ND reopen url, previous stuff read entire file, caused error
 
             total_size = int(data.info().getheader('Content-Length').strip())
-            total_size_fmt = DownloadLandsatScene.sizeof_fmt(self, total_size)
+            total_size_fmt = self.__sizeof_fmt(total_size)
 
             with open(out_file, 'wb') as f:
                 start = time.clock()
@@ -353,7 +353,7 @@ class DownloadLandsatScene(object):
 
         return rep, nom_fic
 
-    def cycle_day(self, path):
+    def __cycle_day(self, path):
         """ provides the day in cycle given the path number. """
         cycle_day_path1 = 5
         cycle_day_increment = 7
@@ -365,7 +365,7 @@ class DownloadLandsatScene(object):
             
         return(cycle_day_path)
 
-    def next_overpass(self, date1, path, sat):
+    def __next_overpass(self, date1, path, sat):
         """ Provides the next overpass for path after date1. """
         date0 = 0
 
@@ -374,14 +374,14 @@ class DownloadLandsatScene(object):
         elif sat == 'LC8':
             date0 =  datetime.datetime(2013, 5, 1)
         
-        next_day = math.fmod((date1-date0).days - DownloadLandsatScene.cycle_day(self, path) + 1, 16)
+        next_day = math.fmod((date1-date0).days - self.__cycle_day(path) + 1, 16)
         if next_day != 0:
             date_overpass = date1 + datetime.timedelta(16 - next_day)
         else:
             date_overpass = date1
         return(date_overpass)
 
-    def unzipimage(self, scene_id, outputdir):
+    def __unzipimage(self, scene_id, outputdir):
         """ Unzip tgz file. """
         tgz_file = os.path.join(outputdir, scene_id + '.tgz')
         out_dir = os.path.join(outputdir, scene_id)
@@ -400,7 +400,7 @@ class DownloadLandsatScene(object):
             
         return 0
 
-    def read_cloudcover_in_metadata(self, image_path):
+    def __read_cloudcover_in_metadata(self, image_path):
         """ Read cloud cover from image metadata. """
         output_list = []
         fields = ['CLOUD_COVER']
@@ -417,9 +417,9 @@ class DownloadLandsatScene(object):
                     cloud_cover = lineval.replace('\n', '')
         return float(cloud_cover)
 
-    def check_cloud_limit(self, imagepath, limit):
+    def __check_cloud_limit(self, imagepath, limit):
         """ check cloud limit provided by user. """
-        cloudcover = DownloadLandsatScene.read_cloudcover_in_metadata(self, imagepath)
+        cloudcover = self.read_cloudcover_in_metadata(imagepath)
         if cloudcover > limit:
             shutil.rmtree(imagepath)
             self.logger.info('check_cloud_limit: Image exceeds cloud cover value of " + str(cloudcover) + " defined by the user!')

@@ -40,10 +40,9 @@ class ModeledRadiance(object):
         ret_val = nd.start_download()   # make call
         if ret_val == -1:
             return -1
-        CalibrationController.cleanup(self, False, 'data/narr/HGT_1',
-                                     'data/narr/HGT_2', 'data/narr/SHUM_1',
-                                     'data/narr/SHUM_2', 'data/narr/TMP_1',
-                                     'data/narr/TMP_2')
+        self.cleanup(False, 'data/narr/HGT_1', 'data/narr/HGT_2', 
+                            'data/narr/SHUM_1', 'data/narr/SHUM_2', 
+                            'data/narr/TMP_1', 'data/narr/TMP_2')
         return 0
 
     def calc_mod_radiance(self):
@@ -61,12 +60,12 @@ class ModeledRadiance(object):
         else:
             self.modeled_radiance, caselist = return_vals
 
-            CalibrationController.cleanup(self, False, 'data/modtran/newHead.txt',
-                                          'data/modtran/newHead2.txt', 'data/modtran/newHead3.txt',
-                                          'data/modtran/newHead4.txt', 'data/modtran/tempLayers.txt',
-                                          'data/modtran/newTail.txt', 'data/modtran/newTail2.txt',
-                                          'data/modtran/newTail3.txt', 'data/modtran/newTail5.txt',
-                                          'data/modtran/newTail4.txt', 'data/modtran/newTail6.txt',)
+            self.cleanup(False, 'data/modtran/newHead.txt', 
+                         'data/modtran/newHead2.txt', 'data/modtran/newHead3.txt',
+                         'data/modtran/newHead4.txt', 'data/modtran/tempLayers.txt',
+                         'data/modtran/newTail.txt', 'data/modtran/newTail2.txt',
+                         'data/modtran/newTail3.txt', 'data/modtran/newTail5.txt',
+                         'data/modtran/newTail4.txt', 'data/modtran/newTail6.txt',)
         return 0
 
 

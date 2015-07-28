@@ -58,10 +58,10 @@ class ImageRadProcessing(object):
         for i in range(num_bands):
            self.logger.info('do_processing: band %s of %s', i+1, num_bands)
            
-           poi = ImageRadProcessing._find_roi(self)
+           poi = self.__find_roi()
 
-           dc_avg = ImageRadProcessing._calc_dc_avg(self, poi)
-           image_radiance.append(ImageRadProcessing._dc_to_rad(self, dc_avg))
+           dc_avg = self.__calc_dc_avg(poi)
+           image_radiance.append(self.__dc_to_rad(dc_avg))
            
            if self.which_landsat == [7,1]: break
            else: 
@@ -74,7 +74,7 @@ class ImageRadProcessing(object):
             
         return image_radiance, poi
         
-    def _calc_dc_avg(self, poi):
+    def __calc_dc_avg(self, poi):
         """ calculate the digital count average. """
         #open image
         im = Image.open(self.filename)
@@ -93,7 +93,7 @@ class ImageRadProcessing(object):
    
         return dc_avg
         
-    def _find_roi(self):
+    def __find_roi(self):
         """ find the rgion of interest in pixel coordinates. """
         # open image
         ds = gdal.Open(self.filename)
@@ -107,7 +107,7 @@ class ImageRadProcessing(object):
         l_y = ret_val[1]
             
         if self.metadata['UTM_ZONE'] != ret_val[2]:
-            l_x, l_y = ImageRadProcessing._convert_utm_zones(self, l_x, l_y, ret_val[2], self.metadata['UTM_ZONE'])
+            l_x, l_y = self._convert_utm_zones(l_x, l_y, ret_val[2], self.metadata['UTM_ZONE'])
         
         #calculate pixel locations- 
         #source:http://www.gdal.org/gdal_datamodel.html
@@ -116,7 +116,7 @@ class ImageRadProcessing(object):
         
         return x, y
         
-    def _convert_utm_zones(self, x, y, zone_from, zone_to):
+    def __convert_utm_zones(self, x, y, zone_from, zone_to):
         """ convert lat/lon to appropriate utm zone. """
         import ogr, osr
     
@@ -142,7 +142,7 @@ class ImageRadProcessing(object):
     
         return point.GetX(), point.GetY()
     
-    def _dc_to_rad(self, DCavg):
+    def __dc_to_rad(self, DCavg):
         """ Convert digital count average to radiance. """
         #load values from metadata for calculation
         metadata = self.metadata

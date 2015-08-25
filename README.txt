@@ -1,5 +1,3 @@
-RIT 2015
-
 Calculates and compares the radiance of a thermal LANSAT scene to the actual
 radiance as measured by a NBDC buoy. Based on work by Frank Padula and Monica Cook.
 
@@ -21,5 +19,4 @@ Output can be found in ./logs/output.txt
 Notes:
 Log information can be found in ./logs/calibrationController.log, ./logs/modtran.log
 
-Developed by Nathan Dileas
-Bugs: nid4986@rit.edu, subject line: "Landsat Vicarious Calibration Bug"
+Developed by Nathan Dileas, RIT 2015

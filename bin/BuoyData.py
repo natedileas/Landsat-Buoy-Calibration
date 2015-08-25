@@ -119,25 +119,28 @@ class BuoyData(object):
                 if os.path.exists(unzipped_file):
                     subprocess.Popen('rm '+unzipped_file, shell=True)
             else:
-                skin_temp = self.__find_skin_temp(url, depths[urls.index(url)])
+                ret_val = self.__find_skin_temp(url, depths[urls.index(url)])
 
-                if skin_temp == -1:
+                if ret_val == -1:
                     self.logger.warning('.start_download: The date range \
                     requested was not found in the data set %s.', self.dataset)
 
                     if os.path.exists(unzipped_file):
                         subprocess.Popen('rm '+unzipped_file, shell=True)
-
-                elif skin_temp >= 600:
-                    self.logger.warning('.start_download: No water temp data \
-                    for selected date range in the data set %s.', self.dataset)
-
-                    if os.path.exists(unzipped_file):
-                        subprocess.Popen('rm '+unzipped_file, shell=True)
                 else:
                     # good exit, return buoy actually used
+                    skin_temp, pres, atemp, dewp = ret_val
+                    
+                    if skin_temp >= 600:
+                        self.logger.warning('.start_download: No water temp data \
+                    for selected date range in the data set %s.', self.dataset)
+
+                        if os.path.exists(unzipped_file):
+                            subprocess.Popen('rm '+unzipped_file, shell=True)
+
                     return_vals = [datasets[urls.index(url)],
-                                   buoy_coors[urls.index(url)], skin_temp]
+                                   buoy_coors[urls.index(url)], skin_temp,
+                                   pres, atemp, dewp]
 
                     if os.path.exists(unzipped_file):
                         subprocess.Popen('rm '+unzipped_file, shell=True)
@@ -375,11 +378,17 @@ class BuoyData(object):
         # compute 24hr wind speed and temperature
         avg_wspd = 0    # m/s
         avg_wtmp = 0    # C
+        pres = 0
+        atemp = 0
+        dewp = 0
 
         for i in range(24):
             try:
                 avg_wspd += float(data[i][6]) / 24
                 avg_wtmp += float(data[i][14]) / 24
+                pres += float(data[i][12]) / 24
+                atemp += float(data[i][13]) / 24
+                dewp += float(data[i][15]) / 24
             except ValueError:
                 pass
             except IndexError:
@@ -398,4 +407,4 @@ class BuoyData(object):
         # CALCULATE SKIN_TEMPERATURE. sry for the caps
         skin_temp = avg_wtmp + 273.15 - (a * z) - d
 
-        return skin_temp
+        return skin_temp, pres, atemp, dewp

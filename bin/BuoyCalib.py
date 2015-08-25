@@ -29,6 +29,7 @@ class ModeledRadiance(object):
         """ initialize the object. """
         self.modeled_temperature = []
         self.modeled_radiance = []
+        self.narr_coor = []
 
     def download_mod_data(self):
         """ doenload NARR data. """
@@ -39,6 +40,7 @@ class ModeledRadiance(object):
         nd = NarrData.NarrData(self)   # initialize
         ret_val = nd.start_download()   # make call
         if ret_val == -1:
+            self.logger.info('download_mod_data: missing wgrib issue')
             return -1
         self.cleanup(False, 'data/narr/HGT_1', 'data/narr/HGT_2', 
                             'data/narr/SHUM_1', 'data/narr/SHUM_2', 
@@ -58,7 +60,7 @@ class ModeledRadiance(object):
             self.logger.info('calc_mod_radiance: return_vals were -1')
             return -1
         else:
-            self.modeled_radiance, caselist = return_vals
+            self.modeled_radiance, caselist, self.narr_coor = return_vals
 
             self.cleanup(False, 'data/modtran/newHead.txt', 
                          'data/modtran/newHead2.txt', 'data/modtran/newHead3.txt',
@@ -113,6 +115,8 @@ class SensorRadiance(object):
 
         self.cloud_cover = None
         self.poi = None
+        
+        self.image_file_extension = 'data/landsat'
 
     @property
     def scene_id(self):
@@ -265,12 +269,15 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
 
         if return_vals:
             if return_vals == -1:
-                sys.exit()
+                return -1
             else:
                 self.buoy_id = return_vals[0]
                 self.buoy_latitude = return_vals[1][0]
                 self.buoy_longitude = return_vals[1][1]
                 self.buoy_temperature = return_vals[2]
+                self.buoy_press = return_vals[3]
+                self.buoy_airtemp = return_vals[4]
+                self.buoy_dewpnt = return_vals[5]
                 self.cleanup_list.append('data/buoy/station_table.txt')
                 return 0
         else:
@@ -299,13 +306,14 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
         """ Output calculated values to command line or txt file. """
         if self.output_txt:
             outfile = os.path.join(self.filepath_base, 'logs/output.txt')
-            #other = '%21s%7s%10s%7s' % (self.scene_id, self.buoy_latitude, self.buoy_longitude, self.buoy_id)
+            header = '%21s' % (self.scene_id)
+            buoy_info = ' %7s%8s%7s %4.4f' %(self.buoy_latitude, self.buoy_longitude, self.buoy_id, self.buoy_temperature)
             radiances = ' %2.6f %2.6f %2.6f %2.6f' % (self.image_radiance[0], self.modeled_radiance[0], self.image_radiance[1], self.modeled_radiance[1])
-            buoy_temp = ' %4.4f' % float(self.buoy_temperature)
-            #timestamp = '   '+datetime.datetime.now().strftime('%m/%d/%y-%H:%M:%S')
+            narr_coor = ' %14s, %14s, %14s, %14s' % (self.narr_coor[0], self.narr_coor[1], self.narr_coor[2], self.narr_coor[3])
+            timestamp = '   '+datetime.datetime.now().strftime('%m/%d/%y-%H:%M:%S')
 
             with open(outfile, 'a') as f:
-                f.write(radiances + buoy_temp + '\n')
+                f.write(header + buoy_info + radiances + narr_coor + '\n')
         else:
             print 'Scene ID: ', self.scene_id
             if self.buoy_latitude: print 'Buoy Latitude:', self.buoy_latitude

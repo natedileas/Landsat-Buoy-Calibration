@@ -8,7 +8,7 @@ import time
 import subprocess
 import logging
 import sys
-
+import httplib
 
 class LandsatData(object):
     """ Download Landsat Images and Metadata.
@@ -33,7 +33,7 @@ class LandsatData(object):
     def __init__(self, other):
         """ initialize the attributes using a CalibrationController object. """
         self.filepath_base = other.filepath_base
-        self.save_dir = os.path.join(self.filepath_base, 'data/landsat')
+        self.save_dir = os.path.join(self.filepath_base, other.image_file_extension)
         
         log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
         logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
@@ -92,6 +92,10 @@ class LandsatData(object):
             self.scene_id = landsat_id
             
         metadata = self.read_metadata()
+        
+        if metadata == -1:
+            self.logger.warning('.start_download: wrong version was downloaded')
+            return -1
 
         return self.scene_id, metadata
 
@@ -111,25 +115,28 @@ class LandsatData(object):
             ValueError: Attempt to float() NaN: handled
         """
 
-        filename = os.path.join(self.save_dir, '%s/%s_MTL.txt' %
-                                (self.scene_id, self.scene_id))
+        filename = os.path.join(self.save_dir, '%s_MTL.txt' %
+                                ( self.scene_id))
         info = []*2
         chars = ['\n', '"', '\'']    # characters to remove from lines
         desc = []
         data = []
 
         # open file, split, and save to two lists
-        with open(filename, 'r') as f:
-            for line in f:
-                try:
-                    info = line.split(' = ')
-                    info[1] = info[1].translate(None, ''.join(chars))
-                    desc.append(info[0])
-                    data.append(float(info[1]))
-                except IndexError:
-                    break
-                except ValueError:
-                    data.append(info[1])
+        try:
+            with open(filename, 'r') as f:
+                for line in f:
+                    try:
+                        info = line.split(' = ')
+                        info[1] = info[1].translate(None, ''.join(chars))
+                        desc.append(info[0])
+                        data.append(float(info[1]))
+                    except IndexError:
+                        break
+                    except ValueError:
+                        data.append(info[1])
+        except IOError:
+            return -1
 
         desc = [x.strip(' ') for x in desc]   # remove empty entries in list
         metadata = dict(zip(desc, data))   # create dictionary
@@ -192,16 +199,14 @@ class DownloadLandsatScene(object):
         #assign dates
         sixteen_days = datetime.timedelta(16)
         search_date = self.__next_overpass(date, int(path), prefix)
-        dates = [datetime.datetime.strftime(search_date, '%Y%j'), 
-                 datetime.datetime.strftime(search_date + sixteen_days, '%Y%j'),
-                 datetime.datetime.strftime(search_date - sixteen_days, '%Y%j')]
+        date = datetime.datetime.strftime(search_date, '%Y%j')
             
         scene_ids = [scene_id]
         
-        for date in dates:
-            for station in stations:
-                for version in ['00', '01', '02', '03', '04']:
-                    scene_ids.append(prefix + scene + date + station + version)
+        
+        for station in stations:
+            for version in ['00', '01', '02', '03', '04']:
+                scene_ids.append(prefix + scene + date + station + version)
                    
         scene_ids = filter(None, scene_ids)
         
@@ -246,7 +251,7 @@ class DownloadLandsatScene(object):
     def __get_status(self, scene_id, output_dir, url):
         """ get status of file. """
         tgzfile = os.path.join(output_dir, scene_id + '.tgz')
-        unzipdfile = os.path.join(output_dir, scene_id)
+        unzipdfile = os.path.join(output_dir, scene_id + '_B10.TIF')
     
         if os.path.exists(unzipdfile):   #downloaded and unzipped
             return 1
@@ -304,6 +309,9 @@ class DownloadLandsatScene(object):
         except urllib2.URLError, e:
             self.logger.error('URL Error: %s %s' % (e.reason, url))
             return -1
+            
+        except httplib.BadStatusLine:
+            pass
 
     def __sizeof_fmt(self, num):
         for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
@@ -419,7 +427,7 @@ class DownloadLandsatScene(object):
 
     def __check_cloud_limit(self, imagepath, limit):
         """ check cloud limit provided by user. """
-        cloudcover = self.read_cloudcover_in_metadata(imagepath)
+        cloudcover = self.__read_cloudcover_in_metadata(imagepath)
         if cloudcover > limit:
             shutil.rmtree(imagepath)
             self.logger.info('check_cloud_limit: Image exceeds cloud cover value of " + str(cloudcover) + " defined by the user!')

@@ -35,16 +35,14 @@ class ImageRadProcessing(object):
         self.scene_id = other._scene_id
         self.metadata = other.metadata
         self.buoy_coor = [other.buoy_latitude, other.buoy_longitude]
-        self.save_dir = os.path.join(other.filepath_base, 'data/landsat')
+        self.save_dir = os.path.join(other.filepath_base, other.image_file_extension)
         
         if other.satelite == 8:
             self.which_landsat = [8,2]
-            self.filename = '%s/%s' % (self.metadata['LANDSAT_SCENE_ID'], \
-                                         self.metadata['FILE_NAME_BAND_10'])
+            self.filename = '%s' % ( self.metadata['FILE_NAME_BAND_10'])
         else: 
             self.which_landsat = [7,1]
-            self.filename = '%d/%d.TIF' % (self.metadata['LANDSAT_SCENE_ID'],\
-                                     self.metadata['FILE_NAME_BAND_6_VCID_2'])
+            self.filename = '%d.TIF' % (self.metadata['FILE_NAME_BAND_6_VCID_2'])
         
         #strip unwanted characters and make a solid path
         self.filename = self.filename.translate(None, ''.join('"'))   
@@ -66,8 +64,7 @@ class ImageRadProcessing(object):
            if self.which_landsat == [7,1]: break
            else: 
                self.which_landsat = [8,1]
-               self.filename = '%s/%s' % (self.metadata['LANDSAT_SCENE_ID'], \
-                                          self.metadata['FILE_NAME_BAND_11'])
+               self.filename = '%s' %(self.metadata['FILE_NAME_BAND_11'])
                #strip unwanted characters and make a solid path
                self.filename = self.filename.translate(None, ''.join('"'))   
                self.filename = os.path.join(self.save_dir, self.filename)
@@ -107,7 +104,7 @@ class ImageRadProcessing(object):
         l_y = ret_val[1]
             
         if self.metadata['UTM_ZONE'] != ret_val[2]:
-            l_x, l_y = self._convert_utm_zones(l_x, l_y, ret_val[2], self.metadata['UTM_ZONE'])
+            l_x, l_y = self.__convert_utm_zones(l_x, l_y, ret_val[2], self.metadata['UTM_ZONE'])
         
         #calculate pixel locations- 
         #source:http://www.gdal.org/gdal_datamodel.html

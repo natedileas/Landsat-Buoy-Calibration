@@ -1,28 +1,38 @@
 #list.py
 import sys
+import os
+import re
+from collections import OrderedDict
 
-def id_list():
-    #44009, 41009s, 2-14
-    #issues with 5, 9, 14
-    #scene_IDs = ['LC80130332013145LGN00','LC80140332013104LGN01','LC80140332013200LGN00','LC80140332014299LGN00','LC80150402013175LGN00','LC80150402013207LGN00','LC80150402013239LGN00','LC80150402014002LGN00','LC80150402014018LGN00','LC80150402014114LGN00','LC80150402014210LGN00','LC80150402014258LGN00','LC80150402014290LGN00']
-
-    #buoy_IDs = ['44009',44009',44009',44009','41009','41009','41009','41009','41009', '41009', '41009', '41009', '41009']
+def id_list(directory):
+    a = os.listdir(directory)
+    d = []
     
+    with open('./logs/output.txt', 'r') as f:
+        output = f.read()
+
+
+    LID = re.compile('^L[CE][78]\d*\w\w\w0[0-5]')
     
-
-    #46025 buoy, no narr points in scene
-    scene_IDs = ['LC80410372013133LGN01','LC80410372013149LGN00','LC80410372013181LGN00','LC80410372014072LGN00','LC80410372014104LGN00','LC80410372014136LGN00','LC80160302013166LGN04','LC80160302013262LGN00','LC80160302014153LGN00','LC80160302014185LGN00','LC80170302013237LGN00','LC80170302013285LGN00','LC80170302014144LGN00','LC80170302014192LGN00','LC80170302014272LGN00','LC80200292013226LGN00','LC80200292013226LGN00']
-
-    buoy_IDs = ['46025','46025','46025','46025','46025','46025','45012','45012','45012','45012','45012','45012','45012','45012','45012','45003','45008']
-
-
-
-    if len(scene_IDs) != len(buoy_IDs):
-       print 'Lengths are not the same!'
-       print len(scene_IDs)
-       print len(buoy_IDs)
-       sys.exit()
-    return scene_IDs, buoy_IDs
+    for file in a:
+        match = re.match(LID, file)
+        if match:   # if it matches the pattern
+            if not str(match.group()) in output:
+                d.append(match.group())
+            
+    #remove duplicates
+    ids = list(OrderedDict.fromkeys(d))
+    
+    #remove unwated path/rows, these are jpl buoy scenes
+    wrs2s = ['042033', '137207', '140211']
+    scene_IDs = 0
+    for wrs2 in wrs2s:
+        scene_IDs = [sid for sid in ids if not wrs2 in sid]
+    
+    #print scene_IDs
+    print len(scene_IDs)
+    
+    return scene_IDs
     
 if __name__ == '__main__':
-    print id_list()
+    print id_list('./data/landsat')

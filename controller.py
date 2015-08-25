@@ -3,7 +3,7 @@ if __name__=='__main__':
     import bin.BuoyCalib
     import time
     import sys
-    
+
     try:
         if len(sys.argv) == 1:
             sys.exit()
@@ -39,7 +39,7 @@ if __name__=='__main__':
             # read from file #TODO decide standard file
             from id_list import id_list
 
-            scene_IDs, buoy_IDs = id_list()
+            scene_IDs = id_list('/dirs/staff/adgpci/BUOYS')
             
             start_time = time.time()
             #start runs
@@ -53,24 +53,25 @@ if __name__=='__main__':
                     cc.verbose = args.verbose
                     
                 cc.scene_id = scene_IDs[i]
-                cc.buoy_id = buoy_IDs[i]
+                cc.image_file_extension = 'data/landsat/%s/'%(scene_IDs[i])
             
                 __=cc.download_img_data()
                 
+                #regular run
                 if __ != -1:
                     __=cc.calculate_buoy_information()
-
-                    __=cc.calc_img_radiance()
-
-                    __=cc.download_mod_data()
                     if __ != -1:
-                    
-                        __=cc.calc_mod_radiance()
-                        
+                        __=cc.calc_img_radiance()
+
+                        __=cc.download_mod_data()
                         if __ != -1:
-                            __=cc.output()
-                        else:
-                            print cc.image_radiance
+                        
+                            __=cc.calc_mod_radiance()
+                        
+                            if __ != -1:
+                                __=cc.output()
+                            else:
+                                print cc.image_radiance
                 __=cc.cleanup(True)
                 
                 print '[ %s / %s ] Completed. Elapsed Time: %2.1f mins %s' % (i+1,len(scene_IDs), (time.time()-start_time)/60, scene_IDs[i])
@@ -79,6 +80,8 @@ if __name__=='__main__':
             
             if args.input == 'ids':
                 cc.scene_id = args.scene_id
+                
+                cc.image_file_extension = 'data/landsat/%s/'%(args.scene_id)
                 
             elif args.input == 'piece':
                 cc.satelite = args.satelite

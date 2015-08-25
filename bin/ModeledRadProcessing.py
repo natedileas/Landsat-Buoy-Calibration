@@ -34,6 +34,10 @@ class ModeledRadProcessing(object):
         # both
         self.skin_temp = other.buoy_temperature
         self.verbose = other.verbose
+        
+        self.buoy_press = other.buoy_press
+        self.buoy_airtemp = other.buoy_airtemp
+        self.buoy_dewpnt = other.buoy_dewpnt
 
         if other.satelite == 8:
             self.which_landsat = [8,2]
@@ -52,10 +56,8 @@ class ModeledRadProcessing(object):
         # read in narr data and generate tape5 files and caseList
         current_dir = os.getcwd()
         os.chdir(self.filepath_base)
-        mt5 = MakeTape5s(self.metadata, self.buoy_coors, self.skin_temp, self.which_landsat, self.filepath_base, self.verbose)
+        mt5 = MakeTape5s(self.metadata, self.buoy_coors, self.skin_temp, self.which_landsat, self.filepath_base, self.verbose, [self.buoy_press, self.buoy_airtemp, self.buoy_dewpnt])
         ret_vals = mt5.main()   # first_files equivalent
-        
-        __ = raw_input('Press any key when done modifying the tape5 files...')
         
         if ret_vals != -1:
             caseList, narr_coor = ret_vals
@@ -133,7 +135,7 @@ class ModeledRadProcessing(object):
             else: break
 
         os.chdir(current_dir)
-        return return_radiance, caseList
+        return return_radiance, caseList, narr_coor
 
     def __read_tape6(self, case):
         """read in tape6 files and return values
@@ -221,7 +223,7 @@ class ModeledRadProcessing(object):
     def __interpolate_params(self, array, narr_coor):
         narr_coor = numpy.absolute(narr_coor)
         buoy_coors = numpy.absolute(self.buoy_coors)
-        array = numpy.reshape(array, (4, 411))
+        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
         
         diffs_x = numpy.absolute(numpy.subtract(narr_coor[:, 0], buoy_coors[0]))
         diffs_y = numpy.absolute(numpy.subtract(narr_coor[:, 1], buoy_coors[1]))
@@ -346,7 +348,7 @@ class ModeledRadProcessing(object):
 
 
 class MakeTape5s(object):
-    def __init__(self, metadata, buoy_coor, skin_temp, whichLandsat, filepath_base, verbose):
+    def __init__(self, metadata, buoy_coor, skin_temp, whichLandsat, filepath_base, verbose, buoy_params):
         self.filepath_base = filepath_base
 
         log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
@@ -360,6 +362,7 @@ class MakeTape5s(object):
         self.directory = os.path.join(self.filepath_base, 'data/modtran/')
         self.home = os.path.join(self.filepath_base, 'data')
         self.skin_temp = '%3.3f' % (skin_temp)
+        self.buoy_params = buoy_params
         self.verbose = verbose
 
         self.geometricHeight_1 = None
@@ -606,12 +609,9 @@ class MakeTape5s(object):
         lon = numpy.reshape(narrLon,(277,349)).astype(float)
     
         if self.metadata['CORNER_UL_LAT_PRODUCT'] > 0: 
-            landsatHemi = 6 
+            landsatHemi = 6
         else: 
-            landsatHemi = 7        
-    
-        #UL_utm = utm.from_latlon(self.metadata['CORNER_UL_LAT_PRODUCT'] + 0.5,self.metadata['CORNER_UL_LON_PRODUCT'] - 0.5)
-        #LR_utm = utm.from_latlon(self.metadata['CORNER_LR_LAT_PRODUCT'] - 0.5,self.metadata['CORNER_LR_LON_PRODUCT'] + 0.5)
+            landsatHemi = 7
         
         UL_X = self.metadata['CORNER_UL_LAT_PRODUCT'] + 0.5
         UL_Y = self.metadata['CORNER_UL_LON_PRODUCT'] - 0.5
@@ -829,6 +829,7 @@ class MakeTape5s(object):
         case_list = ['']*num_points
         entry = 0
     
+        plot_list = [0]*4
         for i in range(num_points):
             latString = '%2.3f' % (lat[NARRindices[i,0], NARRindices[i,1]])
             
@@ -942,6 +943,71 @@ class MakeTape5s(object):
             dewpoint_k = tempTemp - ((100 - tempRelHum) / 5)   #kelvin
             #source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
             
+            
+#            #########################  RADIOSONDE CORRECTION   ##################################
+#            radiosonde = []
+#            rad_file = '../testing/radiosonde_test/4_14_13.rsd'
+#            with open(rad_file, 'r') as f:
+#                lines = f.readlines()
+#                for line in lines[5:]:
+#                    if not '99999' in line:
+#                        #line = line.replace('99999', '0')
+#                        data=line.split()
+#                
+#                        radiosonde.append([float(data[2])/1000.0, float(data[1])/10.0, float(data[3])/10.0+273.15, float(data[4])/10.0+273.15])
+#                    
+#            radiosonde = numpy.asarray(radiosonde)
+#            #radiosonde = numpy.reshape(radiosonde, (4, numpy.shape(radiosonde)[0]))
+#            rad_height = radiosonde[:, 0]
+#            rad_press = radiosonde[:, 1]
+#            rad_temp = radiosonde[:, 2]
+#            rad_dewpoint = radiosonde[:, 3]
+#            
+#            radiosonde = numpy.array([rad_height, rad_press, rad_temp, rad_dewpoint])
+#            
+#            sorts_idxs = numpy.argsort(rad_height)
+#            
+#            find_nearest = lambda a, a0: (numpy.abs(a - a0)).argmin()
+#            
+#            j = 0
+#            indexs = []
+#            while len(indexs) < 3:
+#                idx = numpy.where(sorts_idxs == j)
+#                if rad_press[idx] != 0.0:
+#                    if rad_temp[idx] != 0.0:
+#                        if rad_height[idx] != 0.0:
+#                            if rad_dewpoint[idx] != 0.0:
+#                                 indexs.append(idx)
+#                j += 1
+#            indexs = [x[0][0] for x in indexs]
+#            
+#            a = find_nearest(tempGeoHeight, rad_height[indexs[-1]])
+#            tempGeoHeight = numpy.insert(tempGeoHeight[a:], 0, rad_height[indexs])
+#            tempPress = numpy.insert(tempPress[a:], 0, rad_press[indexs])
+#            tempTemp = numpy.insert(tempTemp[a:], 0, rad_temp[indexs])
+#            dewpoint_k = numpy.insert(dewpoint_k[a:], 0, rad_dewpoint[indexs])
+            #######################################################################
+
+            ##################### BUOY CORRECTION #################################
+            
+#            print tempPress[0], ' ', self.buoy_params[0]
+#            print tempTemp[0], ' ', self.buoy_params[1] + 273.15
+#            print dewpoint_k[0], ' ', self.buoy_params[2] + 273.15
+            
+#            tempPress[0] = self.buoy_params[0]
+#            tempTemp[0] = self.buoy_params[1] + 273.15
+#            dewpoint_k[0] = self.buoy_params[2] + 273.15
+#            
+#            #######################################################################
+#            
+#            ################### RADIOSONDE TEST ##################################
+#            
+#            tempGeoHeight = rad_height
+#            tempPress = rad_press
+#            tempTemp = rad_temp
+#            dewpoint_k = rad_dewpoint
+            
+            #########################################################################
             with open(filename, 'w') as f:
                 for k in range(numpy.shape(tempGeoHeight)[0]):
                     line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%16s\n' % \
@@ -951,6 +1017,8 @@ class MakeTape5s(object):
                     line = line.replace('e', 'E')
                     f.write(line)
             
+            plot_list[i] = (tempGeoHeight, tempPress, tempTemp, dewpoint_k)
+            #print plot_list[i]
             # determine number of layers for current ground altitude and insert into head file
             numLayers = numpy.shape(tempGeoHeight)[0]
     
@@ -993,5 +1061,9 @@ class MakeTape5s(object):
             for i in range(len(case_list)):
                 f.write(case_list[i])
                 f.write('\n')
+
+
+        #import test_plot
+        #test_plot.plot_atmo(plot_list, radiosonde, show=True)
 
         return case_list

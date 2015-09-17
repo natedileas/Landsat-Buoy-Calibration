@@ -76,10 +76,27 @@ class ModeledRadProcessing(object):
         return_radiance = []
         radiances = []
         
-        emissivity = .986    # of water
-        reflectivity = 1 - emissivity   
+        # OLD Emissivity
+        # emissivity = .986
+        # reflectivity = 1 - emissivity
+        
+        # New Emissivity
+        spec_r = numpy.array(0)
+        spec_r_wvlens = numpy.array(0)
+        water_file = './data/water.txt'
+        
+        with open(water_file, 'r') as f:
+            water_file = f.readlines()
+            for line in water_file[3:]:
+                data = line.split()
+                spec_r_wvlens = numpy.append(spec_r_wvlens, float(data[0]))
+                spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
+        
+        #spec_emissivity = numpy.interp(wavelengths, spec_e_wvlens, spec_emissivity)
+        #spec_reflectivity = 1 - spec_emissivity
 
         num_bands = self.which_landsat[1]
+
         for i in range(num_bands):
             upwell_rad = []
             downwell_rad = []
@@ -99,20 +116,22 @@ class ModeledRadProcessing(object):
                 transmission = numpy.append(transmission, ret_vals[3])
                 
             upwell_rad = self.__interpolate_params(upwell_rad, narr_coor)
-            downwell_rad= self.__interpolate_params(downwell_rad, narr_coor)
+            downwell_rad = self.__interpolate_params(downwell_rad, narr_coor)
             transmission = self.__interpolate_params(transmission, narr_coor)
             
             RSR, RSR_wavelengths = self.__read_RSR()
                 
-            # interpolate RSR to match wavelengths
+            # interpolate RSR and emissivity to match wavelengths
             RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
+            spec_reflectivity = numpy.interp(wavelengths, spec_r_wvlens, spec_r)
+            spec_emissivity = 1 - spec_reflectivity
 
             # calculate temperature array
             Lt = self.__calc_temperature_array(wavelengths)
                 
             # calculate top of atmosphere radiance
-            term1 = numpy.multiply(Lt, emissivity)
-            term2 = numpy.multiply(downwell_rad, reflectivity)
+            term1 = numpy.multiply(Lt, spec_emissivity)
+            term2 = numpy.multiply(downwell_rad, spec_reflectivity)
             term1_2 = numpy.add(term1,term2)
             term3 = numpy.multiply(transmission, term1_2)
             Ltoa = numpy.add(upwell_rad, term3)

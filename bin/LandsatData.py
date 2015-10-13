@@ -94,7 +94,7 @@ class LandsatData(object):
         metadata = self.read_metadata()
         
         if metadata == -1:
-            self.logger.warning('.start_download: wrong version was downloaded')
+            self.logger.warning('.start_download: data not downlaoded or unzipped correctly')
             return -1
 
         return self.scene_id, metadata
@@ -168,7 +168,8 @@ class DownloadLandsatScene(object):
                             filemode='w', level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
-        output_dir = str(output)
+        output_dir = str(output)[:-22]
+
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -251,7 +252,8 @@ class DownloadLandsatScene(object):
     def __get_status(self, scene_id, output_dir, url):
         """ get status of file. """
         tgzfile = os.path.join(output_dir, scene_id + '.tgz')
-        unzipdfile = os.path.join(output_dir, scene_id + '_B10.TIF')
+        unzip_dir = os.path.join(output_dir, scene_id)
+        unzipdfile = os.path.join(unzip_dir, scene_id + '_B10.TIF')
     
         if os.path.exists(unzipdfile):   #downloaded and unzipped
             return 1

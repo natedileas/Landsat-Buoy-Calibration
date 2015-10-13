@@ -92,9 +92,6 @@ class ModeledRadProcessing(object):
                 spec_r_wvlens = numpy.append(spec_r_wvlens, float(data[0]))
                 spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
         
-        #spec_emissivity = numpy.interp(wavelengths, spec_e_wvlens, spec_emissivity)
-        #spec_reflectivity = 1 - spec_emissivity
-
         num_bands = self.which_landsat[1]
 
         for i in range(num_bands):
@@ -121,10 +118,11 @@ class ModeledRadProcessing(object):
             
             RSR, RSR_wavelengths = self.__read_RSR()
                 
-            # interpolate RSR and emissivity to match wavelengths
+            # interpolate RSR and reflectivity to match wavelength range
             RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
             spec_reflectivity = numpy.interp(wavelengths, spec_r_wvlens, spec_r)
-            spec_emissivity = 1 - spec_reflectivity
+            
+            spec_emissivity = 1 - spec_reflectivity   # calculate emissivity
 
             # calculate temperature array
             Lt = self.__calc_temperature_array(wavelengths)
@@ -135,6 +133,9 @@ class ModeledRadProcessing(object):
             term1_2 = numpy.add(term1,term2)
             term3 = numpy.multiply(transmission, term1_2)
             Ltoa = numpy.add(upwell_rad, term3)
+            
+            ## Lbb(T) * tau * emis + gnd_ref*reflect + pth_thermal
+            ### TODO
             
             #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
                 

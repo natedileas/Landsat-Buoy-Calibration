@@ -99,6 +99,7 @@ class ModeledRadProcessing(object):
             downwell_rad = []
             wavelengths = []
             transmission = []
+            gnd_reflect = []
             
             self.logger.info('do_processing: band %s of %s', i+1, num_bands)
             
@@ -111,6 +112,7 @@ class ModeledRadProcessing(object):
                 downwell_rad = numpy.append(downwell_rad, ret_vals[1])
                 wavelengths = ret_vals[2]
                 transmission = numpy.append(transmission, ret_vals[3])
+                gnd_reflect = numpy.append(gnd_reflect, ret_vals[1])
                 
             upwell_rad = self.__interpolate_params(upwell_rad, narr_coor)
             downwell_rad = self.__interpolate_params(downwell_rad, narr_coor)
@@ -128,14 +130,19 @@ class ModeledRadProcessing(object):
             Lt = self.__calc_temperature_array(wavelengths)
                 
             # calculate top of atmosphere radiance
-            term1 = numpy.multiply(Lt, spec_emissivity)
-            term2 = numpy.multiply(downwell_rad, spec_reflectivity)
-            term1_2 = numpy.add(term1,term2)
-            term3 = numpy.multiply(transmission, term1_2)
-            Ltoa = numpy.add(upwell_rad, term3)
             
-            ## Lbb(T) * tau * emis + gnd_ref*reflect + pth_thermal
-            ### TODO
+            # OLD METHOD
+            #term1 = numpy.multiply(Lt, spec_emissivity)
+            #term2 = numpy.multiply(downwell_rad, spec_reflectivity)
+            #term1_2 = numpy.add(term1,term2)
+            #term3 = numpy.multiply(transmission, term1_2)
+            #Ltoa = numpy.add(upwell_rad, term3)
+            
+            # NEW METHOD
+            ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
+            term1 = Lt * spec_emissivity * transmission
+            term2 = spec_reflectivity
+            Ltoa = upwell_rad + term1 + term2
             
             #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
                 
@@ -238,7 +245,11 @@ class ModeledRadProcessing(object):
         transission = numpy.fliplr(transission)
         transission = transission[0]
         
-        return radiance_up, radiance_dn, wavelength, transission
+        gnd_reflected_radiance = numpy.tile(gnd_reflected_radiance,(1,1))
+        gnd_reflected_radiance = numpy.fliplr(gnd_reflected_radiance)
+        gnd_reflected_radiance = gnd_reflected_radiance[0]
+        
+        return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
         
     def __interpolate_params(self, array, narr_coor):
         narr_coor = numpy.absolute(narr_coor)
@@ -260,6 +271,35 @@ class ModeledRadProcessing(object):
         array_interp = (array_x + array_y) / 2.0
 
         return array_interp
+        
+    def __bilinear_interp(self, array, narr_corr):
+        narr_coor = numpy.absolute(narr_coor)
+        buoy_coors = numpy.absolute(self.buoy_coors)
+        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
+        
+        # f(x, y) = w1 * ((f(1,1) * w2) + (f(2,1) * w3) + (f(1,2)*w4), (f(2,2)*w5))
+        # w1 = 1 / ((x2-x1)(y2-y1))
+        # w2 = (x2-x)(y2-y)
+        # w3 = (x-x1)(y2-y)
+        # w4 = (x2-x)(y-y1)
+        # w5 = (x-x1)(y-y1)
+        
+        a = (0, 0)
+        b = (0, )
+        c = (, 0)
+        d = (, )
+        
+        e = (, )
+        
+        w1 = 1 / (c[0] * b[1])
+        w2 = (c[0] - e[0]) * (b[1] - e[1])
+        w3 = (e[0]) * (b[1] - e[1])
+        w4 = (c[0] - e[0]) * (e[1])
+        w5 = (e[0]) * (e[1])
+        
+        weighted =  w1 * ((array[0] * w2) + (array[2] * w3) + (array[1] * w4), (array[3] * w5))
+        
+        return weighted
         
     def __read_RSR(self):
         """read in RSR data and return it to the caller.

@@ -117,18 +117,29 @@ class ModeledRadProcessing(object):
             upwell_rad = self.__interpolate_params(upwell_rad, narr_coor)
             downwell_rad = self.__interpolate_params(downwell_rad, narr_coor)
             transmission = self.__interpolate_params(transmission, narr_coor)
+            gnd_reflect = self.__interpolate_params(gnd_reflect, narr_coor)
             
             RSR, RSR_wavelengths = self.__read_RSR()
                 
             # interpolate RSR and reflectivity to match wavelength range
-            RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
-            spec_reflectivity = numpy.interp(wavelengths, spec_r_wvlens, spec_r)
+            # upsampling the rsr may be causing issues.
+            #RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
+            #spec_reflectivity = numpy.interp(wavelengths, spec_r_wvlens, spec_r)
+            
+            upwell_rad = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)
+            downwell_rad = numpy.interp(RSR_wavelengths, wavelengths, downwell_rad)
+            transmission = numpy.interp(RSR_wavelengths, wavelengths, transmission)
+            gnd_reflect = numpy.interp(RSR_wavelengths, wavelengths, gnd_reflect)
+            spec_reflectivity = numpy.interp(RSR_wavelengths, spec_r_wvlens, spec_r)
+            
+            #print numpy.size(RSR)
+            #print numpy.size(spec_reflectivity)
+            #print numpy.size(transmission)
             
             spec_emissivity = 1 - spec_reflectivity   # calculate emissivity
 
             # calculate temperature array
-            Lt = self.__calc_temperature_array(wavelengths)
-                
+            Lt = self.__calc_temperature_array(RSR_wavelengths)
             # calculate top of atmosphere radiance
             
             # OLD METHOD
@@ -141,14 +152,14 @@ class ModeledRadProcessing(object):
             # NEW METHOD
             ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
             term1 = Lt * spec_emissivity * transmission
-            term2 = spec_reflectivity
+            term2 = spec_reflectivity * gnd_reflect
             Ltoa = upwell_rad + term1 + term2
             
             #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
                 
             # calculate observed radiance
-            numerator = self.__integrate(wavelengths, numpy.multiply(Ltoa, RSR))
-            denominator = self.__integrate(wavelengths, RSR)
+            numerator = self.__integrate(RSR_wavelengths, numpy.multiply(Ltoa, RSR))
+            denominator = self.__integrate(RSR_wavelengths, RSR)
             
             try:
                 modeled_rad = numerator / denominator
@@ -272,34 +283,34 @@ class ModeledRadProcessing(object):
 
         return array_interp
         
-    def __bilinear_interp(self, array, narr_corr):
-        narr_coor = numpy.absolute(narr_coor)
-        buoy_coors = numpy.absolute(self.buoy_coors)
-        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
-        
-        # f(x, y) = w1 * ((f(1,1) * w2) + (f(2,1) * w3) + (f(1,2)*w4), (f(2,2)*w5))
-        # w1 = 1 / ((x2-x1)(y2-y1))
-        # w2 = (x2-x)(y2-y)
-        # w3 = (x-x1)(y2-y)
-        # w4 = (x2-x)(y-y1)
-        # w5 = (x-x1)(y-y1)
-        
-        a = (0, 0)
-        b = (0, )
-        c = (, 0)
-        d = (, )
-        
-        e = (, )
-        
-        w1 = 1 / (c[0] * b[1])
-        w2 = (c[0] - e[0]) * (b[1] - e[1])
-        w3 = (e[0]) * (b[1] - e[1])
-        w4 = (c[0] - e[0]) * (e[1])
-        w5 = (e[0]) * (e[1])
-        
-        weighted =  w1 * ((array[0] * w2) + (array[2] * w3) + (array[1] * w4), (array[3] * w5))
-        
-        return weighted
+#    def __bilinear_interp(self, array, narr_corr):
+#        narr_coor = numpy.absolute(narr_coor)
+#        buoy_coors = numpy.absolute(self.buoy_coors)
+#        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
+#        
+#        # f(x, y) = w1 * ((f(1,1) * w2) + (f(2,1) * w3) + (f(1,2)*w4), (f(2,2)*w5))
+#        # w1 = 1 / ((x2-x1)(y2-y1))
+#        # w2 = (x2-x)(y2-y)
+#        # w3 = (x-x1)(y2-y)
+#        # w4 = (x2-x)(y-y1)
+#        # w5 = (x-x1)(y-y1)
+#        
+#        a = (0, 0)
+#        b = (0, )
+#        c = (, 0)
+#        d = (, )
+#        
+#        e = (, )
+#        
+#        w1 = 1 / (c[0] * b[1])
+#        w2 = (c[0] - e[0]) * (b[1] - e[1])
+#        w3 = (e[0]) * (b[1] - e[1])
+#        w4 = (c[0] - e[0]) * (e[1])
+#        w5 = (e[0]) * (e[1])
+#        
+#        weighted =  w1 * ((array[0] * w2) + (array[2] * w3) + (array[1] * w4), (array[3] * w5))
+#        
+#        return weighted
         
     def __read_RSR(self):
         """read in RSR data and return it to the caller.
@@ -345,16 +356,23 @@ class ModeledRadProcessing(object):
             
         return Lt
         
-    def __radiance(self, wvlen):
+    def __radiance(self, wvlen, units='microns'):
         """calculate blackbody radiance given wavelength and temperature.
         """
         
         # define constants
-        c1 = 374151000   # boltzman's const
-        c2 = 14387.9
+                
+        if units == 'microns':
+            c1 = 374151000   # 2 * pi * c^2 * h
+            c2 = 14387.9     # (h * c) / k
         
+        else:
+            c1 = 374151000   # boltzman's const
+            c2 = 14387.9
+            
         # calculate radiance
-        rad = c1/((math.pi*(wvlen**5))*(math.e**((c2/(self.skin_temp * wvlen)))-1))
+        rad = c1 / ((math.pi * (wvlen**5)) *
+        (math.e**((c2 / (self.skin_temp * wvlen))) -1))
         
         return rad
         

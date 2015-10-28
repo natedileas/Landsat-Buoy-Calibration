@@ -114,10 +114,10 @@ class ModeledRadProcessing(object):
                 transmission = numpy.append(transmission, ret_vals[3])
                 gnd_reflect = numpy.append(gnd_reflect, ret_vals[1])
                 
-            upwell_rad = self.__interpolate_params(upwell_rad, narr_coor)
-            downwell_rad = self.__interpolate_params(downwell_rad, narr_coor)
-            transmission = self.__interpolate_params(transmission, narr_coor)
-            gnd_reflect = self.__interpolate_params(gnd_reflect, narr_coor)
+            upwell_rad = self.__offset_bilinear_interp(upwell_rad, narr_coor)
+            downwell_rad = self.__offset_bilinear_interp(downwell_rad, narr_coor)
+            transmission = self.__offset_bilinear_interp(transmission, narr_coor)
+            gnd_reflect = self.__offset_bilinear_interp(gnd_reflect, narr_coor)
             
             RSR, RSR_wavelengths = self.__read_RSR()
                 
@@ -283,34 +283,51 @@ class ModeledRadProcessing(object):
 
         return array_interp
         
-#    def __bilinear_interp(self, array, narr_corr):
-#        narr_coor = numpy.absolute(narr_coor)
-#        buoy_coors = numpy.absolute(self.buoy_coors)
-#        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
-#        
-#        # f(x, y) = w1 * ((f(1,1) * w2) + (f(2,1) * w3) + (f(1,2)*w4), (f(2,2)*w5))
-#        # w1 = 1 / ((x2-x1)(y2-y1))
-#        # w2 = (x2-x)(y2-y)
-#        # w3 = (x-x1)(y2-y)
-#        # w4 = (x2-x)(y-y1)
-#        # w5 = (x-x1)(y-y1)
-#        
-#        a = (0, 0)
-#        b = (0, )
-#        c = (, 0)
-#        d = (, )
-#        
-#        e = (, )
-#        
-#        w1 = 1 / (c[0] * b[1])
-#        w2 = (c[0] - e[0]) * (b[1] - e[1])
-#        w3 = (e[0]) * (b[1] - e[1])
-#        w4 = (c[0] - e[0]) * (e[1])
-#        w5 = (e[0]) * (e[1])
-#        
-#        weighted =  w1 * ((array[0] * w2) + (array[2] * w3) + (array[1] * w4), (array[3] * w5))
-#        
-#        return weighted
+    def __bilinear_interp(self, array, narr_corr):
+        narr_coor = numpy.absolute(narr_coor)
+        buoy_coors = numpy.absolute(self.buoy_coors)
+        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
+
+        # f(x, y) = w1 * ((f(1,1) * w2) + (f(2,1) * w3) + (f(1,2)*w4), (f(2,2)*w5))
+        # w1 = 1 / ((x2-x1)(y2-y1))
+        # w2 = (x2-x)(y2-y)
+        # w3 = (x-x1)(y2-y)
+        # w4 = (x2-x)(y-y1)
+        # w5 = (x-x1)(y-y1)
+        
+        a, b, c, d = narr_coor
+        
+        e = buoy_coors
+        
+        w1 = 1 / (c[0] * b[1])
+        w2 = (c[0] - e[0]) * (b[1] - e[1])
+        w3 = (e[0]) * (b[1] - e[1])
+        w4 = (c[0] - e[0]) * (e[1])
+        w5 = (e[0]) * (e[1])
+        
+        weighted =  w1 * ((array[0] * w2) + (array[2] * w3) + (array[1] * w4), (array[3] * w5))
+        
+        return weighted
+        
+        
+    def __offset_bilinear_interp(self, array, narr_cor):
+        narr_coor = numpy.absolute(narr_cor)   # 1, 2 , 3, 4
+        buoy_coors = numpy.absolute(self.buoy_coors)
+        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
+        
+        a = -narr_coor[0,0] + narr_coor[2,0]
+        b = -narr_coor[0,0] + narr_coor[1,0]
+        c = narr_coor[0,0] - narr_coor[1,0] - narr_coor[2,0] + narr_coor[3,0]
+        d = buoy_coors[0] - narr_coor[0,0]
+        e = -narr_coor[0,1] + narr_coor[2,1]
+        f = -narr_coor[0,1] + narr_coor[1,1]
+        g = narr_coor[0,1] - narr_coor[1,1] - narr_coor[2,1] + narr_coor[3,1]
+        h = buoy_coors[1] - narr_coor[0,1]
+        
+        alpha = -(b*e - a*f + d*g - c*h + math.sqrt(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))/(2*c*e - 2*a*g)    
+        beta  = -(b*e - a*f - d*g + c*h + math.sqrt(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))/(2*c*f - 2*b*g)
+        
+        return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + alpha * ((1 - beta) * array[2] + beta * array[3]))
         
     def __read_RSR(self):
         """read in RSR data and return it to the caller.

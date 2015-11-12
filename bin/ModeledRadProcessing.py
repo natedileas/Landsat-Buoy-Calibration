@@ -149,7 +149,7 @@ class ModeledRadProcessing(object):
             #term3 = numpy.multiply(transmission, term1_2)
             #Ltoa = numpy.add(upwell_rad, term3)
             
-            # NEW METHOD
+            # NEW METHOD 
             ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
             term1 = Lt * spec_emissivity * transmission
             term2 = spec_reflectivity * gnd_reflect
@@ -162,7 +162,8 @@ class ModeledRadProcessing(object):
             denominator = self.__integrate(RSR_wavelengths, RSR)
             
             try:
-                modeled_rad = numerator / denominator
+                modeled_rad = numerator / denominator 
+                modeled_rad = modeled_rad * 10000.0 
             except ZeroDivisionError:
                 self.logger.error('ZeroDivisionError, modeled_rad_procssing')
                 return -1
@@ -369,7 +370,7 @@ class ModeledRadProcessing(object):
     
         for i in wavelengths:
             x = self.__radiance(i)
-            Lt.append(x)
+            Lt.append(x / (10**4))
             
         return Lt
         
@@ -388,9 +389,10 @@ class ModeledRadProcessing(object):
             c2 = 14387.9
             
         # calculate radiance
-        rad = c1 / ((math.pi * (wvlen**5)) *
-        (math.e**((c2 / (self.skin_temp * wvlen))) -1))
+        rad = c1 / ((math.pi * (wvlen**5)) * (math.e**((c2 / (self.skin_temp * wvlen))) -1))
         
+        # UNITS
+        # (W / m^2 * sr) * <wavelength unit>
         return rad
         
     def __integrate(self, x, y, method='trap'):

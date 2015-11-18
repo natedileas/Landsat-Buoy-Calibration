@@ -325,8 +325,11 @@ class ModeledRadProcessing(object):
         g = narr_coor[0,1] - narr_coor[1,1] - narr_coor[2,1] + narr_coor[3,1]
         h = buoy_coors[1] - narr_coor[0,1]
         
-        alpha = -(b*e - a*f + d*g - c*h + math.sqrt(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))/(2*c*e - 2*a*g)    
-        beta  = -(b*e - a*f - d*g + c*h + math.sqrt(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))/(2*c*f - 2*b*g)
+        i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
+        # i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
+        
+        alpha = -(b*e - a*f + d*g - c*h + i)/(2*c*e - 2*a*g)    
+        beta  = -(b*e - a*f - d*g + c*h + i)/(2*c*f - 2*b*g)
         
         return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + alpha * ((1 - beta) * array[2] + beta * array[3]))
         

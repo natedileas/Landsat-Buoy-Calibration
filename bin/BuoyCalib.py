@@ -5,6 +5,7 @@ import sys
 import datetime
 import math
 import re
+import shutil
 
 
 class ModeledRadiance(object):
@@ -67,7 +68,8 @@ class ModeledRadiance(object):
                          'data/modtran/newHead4.txt', 'data/modtran/tempLayers.txt',
                          'data/modtran/newTail.txt', 'data/modtran/newTail2.txt',
                          'data/modtran/newTail3.txt', 'data/modtran/newTail5.txt',
-                         'data/modtran/newTail4.txt', 'data/modtran/newTail6.txt',)
+                         'data/modtran/newTail4.txt', 'data/modtran/newTail6.txt',
+                         'data/modtran/points')
         return 0
 
 
@@ -328,7 +330,6 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
 
     def cleanup(self, execute=False, *args):
         """ Remove temporary files. """
-        import shutil
 
         if execute is True:
             for rm_file in self.cleanup_list:

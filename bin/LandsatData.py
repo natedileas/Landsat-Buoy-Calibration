@@ -253,10 +253,11 @@ class DownloadLandsatScene(object):
         """ get status of file. """
         tgzfile = os.path.join(output_dir, scene_id + '.tgz')
         unzip_dir = os.path.join(output_dir, scene_id)
-        unzipdfile = os.path.join(unzip_dir, scene_id + '_B10.TIF')
+        unzipdfile=[os.path.join(unzip_dir, scene_id + '_B10.TIF'), os.path.join(output_dir, scene_id + '_B10.TIF')]
     
-        if os.path.exists(unzipdfile):   #downloaded and unzipped
-            return 1
+        for i in unzipdfile:
+            if os.path.exists(i):   #downloaded and unzipped
+                return 1
         elif os.path.isfile(tgzfile):    #downloaded, not unzipped
             return 2
         else:    #not downloaded

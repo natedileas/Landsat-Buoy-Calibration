@@ -112,7 +112,7 @@ class ModeledRadProcessing(object):
                 downwell_rad = numpy.append(downwell_rad, ret_vals[1])
                 wavelengths = ret_vals[2]
                 transmission = numpy.append(transmission, ret_vals[3])
-                gnd_reflect = numpy.append(gnd_reflect, ret_vals[1])
+                gnd_reflect = numpy.append(gnd_reflect, ret_vals[4])
                 
             upwell_rad = self.__offset_bilinear_interp(upwell_rad, narr_coor)
             downwell_rad = self.__offset_bilinear_interp(downwell_rad, narr_coor)

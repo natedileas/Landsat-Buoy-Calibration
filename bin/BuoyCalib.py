@@ -6,236 +6,63 @@ import datetime
 import math
 import re
 import shutil
+import NarrData
+import ModeledRadProcessing
 
 
-class ModeledRadiance(object):
-    """ Attributes and methods to calculate the modeled radiance.
-    
-    Attributes:
-        modeled_temperature: empty array for modeled temperatures, list
-        modeled_radiance: empty array for modeled radiances, list
-    
-    Methods:
-        __init__(self): initializes the object.
-        download_mod_data(self): launcher for NarrData.start_download(),
-            downloads NARR data.
-            Returns: 0 if good, -1 if bad
-        calc_mod_radiance(self): Calculate  modeled band 10 and 11 radiance.
-            Launcher for ModeledRadProcessing.do_processing().
-            Returns: 0 if good, -1 if bad
-            
-    Intended to be subclassed, but can be used alone.
-    """
-    def __init__(self):
-        """ initialize the object. """
-        self.modeled_temperature = []
-        self.modeled_radiance = []
-        self.narr_coor = []
-
-    def download_mod_data(self):
-        """ doenload NARR data. """
-        import NarrData
-
-        self.logger.info('download_mod_data: Downloading NARR Data')
-
-        nd = NarrData.NarrData(self)   # initialize
-        ret_val = nd.start_download()   # make call
-        if ret_val == -1:
-            self.logger.info('download_mod_data: missing wgrib issue')
-            return -1
-        self.cleanup(False, 'data/narr/HGT_1', 'data/narr/HGT_2', 
-                            'data/narr/SHUM_1', 'data/narr/SHUM_2', 
-                            'data/narr/TMP_1', 'data/narr/TMP_2')
-        return 0
-
-    def calc_mod_radiance(self):
-        """ calculate modeled radiance. """
-        import ModeledRadProcessing
-
-        self.logger.info('calc_mod_radiance: Calculating Modeled Radiance')
-
-        mrp = ModeledRadProcessing.ModeledRadProcessing(self)   # initialize
-        return_vals = mrp.do_processing()   # make call
-        
-        if return_vals == -1:
-            self.logger.info('calc_mod_radiance: return_vals were -1')
-            return -1
-        else:
-            self.modeled_radiance, caselist, self.narr_coor = return_vals
-
-            self.cleanup(False, 'data/modtran/newHead.txt', 
-                         'data/modtran/newHead2.txt', 'data/modtran/newHead3.txt',
-                         'data/modtran/newHead4.txt', 'data/modtran/tempLayers.txt',
-                         'data/modtran/newTail.txt', 'data/modtran/newTail2.txt',
-                         'data/modtran/newTail3.txt', 'data/modtran/newTail5.txt',
-                         'data/modtran/newTail4.txt', 'data/modtran/newTail6.txt',
-                         'data/modtran/points')
-        return 0
-
-
-class SensorRadiance(object):
-    """ Attributes and methods to calculate the sensor radiance.
-    
-    Attributes:
-        image_temperature: empty array for image temperature, list
-        image_radiance: empty array for image radaiances, list
-        _scene_id: landsat id, has setter and getter, string
-        satelite: landsat version, options(8, 7), int
-        WRS2_path: path for landsat id construction, string
-        WRS2_row: row for landsat id construction, string
-        year: year for landsat id construction, string
-        julian_date: day of year, for landsat id construction, string
-        cloud_cover: cloud cover, optional argument, range(0-100), string
-        poi: pixel of interest, assigned from calc_rad call, list
-    
-    Methods:
-        __init__(self): initializes the object.
-        scene_id(self): getter, returns: self._scene_id.
-        scene_id(self, new_id): setter, checks for proper format.
-        download_img_data(self): download image data for the appropriate 
-            scene_id or parts whereof.
-        calc_img_radiance(self): calculate image radiance, launcher for 
-            LandsatData.start_download().
-        download_img_data(self): Launcher for ImageRadProcessing.do_processing
-            , depends on a BuoyData call and a LandsatData call.
-            Returns: self.image_radiance.
-            
-    Intended to be subclassed, but can be used alone.
-    """
-    def __init__(self):
-        """ initialize the object. """
-        self.image_temperature = []
-        self.image_radiance = []
-
-        self._scene_id = None
-
-        self.satelite = None
-        self.WRS2_path = None
-        self.WRS2_row = None
-        self.year = None
-        self.julian_date = None
-
-        self.cloud_cover = None
-        self.poi = None
-        
-        self.image_file_extension = 'data/landsat'
-
-    @property
-    def scene_id(self):
-        return self._scene_id
-
-    @scene_id.setter
-    def scene_id(self, new_id):
-        """ check for correct format in landsat id. """
-        if new_id is not None:
-            chars = ['\n', ' ', '"', '\\', '/']   # unwanted characters
-            new_id = new_id.translate(None, ''.join(chars))
-            match = re.match('L[CE][78]\d*\w\w\w0[0-5]', new_id)
-
-            if match:   # if it matches the pattern
-                self._scene_id = match.group()
-                return 0
-            else:
-                self._scene_id = new_id
-                self.logger.warning('.scene_id: @scene_id.setter: \
-                                    the given landsat id is the wrong format')
-                return -1
-        else:
-            self._scene_id = None
-            return 0
-
-    def download_img_data(self):
-        """ download landsat image and parse metadata. """
-        import LandsatData
-
-        self.logger.info('.download_img_data: Dealing with Landsat Data')
-
-        ld = LandsatData.LandsatData(self)   # initialize
-        return_vals = ld.start_download()   # make call
-
-        if return_vals:   # make sure return_vals exist and are good returns
-            if return_vals == -1:
-                self.logger.warning('.download_img_data: something went wrong')
-                return -1
-            else:          # otherwise, assign values
-                self.satelite = int(return_vals[0][2:3])
-                self.scene_id = return_vals[0]
-                self.metadata = return_vals[1]
-                return 0
-        else:
-            return -1
-
-    def calc_img_radiance(self):
-        """ calculate image radiance. """
-        import ImageRadProcessing
-
-        self.logger.info('.calc_img_radiance: Calculating Image Radiance')
-        irp = ImageRadProcessing.ImageRadProcessing(self)
-        return_vals = irp.do_processing()
-
-        self.image_radiance = return_vals[0]
-        self.poi = return_vals[1]
-        return 0
-
-
-class CalibrationController(ModeledRadiance, SensorRadiance):
-    """ Provides wrappers for BuoyData, cleanup, and output functionality.
-    
-    Attributes:
-        filepath_base: smart path object.
-        self.logger: logging object used by super and sub classes.
-        _buoy_id: assigned by user initially, after buoy_info call it is the
-            actual dataset used, int
-        buoy_latitude: calculated from stationtable.txt, float
-        buoy_longitude: calculated from stationtable.txt, float
-        buoy_temperature: calculated from buoy dataset, float
-        metadata: landsat metadata, dict
-        output_txt: option to for output, string
-        verbose: option for command line output, int
-        cleanup_list: files to remove, list
-        
-    Methods:
-        __init__(self): initialize the object
-        buoy_id(self): getter
-        buoy_id(self, new_id): setter, check for correct format
-        calculate_buoy_information(self): Launcher for BuoyData.start_download,
-             does all buoy calculations.
-        calc_brightness_temperature(self): Depends on image_radiance
-             and modeled_radiance being calculated already, will return -1 if
-             not.
-        output(self): Output calculated values to command line or txt file.
-        cleanup(self, execute=False, *args): remove temporary files, if
-            execute is false then append input args to the list. 
-        
-    Subclasses ModeledRadiance and SensorRadiance.
-    """
-    def __init__(self):
-        """ initialize the object. """
-        # standardize file paths in modules
+class CalCon:
+    def __init__(self, ):
         self.filepath_base = os.path.realpath(__file__)
         match = re.search('/bin/BuoyCalib.pyc?', self.filepath_base)
         if match:
             self.filepath_base = self.filepath_base.replace(match.group(), '')
 
-        log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
-        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-
-        # buoy id- assigned by user initially, after
         self._buoy_id = None  # buoy_info call it is the actual dataset used
-        self.buoy_latitude = None  # calculated from stationtable.txt
-        self.buoy_longitude = None   # calculated from stationtable.txt
+        self.buoy_location = None  # lat, lon
         self.buoy_temperature = None   # calculated from buoy dataset
 
         self.metadata = None   # landsat metadata
-
-        self.output_txt = True   # option to for output
-        self.verbose = False   # option for command line output
         
-        self.cleanup_list = ['data/modtran/points']   # list of files to remove
+        self.modeled_temperature = None
+        self.modeled_radiance = None
+        self.narr_coor = None
+        
+        self.image_temperature = None
+        self.image_radiance = None
 
-        ModeledRadiance.__init__(self)   # initializers to utilize attributes
-        SensorRadiance.__init__(self)    # from parent classes
+        self.satelite = None
+        self.WRS2 = None
+        self.date = None
+        self.version = None
+
+        self.cloud_cover = None
+        self.poi = None
+        
+        self.image_file_extension = 'data/landsat'
+        self.output_txt = True   # option for output
+        self.verbose = True   # option for command line output
+
+    @property
+    def scene_id(self):
+        lid = '%s%s%sLGN%2f' % (self.satelite, self.WRS2, self.date.strftime('%Y%j'), self.version)
+        print 5
+        return lid
+
+    @scene_id.setter
+    def scene_id(self, new_id):
+        match = re.match('L[CE][78]\d*\w\w\w0[0-5]', new_id)
+
+        if match:
+            new_id = match.group()
+            self.satelite = new_id[0:3]
+            self.WRS2 = new_id[3:9]
+            self.date = datetime.datetime.strptime(new_id[9:16], '%Y%j')
+            self.version = new_id[-2:]
+            return 0
+
+        else:
+            print 'WARNING scene_id.setter: %s is the wrong format' % new_id
+            return -1
         
     @property
     def buoy_id(self):
@@ -254,56 +81,12 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
                 return 0
             else:
                 self._buoy_id = new_id
-                self.logger.warning('.buoy_id: @buoy_id.setter: \
-                                    the given buoy id is the wrong format')
+                print 'WARNING .buoy_id: @buoy_id.setter: the given buoy id is the wrong format'
                 return -1
         else:
             self._buoy_id = None
             return 0
-
-    def calculate_buoy_information(self):
-        """pick buoy dataset, download, and calculate skin_temp. """
-        import BuoyData
-
-        self.logger.info('calculate_buoy_information: Downloading Buoy Data')
-        bd = BuoyData.BuoyData(self)
-        return_vals = bd.start_download()
-
-        if return_vals:
-            if return_vals == -1:
-                return -1
-            else:
-                self.buoy_id = return_vals[0]
-                self.buoy_latitude = return_vals[1][0]
-                self.buoy_longitude = return_vals[1][1]
-                self.buoy_temperature = return_vals[2]
-                self.buoy_press = return_vals[3]
-                self.buoy_airtemp = return_vals[4]
-                self.buoy_dewpnt = return_vals[5]
-                self.cleanup_list.append('data/buoy/station_table.txt')
-                return 0
-        else:
-            return -1
-
-        return 0
-
-    def calc_brightness_temperature(self):
-        """ translate radiance to temperature. """
-
-        K1 = self.metadata['K1_CONSTANT_BAND_10'], \
-             self.metadata['K1_CONSTANT_BAND_11']
-        K2 = self.metadata['K2_CONSTANT_BAND_10'], \
-             self.metadata['K2_CONSTANT_BAND_11']
-
-        for i in range(2):
-            Timg = K2[i] / math.log((K1[i] / self.image_radiance[i]) + 1)
-            Tmod = K2[i] / math.log((K1[i] / self.modeled_radiance[i]) + 1)
-
-            self.image_temperature.append(Timg)
-            self.modeled_temperature.append(Tmod)
-
-        return 0
-
+            
     def output(self):
         """ Output calculated values to command line or txt file. """
         if self.output_txt:
@@ -346,3 +129,89 @@ class CalibrationController(ModeledRadiance, SensorRadiance):
                 self.cleanup_list.append(os.path.join(self.filepath_base, add_file))
 
         return 0
+
+def download_mod_data(cc):
+
+    print 'download_mod_data: Downloading NARR Data'
+
+    ret_val = nd.start_download(cc)   # make call
+    
+    if ret_val == -1:
+        print 'download_mod_data: missing wgrib issue'
+        return -1
+
+    return 0
+
+def calc_mod_radiance(cc):
+    """ calculate modeled radiance. """
+
+    print 'calc_mod_radiance: Calculating Modeled Radiance'
+    return_vals = mrp.do_processing(cc)   # make call
+    
+    if return_vals == -1:
+        print 'calc_mod_radiance: return_vals were -1'
+        return -1
+    else:
+        cc.modeled_radiance, cc.narr_coor = return_vals
+
+    return 0
+
+def download_img_data(cc):
+    """ download landsat image and parse metadata. """
+    import LandsatData
+
+    print '.download_img_data: Dealing with Landsat Data'
+
+    return_vals = ld.download(cc)   # make call
+
+    if return_vals:   # make sure return_vals exist and are good returns
+        if return_vals == -1:
+            print 'WARNING .download_img_data: something went wrong'
+            return -1
+        else:          # otherwise, assign values
+            cc.satelite = int(return_vals[0][2:3])
+            cc.scene_id = return_vals[0]
+            cc.metadata = return_vals[1]
+            return 0
+    else:
+        return -1
+
+def calc_img_radiance(cc):
+    """ calculate image radiance. """
+    import ImageRadProcessing
+
+    print '.calc_img_radiance: Calculating Image Radiance'
+    return_vals = irp.do_processing(cc)
+
+    cc.image_radiance = return_vals[0]
+    cc.poi = return_vals[1]
+    return 0
+    
+def calculate_buoy_information(cc):
+    """pick buoy dataset, download, and calculate skin_temp. """
+    import BuoyData
+
+    print 'calculate_buoy_information: Downloading Buoy Data'
+    if not cc.metadata:
+      return -1
+      
+    return_vals = BuoyData.start_download(cc)
+
+    if return_vals:
+        if return_vals == -1:
+            return -1
+        else:
+            cc.buoy_id = return_vals[0]
+            cc.buoy_latitude = return_vals[1][0]
+            cc.buoy_longitude = return_vals[1][1]
+            cc.buoy_temperature = return_vals[2]
+            cc.buoy_press = return_vals[3]
+            cc.buoy_airtemp = return_vals[4]
+            cc.buoy_dewpnt = return_vals[5]
+            return 0
+    else:
+        return -1
+
+    return 0
+
+    

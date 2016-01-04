@@ -1,4 +1,3 @@
-import datetime
 import urllib2
 import urllib
 import os
@@ -10,138 +9,62 @@ import logging
 import sys
 import httplib
 
-class LandsatData(object):
-    """ Download Landsat Images and Metadata.
+def start_download(cc):
+    """ download landsat data and parse metadata. """
+    login_info = os.path.join(cc.filepath_base, 'logs/usgs_login.txt')
     
-    Attributes:
-        filepath_base: parent directory, base of all other paths.
-        save_dir: directory to save landsat images in.
-        logger: logger object for non-verbose output.
-        scene_id: scene_id to download, string
-        whichsat: which landsat version, (7 or 8), int
-        date: date on which the image was captured
-        scene_coors: WRS2 path and row
-        cloud_cover: max acceptable cloud cover, in percent.
+    save_dir = os.path.join(cc.filepath_base, cc.image_file_extension)  # TODO fix
     
-    Methods:
-        __init__(self, other): initialize the attributes using a CalibrationController object
-        start_download(self): download landsat data and parse metadata.
-        read_metadata(self): read and parse landsat metadata, return dict
+    args = [login_info, save_dir, cc.scene_id, cc.cloud_cover]
+
+    dls = DownloadLandsatScene()
+    downloaded_scene_id = dls.main(*args)
+
+    if downloaded_scene_id == -1:
+        print '.start_download: landsat_id was -1'
+        return -1
+
+    if cc.scene_id != downloaded_scene_id:
+        print 'WARNING .start_download: scene_id and landsat_id do not match'
         
-    Utilizes Subclass DownloadLandsatScene(object).
-    """
-    def __init__(self, other):
-        """ initialize the attributes using a CalibrationController object. """
-        self.filepath_base = other.filepath_base
-        self.save_dir = os.path.join(self.filepath_base, other.image_file_extension)
+        cc.scene_id = downloaded_scene_id
         
-        log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
-        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
+    metadata = read_metadata(cc, downloaded_scene_id)
+    
+    if metadata == -1:
+        print 'WARNING .start_download: data not downloaded or unzipped correctly'
+        return -1
 
-        self.scene_id = None   #fix error in start_download
-        
-        if other._scene_id:
-            self.scene_id = other._scene_id
-            
-            if other._scene_id[0:3] == 'LC8':
-                self.whichsat = 8
-            else:
-                self.whichsat = 7
-            self.date = datetime.datetime.strptime(other._scene_id[9:16], '%Y%j')
-            self.scene_coors = other._scene_id[3:9]
+    return downloaded_scene_id, metadata
 
-        else:
-            if not other.satelite or not other.julian_date:
-                if not other.year or not other.WRS2_path:
-                    self.logger.error('.__init__: Either scene ID or equivalent \
-                        arguments are required.')
-                    sys.exit(-1)
-            else:
-                self.whichsat =  other.satelite
-                self.scene_coors = other.WRS2_path + other.WRS2_row
-                self.date = datetime.datetime.strptime(other.year+other.julian_date, '%Y%j').timetuple()
-        
-        if other.cloud_cover:
-            self.cloud_cover = other.cloud_cover
-        else:
-            self.cloud_cover = 100
+def read_metadata(cc, dsid):
+    filename = os.path.join(cc.save_dir, '%s_MTL.txt' %( dsid))
+    
+    info = []*2
+    chars = ['\n', '"', '\'']    # characters to remove from lines
+    desc = []
+    data = []
 
-    def start_download(self):
-        """ download landsat data and parse metadata. """
-        usgs = os.path.join(self.filepath_base, 'logs/usgs_login.txt')
-        args = [usgs, self.save_dir, self.scene_coors, self.date, self.whichsat, self.cloud_cover]
-                
-        if self.scene_id:
-            args.append(self.scene_id)
+    # open file, split, and save to two lists
+    try:
+        with open(filename, 'r') as f:
+            for line in f:
+                try:
+                    info = line.split(' = ')
+                    info[1] = info[1].translate(None, ''.join(chars))
+                    desc.append(info[0])
+                    data.append(float(info[1]))
+                except IndexError:
+                    break
+                except ValueError:
+                    data.append(info[1])
+    except IOError:
+        return -1
 
-        dls = DownloadLandsatScene()
-        landsat_id = dls.main(*args)
+    desc = [x.strip(' ') for x in desc]   # remove empty entries in list
+    metadata = dict(zip(desc, data))   # create dictionary
 
-        if landsat_id == -1:
-            self.logger.warning('.start_download: landsat_id was -1')
-            return -1
-
-        if self.scene_id:
-            if self.scene_id != landsat_id:
-                self.logger.warning('.start_download: scene_id and landsat_id \
-                                    do not match')
-            
-            self.scene_id = landsat_id
-        else:
-            self.scene_id = landsat_id
-            
-        metadata = self.read_metadata()
-        
-        if metadata == -1:
-            self.logger.warning('.start_download: data not downlaoded or unzipped correctly')
-            return -1
-
-        return self.scene_id, metadata
-
-    def read_metadata(self):
-        """ read and parse landsat metadata.
-
-        Should only be called on a valid LandsatData instance.
-
-        Args:
-            imageBase: used for the filename of the metadata file, string
-
-        Returns:
-            meta_data: dictionary of metadata values, keyed by their names
-
-        Raises:
-            IndexError: Error in reading metadata
-            ValueError: Attempt to float() NaN: handled
-        """
-
-        filename = os.path.join(self.save_dir, '%s_MTL.txt' %
-                                ( self.scene_id))
-        info = []*2
-        chars = ['\n', '"', '\'']    # characters to remove from lines
-        desc = []
-        data = []
-
-        # open file, split, and save to two lists
-        try:
-            with open(filename, 'r') as f:
-                for line in f:
-                    try:
-                        info = line.split(' = ')
-                        info[1] = info[1].translate(None, ''.join(chars))
-                        desc.append(info[0])
-                        data.append(float(info[1]))
-                    except IndexError:
-                        break
-                    except ValueError:
-                        data.append(info[1])
-        except IOError:
-            return -1
-
-        desc = [x.strip(' ') for x in desc]   # remove empty entries in list
-        metadata = dict(zip(desc, data))   # create dictionary
-
-        return metadata
+    return metadata
 
 
 class DownloadLandsatScene(object):
@@ -162,11 +85,7 @@ class DownloadLandsatScene(object):
         check_cloud_limit: check cloud limit using the helper function.
         read_cloudcover_in_metadata: read cloud percentage in metadata.
     """
-    def main(self, usgs=None, output=None, scene=None, date=None, bird=None, clouds=None, scene_id=None):
-        
-        logging.basicConfig(filename='CalibrationController.log',
-                            filemode='w', level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
+    def main(self, usgs=None, output=None, scene_id=None, clouds=None):
 
         output_dir = str(output)[:-22]
 
@@ -258,7 +177,7 @@ class DownloadLandsatScene(object):
         for i in unzipdfile:
             if os.path.exists(i):   #downloaded and unzipped
                 return 1
-        elif os.path.isfile(tgzfile):    #downloaded, not unzipped
+        if os.path.isfile(tgzfile):    #downloaded, not unzipped
             return 2
         else:    #not downloaded
             try:

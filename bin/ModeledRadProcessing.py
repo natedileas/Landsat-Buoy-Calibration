@@ -119,6 +119,9 @@ class ModeledRadProcessing(object):
             transmission = self.__offset_bilinear_interp(transmission, narr_coor)
             gnd_reflect = self.__offset_bilinear_interp(gnd_reflect, narr_coor)
             
+            #save_a = array([wavelengths, upwell_rad, downwell_rad, transmission, gnd_reflect])
+            #numpy.savetxt('atmo_interp.txt', save_a, fmt='%.4e %+.4j %.4e %+.4j %.4e %+.4j %.4e %+.4j')
+            
             RSR, RSR_wavelengths = self.__read_RSR()
                 
             # interpolate RSR and reflectivity to match wavelength range
@@ -1118,6 +1121,9 @@ class MakeTape5s(object):
                     f.write(line)
             
             plot_list[i] = (tempGeoHeight, tempPress, tempTemp, dewpoint_k)
+            
+            
+            
             #print plot_list[i]
             # determine number of layers for current ground altitude and insert into head file
             numLayers = numpy.shape(tempGeoHeight)[0]
@@ -1153,6 +1159,9 @@ class MakeTape5s(object):
             
             case_list[entry] = currentPoint
             entry += 1
+
+
+            numpy.savetxt('atmo_interp_%s.txt'%(i), plot_list[i])
     
         # write commandList and caseList to file
         case_list_file = os.path.join(self.directory,'caseList')

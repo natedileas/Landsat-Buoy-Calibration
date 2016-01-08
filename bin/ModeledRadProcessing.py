@@ -1074,9 +1074,11 @@ class MakeTape5s(object):
             command = ' '.join(['cat', headFile, tempLayers, tailFile, '>', newFile])
             subprocess.check_call(command, shell=True)
             
+            newfiles = ['newHead.txt','newHead1.txt','newHead2.txt','newHead3.txt','newHead4.txt'
+            'newTail.txt','newTail1.txt','newTail2.txt','newTail3.txt','newTail4.txt' ,'newTail5.txt' ,'newTail6.txt']
             try:
-                subprocess.call('rm ' + os.path.join(self.directory, 'newTail*'))
-                subprocess.call('rm ' + os.path.join(self.directory, 'newHead*'))
+                for asdf in newfiles:
+                    os.remove(os.path.join(self.directory, asdf))
             except OSError:
                 pass
             

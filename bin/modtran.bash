@@ -1,11 +1,11 @@
 #!/bin/bash
 
 directory=./data/shared/modtran
-log=./logs/modtran.log
 
 home=`pwd`
 verbose=$1
 dir2=$2
+log=$dir2/modtran.log
 a=0
 
 echo 'MODTRAN runs' > $log
@@ -25,16 +25,16 @@ for case in `cat $cseLst`
 do
   a=$((a + 1))
   #perform modtran run
-  pushd $case >>$home/$log 2>>$home/$log
-  ln -s /dirs/pkg/Mod4v3r1/DATA >>$home/$log 2>>$home/$log
-  /dirs/pkg/Mod4v3r1/Mod4v3r1.exe >>$home/$log 2>>$home/$log
-  popd >>$home/$log 2>>$home/$log
+  pushd $case >>$log 2>>$log
+  ln -s /dirs/pkg/Mod4v3r1/DATA >>$log 2>>$log
+  /dirs/pkg/Mod4v3r1/Mod4v3r1.exe >>$log 2>>$log
+  popd >>$log 2>>$log
   
 	#Create link
 	ln -f $home/$directory/elim2.sed "${case}"
  
-   echo $case >>$home/$log 2>>$home/$log
-	./bin/tape6parser.bash ${case} >>$home/$log 2>>$home/$log
+   echo $case >>$log 2>>$log
+	./bin/tape6parser.bash ${case} >>$log 2>>$log
  
   if [ ${verbose} -gt -1 ]; then echo -ne '\tMODTRAN RUNS ['$a' / 4] \r'; fi
 done

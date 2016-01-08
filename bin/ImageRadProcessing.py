@@ -1,6 +1,5 @@
 from osgeo import gdal, osr
 from PIL import Image
-import logging
 import numpy
 import os
 import utm
@@ -27,11 +26,6 @@ class ImageRadProcessing(object):
     """
     def __init__(self, other):
         """ initialize the attributes using a CalibrationController object """
-        #initialize logger
-        logging.basicConfig(filename='CalibrationController.log', filemode='w'\
-                            , level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-        
         self.scene_id = other.scene_id
         self.metadata = other.metadata
         self.buoy_coor = other.buoy_location
@@ -54,7 +48,7 @@ class ImageRadProcessing(object):
         
         num_bands = self.which_landsat[1]
         for i in range(num_bands):
-           self.logger.info('do_processing: band %s of %s', i+1, num_bands)
+           print 'do_processing: band %s of %s' % (i+1, num_bands)
            
            poi = self.__find_roi()
 

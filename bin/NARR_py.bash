@@ -166,4 +166,6 @@ mv $grib/HGT/* $scene_dir/HGT_2
 mv $grib/TMP/* $scene_dir/TMP_2
 mv $grib/SHUM/* $scene_dir/SHUM_2
 
+rm ./data/scenes/${imageBase}/${imageBase}'_meta.txt'
+
 if [ ${verbose} -gt -1 ]; then echo -ne '\n'; fi

@@ -143,8 +143,6 @@ class CalCon(object):
         
     def __str__(self):
         """ print calculated values. """
-        if self.verbose is False:
-            sys.stdout = self.stdout
             
         output_items = ['Scene ID: %s'%self.scene_id]
         
@@ -157,6 +155,9 @@ class CalCon(object):
         if self._buoy_id:
             output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %4.4f' %(self.buoy_id, self.buoy_location, self.skin_temp))
             
+        if self.verbose is False:
+            sys.stdout = self.stdout
+            
         return '\n'.join(output_items)
 
     def output(self):
@@ -164,7 +165,7 @@ class CalCon(object):
         
         with open(out_file, 'w') as f:
             if self.buoy_id:
-                f.write('BID: %7s BLL: %8s temp: %4.4f\n' %(self.buoy_id, self.buoy_location, self.skin_temp))
+                f.write('BID: %7s BLL: %4s %4s temp: %4.4f\n' %(self.buoy_id, self.buoy_location[0], self.buoy_location[1], self.skin_temp))
             
             if self.modeled_radiance:
                 f.write('M10: %2.6f M11: %2.6f\n' % (self.modeled_radiance[0], self.modeled_radiance[1]))
@@ -181,7 +182,7 @@ class CalCon(object):
                     data = line.split()
                     if 'BID' in line:
                         self.buoy_id = data[1]
-                        self.buoy_location = [data[3], data[4]]
+                        self.buoy_location = [float(data[3]), float(data[4])]
                         self.skin_temp = float(data[-1])
                     if 'M10' in line:
                         self.modeled_radiance = float(data[1]), float(data[3])

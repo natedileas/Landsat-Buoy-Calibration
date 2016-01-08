@@ -32,12 +32,12 @@ class ImageRadProcessing(object):
                             , level=logging.INFO)
         self.logger = logging.getLogger(__name__)
         
-        self.scene_id = other._scene_id
+        self.scene_id = other.scene_id
         self.metadata = other.metadata
-        self.buoy_coor = [other.buoy_latitude, other.buoy_longitude]
-        self.save_dir = os.path.join(other.filepath_base, other.image_file_extension)
+        self.buoy_coor = other.buoy_location
+        self.save_dir = other.scene_dir
         
-        if other.satelite == 8:
+        if other.satelite == 'LC8':
             self.which_landsat = [8,2]
             self.filename = '%s' % ( self.metadata['FILE_NAME_BAND_10'])
         else: 
@@ -91,7 +91,7 @@ class ImageRadProcessing(object):
         return dc_avg
         
     def __find_roi(self):
-        """ find the rgion of interest in pixel coordinates. """
+        """ find the region of interest in pixel coordinates. """
         # open image
         ds = gdal.Open(self.filename)
         #get data transform

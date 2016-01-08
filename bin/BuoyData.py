@@ -5,8 +5,7 @@ import os
 import utm
 import re
 import sys
-import logging
-
+import shutil
 
 class BuoyData(object):
     """ Pick buoy, download dataet, and calculate skin_temp.
@@ -33,10 +32,6 @@ class BuoyData(object):
     """
     def __init__(self, other):
         """ initialize using a CalibrationController object. """
-        log_file = os.path.join(other.filepath_base, 'logs/CalibrationController.log')
-        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-
         self.metadata = other.metadata
         self.corners = numpy.asarray([[0, 0]]*2, dtype=numpy.float32)
         self.corners[0] = self.metadata['CORNER_UR_LAT_PRODUCT'], \
@@ -47,7 +42,8 @@ class BuoyData(object):
 
         self.buoy = other.buoy_id
 
-        self.save_dir = os.path.join(other.filepath_base, 'data/buoy/')
+        self.save_dir = os.path.join(other.filepath_base, 'data/shared/buoy')
+        self.scene_dir = other.scene_dir
         self.dataset = None
 
     def start_download(self):
@@ -75,11 +71,11 @@ class BuoyData(object):
                 if ret_vals != -1:
                     datasets, buoy_coors, depths = ret_vals
                 else: 
-                    self.logger.error('.start_download: _save_buoy_data failed')
+                    print '.start_download: _save_buoy_data failed'
                     return -1
             else:
-                self.logger.error('.start_download: No buoys in chosen landsat\
-                                  scene and no buoy ID provided.')
+                print 'ERROR .start_download: No buoys in chosen landsat\
+                                  scene and no buoy ID provided.'
                 return -1
         else:
             for dataset in datasets:
@@ -103,8 +99,7 @@ class BuoyData(object):
                     first_try = datasets.pop(datasets.index(self.buoy))
                     datasets.insert(0, first_try)
                 except ValueError:
-                    self.logger.warning('.start_download: Buoy %s was not found \
-                                        in landsat scene.', self.buoy)
+                    print '.start_download: Buoy %s was not found in landsat scene.' % self.buoy
 
         for url in urls:
             self.dataset = os.path.basename(url)
@@ -113,8 +108,7 @@ class BuoyData(object):
             return_val = self.__get_buoy_data(url)
 
             if return_val == -1:
-                self.logger.warning('.start_download: Dataset %s not found. \
-                                    Trying another buoy.', self.dataset)
+                print '.start_download: Dataset %s not found. Trying another buoy.' % self.dataset
 
                 if os.path.exists(unzipped_file):
                     subprocess.Popen('rm '+unzipped_file, shell=True)
@@ -122,8 +116,7 @@ class BuoyData(object):
                 ret_val = self.__find_skin_temp(url, depths[urls.index(url)])
 
                 if ret_val == -1:
-                    self.logger.warning('.start_download: The date range \
-                    requested was not found in the data set %s.', self.dataset)
+                    print '.start_download: The date range requested was not found in the data set %s.'% self.dataset
 
                     if os.path.exists(unzipped_file):
                         subprocess.Popen('rm '+unzipped_file, shell=True)
@@ -132,8 +125,7 @@ class BuoyData(object):
                     skin_temp, pres, atemp, dewp = ret_val
                     
                     if skin_temp >= 600:
-                        self.logger.warning('.start_download: No water temp data \
-                    for selected date range in the data set %s.', self.dataset)
+                        print '.start_download: No water temp data for selected date range in the data set %s.'% self.dataset
 
                         if os.path.exists(unzipped_file):
                             subprocess.Popen('rm '+unzipped_file, shell=True)
@@ -143,15 +135,17 @@ class BuoyData(object):
                                    pres, atemp, dewp]
 
                     if os.path.exists(unzipped_file):
-                        subprocess.Popen('rm '+unzipped_file, shell=True)
-                    self.logger.info('.start_download: used dataset %s, good \
-                                     exit.', self.dataset)
+                        try:
+                            shutil.move(os.path.join(self.save_dir, unzipped_file), self.scene_dir)
+                        except:
+                            pass
+                    print '.start_download: used dataset %s, good exit.'% self.dataset
                     break
 
         if return_vals:
             return return_vals
         else:
-            self.logger.error('.start_download: No usable datasets were found')
+            print 'ERROR .start_download: No usable datasets were found'
             return -1
 
     def __find_datasets(self):
@@ -294,13 +288,13 @@ class BuoyData(object):
                 return 0
                 
             except urllib2.HTTPError, e:
-                self.logger.error("HTTP Error:", e.code, url)
+                print "HTTP Error:", e.code, url
                 return -1
             except urllib2.URLError, e:
-                self.logger.error("URL Error:", e.reason, url)
+                print "URL Error:", e.reason, url
                 return -1
             except OSError, e:
-                self.logger.error('OSError: ', e.reason)
+                print 'OSError: ', e.reason
                 return -1
         else:
             return 0
@@ -345,7 +339,7 @@ class BuoyData(object):
         import math
 
         # define filename
-        filename = self.save_dir+self.dataset
+        filename = os.path.join(self.save_dir, self.dataset)
         filename = filename.replace('.gz', '')
 
         # parse year, month, day

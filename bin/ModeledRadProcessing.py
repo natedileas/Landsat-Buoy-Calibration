@@ -1,5 +1,4 @@
 import datetime
-import logging
 import os
 import math
 import numpy
@@ -10,68 +9,54 @@ import utm
 
 
 class ModeledRadProcessing(object):
-    """ Calculate the modeled radiance of a landsat scene.
-    
-    Attributes:
-    
-    Methods:
-    
-    """
     def __init__(self, other):
-        self.filepath_base = other.filepath_base
-
-        log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
-        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
-
         # for tape5 generation 
         self.metadata = other.metadata
-        self.buoy_coors = [other.buoy_latitude, other.buoy_longitude]
+        self.buoy_coors = other.buoy_location
 
         # for modradprocesing
         self.filepath_base = other.filepath_base
+        self.scene_dir = other.scene_dir
 
         # both
-        self.skin_temp = other.buoy_temperature
+        self.skin_temp = other.skin_temp
         self.verbose = other.verbose
         
         self.buoy_press = other.buoy_press
         self.buoy_airtemp = other.buoy_airtemp
         self.buoy_dewpnt = other.buoy_dewpnt
 
-        if other.satelite == 8:
+        if other.satelite == 'LC8':
             self.which_landsat = [8,2]
         else: 
             self.which_landsat = [7,1]
 
-        if other.verbose: self.verbose = 0
-        else: self.verbose = -1
+        self.verbose = other.verbose
 
     def do_processing(self):
-        self.logger.info('do_processing: generating tape5 files')
-        
-        self.logger = logging.getLogger('py.warnings')  # log warnings from calling MakeTape5s module
-        logging.captureWarnings(True)
+        print 'do_processing: generating tape5 files'
          
         # read in narr data and generate tape5 files and caseList
         current_dir = os.getcwd()
         os.chdir(self.filepath_base)
-        mt5 = MakeTape5s(self.metadata, self.buoy_coors, self.skin_temp, self.which_landsat, self.filepath_base, self.verbose, [self.buoy_press, self.buoy_airtemp, self.buoy_dewpnt])
+        mt5 = MakeTape5s(self)
         ret_vals = mt5.main()   # first_files equivalent
         
         if ret_vals != -1:
             caseList, narr_coor = ret_vals
         else:
             return -1
-        
-        self.logger = logging.getLogger(__name__)
 
-        self.logger.info('do_processing: running modtran and parsing tape6 files')
+        print 'do_processing: running modtran and parsing tape6 files'
         
         # change access to prevent errors
         modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
         os.chmod(modtran_bash_path, 0755)   
-        subprocess.check_call('./bin/modtran.bash %s' % self.verbose, shell=True)
+        
+        v = -1
+        if self.verbose:
+            v = 0                                        
+        subprocess.check_call('./bin/modtran.bash %s %s' % (v, os.path.join(self.scene_dir, 'points')), shell=True)
 
         return_radiance = []
         radiances = []
@@ -83,7 +68,7 @@ class ModeledRadProcessing(object):
         # New Emissivity
         spec_r = numpy.array(0)
         spec_r_wvlens = numpy.array(0)
-        water_file = './data/water.txt'
+        water_file = './data/shared/water.txt'
         
         with open(water_file, 'r') as f:
             water_file = f.readlines()
@@ -101,18 +86,18 @@ class ModeledRadProcessing(object):
             transmission = []
             gnd_reflect = []
             
-            self.logger.info('do_processing: band %s of %s', i+1, num_bands)
+            print 'do_processing: band %s of %s' % (i+1, num_bands)
             
             for i in range(4):
                 # read relevant tape6 files
                 caseList_p = caseList[i]
                 ret_vals = self.__read_tape6(caseList_p)
                 
-                upwell_rad = numpy.append(upwell_rad, ret_vals[0])
-                downwell_rad = numpy.append(downwell_rad, ret_vals[1])
-                wavelengths = ret_vals[2]
-                transmission = numpy.append(transmission, ret_vals[3])
-                gnd_reflect = numpy.append(gnd_reflect, ret_vals[4])
+                upwell_rad = numpy.append(upwell_rad, ret_vals[0])   # W cm-2 sr-1 um-1
+                downwell_rad = numpy.append(downwell_rad, ret_vals[1])   # W cm-2 sr-1 um-1
+                wavelengths = ret_vals[2]   # microns
+                transmission = numpy.append(transmission, ret_vals[3])   # no units
+                gnd_reflect = numpy.append(gnd_reflect, ret_vals[4])   # W cm-2 sr-1 um-1
                 
             upwell_rad = self.__offset_bilinear_interp(upwell_rad, narr_coor)
             downwell_rad = self.__offset_bilinear_interp(downwell_rad, narr_coor)
@@ -141,8 +126,10 @@ class ModeledRadProcessing(object):
             
             spec_emissivity = 1 - spec_reflectivity   # calculate emissivity
 
+            RSR_wavelengths = numpy.asarray(RSR_wavelengths) / 1e6   # convert to meters
+            
             # calculate temperature array
-            Lt = self.__calc_temperature_array(RSR_wavelengths)
+            Lt = self.__calc_temperature_array(RSR_wavelengths)  # w m-2 sr-1 m-1
             # calculate top of atmosphere radiance
             
             # OLD METHOD
@@ -154,9 +141,9 @@ class ModeledRadProcessing(object):
             
             # NEW METHOD 
             ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
-            term1 = Lt * spec_emissivity * transmission
-            term2 = spec_reflectivity * gnd_reflect
-            Ltoa = upwell_rad + term1 + term2
+            term1 = Lt * spec_emissivity * transmission # W m-2 sr-1 m-1
+            term2 = spec_reflectivity * (gnd_reflect * 1e10) # W m-2 sr-1 m-1
+            Ltoa = (upwell_rad * 1e10) + term1 + term2   # W m-2 sr-1 m-1
             
             #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
                 
@@ -165,10 +152,9 @@ class ModeledRadProcessing(object):
             denominator = self.__integrate(RSR_wavelengths, RSR)
             
             try:
-                modeled_rad = numerator / denominator 
-                modeled_rad = modeled_rad * 10000.0 
+                modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
             except ZeroDivisionError:
-                self.logger.error('ZeroDivisionError, modeled_rad_procssing')
+                print 'ZeroDivisionError, modeled_rad_procssing'
                 return -1
                 
             return_radiance.append(modeled_rad)
@@ -177,7 +163,7 @@ class ModeledRadProcessing(object):
             else: break
 
         os.chdir(current_dir)
-        return return_radiance, caseList, narr_coor
+        return return_radiance, narr_coor
 
     def __read_tape6(self, case):
         """read in tape6 files and return values
@@ -236,8 +222,8 @@ class ModeledRadProcessing(object):
         check = numpy.subtract(radiance_dn, radiance_dn_check)
         
         if numpy.sum(numpy.absolute(check)) >= .05:
-           self.logger.error('Error in modtran module. Total Radiance minus upwelled radianc \
-           e is not (approximately) equal to downwelled radiance*transmission')
+           print 'Error in modtran module. Total Radiance minus upwelled radianc \
+           e is not (approximately) equal to downwelled radiance*transmission'
            sys.exit()
 
         wavelength = numpy.asarray(wavelength)
@@ -265,54 +251,6 @@ class ModeledRadProcessing(object):
         gnd_reflected_radiance = gnd_reflected_radiance[0]
         
         return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
-        
-    def __interpolate_params(self, array, narr_coor):
-        narr_coor = numpy.absolute(narr_coor)
-        buoy_coors = numpy.absolute(self.buoy_coors)
-        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
-        
-        diffs_x = numpy.absolute(numpy.subtract(narr_coor[:, 0], buoy_coors[0]))
-        diffs_y = numpy.absolute(numpy.subtract(narr_coor[:, 1], buoy_coors[1]))
-        
-        total_x = numpy.sum(diffs_x)
-        total_y = numpy.sum(diffs_y)
-        
-        weights_x = numpy.reshape(diffs_x / total_x, (4, -1))
-        weights_y = numpy.reshape(diffs_y / total_y, (4, -1))
-        
-        array_x = numpy.sum(array * weights_x, axis=0)
-        array_y = numpy.sum(array * weights_y, axis=0)
-        
-        array_interp = (array_x + array_y) / 2.0
-
-        return array_interp
-        
-    def __bilinear_interp(self, array, narr_corr):
-        narr_coor = numpy.absolute(narr_coor)
-        buoy_coors = numpy.absolute(self.buoy_coors)
-        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
-
-        # f(x, y) = w1 * ((f(1,1) * w2) + (f(2,1) * w3) + (f(1,2)*w4), (f(2,2)*w5))
-        # w1 = 1 / ((x2-x1)(y2-y1))
-        # w2 = (x2-x)(y2-y)
-        # w3 = (x-x1)(y2-y)
-        # w4 = (x2-x)(y-y1)
-        # w5 = (x-x1)(y-y1)
-        
-        a, b, c, d = narr_coor
-        
-        e = buoy_coors
-        
-        w1 = 1 / (c[0] * b[1])
-        w2 = (c[0] - e[0]) * (b[1] - e[1])
-        w3 = (e[0]) * (b[1] - e[1])
-        w4 = (c[0] - e[0]) * (e[1])
-        w5 = (e[0]) * (e[1])
-        
-        weighted =  w1 * ((array[0] * w2) + (array[2] * w3) + (array[1] * w4), (array[3] * w5))
-        
-        return weighted
-        
         
     def __offset_bilinear_interp(self, array, narr_cor):
         narr_coor = numpy.absolute(narr_cor)   # 1, 2 , 3, 4
@@ -345,11 +283,11 @@ class ModeledRadProcessing(object):
         data = []
         
         if self.which_landsat == [8,1]:
-            filename_RSR = './data/L8_B11.rsp'
+            filename_RSR = './data/shared/L8_B11.rsp'
         if self.which_landsat == [8,2]:
-            filename_RSR = './data/L8_B10.rsp'
+            filename_RSR = './data/shared/L8_B10.rsp'
         if self.which_landsat == [7,1]:
-            filename_RSR = './data/L7.rsp'
+            filename_RSR = './data/shared/L7.rsp'
             
         # read data from file 
         
@@ -376,26 +314,24 @@ class ModeledRadProcessing(object):
     
         for i in wavelengths:
             x = self.__radiance(i)
-            Lt.append(x / (10**4))
+            Lt.append(x)
             
         return Lt
         
     def __radiance(self, wvlen, units='microns'):
-        """calculate blackbody radiance given wavelength and temperature.
+        """calculate blackbody radiance given wavelength (in meters) and temperature.
         """
         
         # define constants
-                
-        if units == 'microns':
-            c1 = 374151000   # 2 * pi * c^2 * h
-            c2 = 14387.9     # (h * c) / k
+        c = 3e8   # speed of light, m s-1
+        h = 6.626e-34	# J*s = kg m2 s-1
+        k = 1.38064852e-23 # m2 kg s-2 K-1, boltzmann
         
-        else:
-            c1 = 374151000   # boltzman's const
-            c2 = 14387.9
+        c1 = 2 * (c * c) * h   # units = kg m4 s-3
+        c2 = (h * c) / k    # (h * c) / k, units = m K    
             
         # calculate radiance
-        rad = c1 / ((math.pi * (wvlen**5)) * (math.e**((c2 / (self.skin_temp * wvlen))) -1))
+        rad = c1 / (((wvlen**5)) * (math.e**((c2 / (self.skin_temp * wvlen))) - 1))
         
         # UNITS
         # (W / m^2 * sr) * <wavelength unit>
@@ -451,37 +387,35 @@ class ModeledRadProcessing(object):
 
 
 class MakeTape5s(object):
-    def __init__(self, metadata, buoy_coor, skin_temp, whichLandsat, filepath_base, verbose, buoy_params):
-        self.filepath_base = filepath_base
 
-        log_file = os.path.join(self.filepath_base, 'logs/CalibrationController.log')
-        logging.basicConfig(filename=log_file, filemode='w', level=logging.INFO)
-        self.logger = logging.getLogger(__name__)
+    geometricHeight_1 = None
+    geometricHeight_2 = None
+    relativeHumidity_1 = None
+    relativeHumidity_2 = None
+    temperature_1 = None
+    temperature_2 = None
+    geometricHeight = None
+    relativeHumidity = None
+    temperature = None
+    stanGeoHeight = None
+    stanPress = None
+    stanTemp = None
+    stanRelHum = None
+    date = None
         
-        self.metadata = metadata
-        self.buoy_coors = buoy_coor
-        self.skin_temp = skin_temp
-        self.whichLandsat = whichLandsat
-        self.directory = os.path.join(self.filepath_base, 'data/modtran/')
+    def __init__(self, other):
+        self.filepath_base = other.filepath_base
+        
+        self.metadata = other.metadata
+        self.buoy_coors = other.buoy_coors
+        self.skin_temp = '%3.3f' % (other.skin_temp)
+        self.whichLandsat = other.which_landsat
+        self.directory = os.path.join(other.filepath_base, 'data/shared/modtran/')
         self.home = os.path.join(self.filepath_base, 'data')
-        self.skin_temp = '%3.3f' % (skin_temp)
-        self.buoy_params = buoy_params
-        self.verbose = verbose
-
-        self.geometricHeight_1 = None
-        self.geometricHeight_2 = None
-        self.relativeHumidity_1 = None
-        self.relativeHumidity_2 = None
-        self.temperature_1 = None
-        self.temperature_2 = None
-        self.geometricHeight = None
-        self.relativeHumidity = None
-        self.temperature = None
-        self.stanGeoHeight = None
-        self.stanPress = None
-        self.stanTemp = None
-        self.stanRelHum = None
-        self.date = None
+        self.buoy_params = [other.buoy_press, other.buoy_airtemp, other.buoy_dewpnt]
+        self.verbose = other.verbose
+        self.point_dir = os.path.join(other.scene_dir, 'points')
+        self.scene_dir = other.scene_dir
         
     def main(self):
         """Reads narr data and generates tape5 files for modtran runs.
@@ -546,38 +480,38 @@ class MakeTape5s(object):
         pressures = numpy.reshape([p]*4, (4,29))
 
         # read in NARR data
-        if os.path.exists(os.path.join(self.filepath_base, 'data/narr/HGT_1/1000.txt')):
-            self.logger.info('NARR Data Successful Download')
+        if os.path.exists(os.path.join(self.scene_dir, 'narr/HGT_1/1000.txt')):
+            print 'NARR Data Successful Download'
         else:
-            self.logger.error('NARR data not downloaded, no wgrib?')
+            print 'NARR data not downloaded, no wgrib?'
             return -1
 
         for i in xrange(0,29):
-            hgt_1[:,i] = self.__narr_read_read('./data/narr/HGT_1/'+str(p[i]) + '.txt')
-            if self.verbose == 0:
+            hgt_1[:,i] = self.__narr_read_read('HGT_1/'+str(p[i]) + '.txt')
+            if self.verbose is True:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 1),
 
-            shum_1[:,i] = self.__narr_read_read('./data/narr/SHUM_1/'+str(p[i]) + '.txt')
-            if self.verbose == 0:
+            shum_1[:,i] = self.__narr_read_read('SHUM_1/'+str(p[i]) + '.txt')
+            if self.verbose:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 2),
 
-            tmp_1[:,i] = self.__narr_read_read('./data/narr/TMP_1/'+str(p[i]) + '.txt')
-            if self.verbose == 0:
+            tmp_1[:,i] = self.__narr_read_read('TMP_1/'+str(p[i]) + '.txt')
+            if self.verbose:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 3),
 
-            hgt_2[:,i] = self.__narr_read_read('./data/narr/HGT_2/'+str(p[i]) + '.txt')
-            if self.verbose == 0:
+            hgt_2[:,i] = self.__narr_read_read('HGT_2/'+str(p[i]) + '.txt')
+            if self.verbose:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 4),
 
-            shum_2[:,i] = self.__narr_read_read('./data/narr/SHUM_2/'+str(p[i]) + '.txt')
-            if self.verbose == 0:
+            shum_2[:,i] = self.__narr_read_read('SHUM_2/'+str(p[i]) + '.txt')
+            if self.verbose:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 5),
 
-            tmp_2[:,i] = self.__narr_read_read('./data/narr/TMP_2/'+str(p[i]) + '.txt')
-            if self.verbose == 0:
+            tmp_2[:,i] = self.__narr_read_read('TMP_2/'+str(p[i]) + '.txt')
+            if self.verbose:
                 print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 6),
 
-        if self.verbose == 0:
+        if self.verbose:
             print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 6),
             print
 
@@ -598,9 +532,11 @@ class MakeTape5s(object):
 
         return pressures
 
-    def __narr_read_read(self, filename):
+    def __narr_read_read(self, g):
         data = []
      
+        filename = os.path.join(self.scene_dir, 'narr/%s' % g)
+        
         with open(filename, 'r') as f:
             f.readline()
             for line in f:
@@ -673,7 +609,7 @@ class MakeTape5s(object):
             distance_in_utm: exactly what it sounds like
         """
         # open coordinates.txt
-        filename = os.path.join(self.filepath_base, './data/narr/coordinates.txt')
+        filename = os.path.join(self.filepath_base, './data/shared/narr/coordinates.txt')
         coordinates = []
         data = ' '
         i = 0
@@ -757,7 +693,7 @@ class MakeTape5s(object):
         
         if num_points == 0:
             print 'No NARR points in landsat scene. Fatal.'
-            sys.exit()
+            sys.exit(-1)
         
         latvalues = []
         lonvalues = []
@@ -889,7 +825,7 @@ class MakeTape5s(object):
 
         # read in file containing standard mid lat summer atmosphere information 
         # to be used for upper layers of atmo profile
-        filename = './data/modtran/stanAtm.txt'
+        filename = os.path.join(self.filepath_base, 'data/shared/modtran/stanAtm.txt')
         stanAtm = []
         chars = ['\n']
     
@@ -912,22 +848,8 @@ class MakeTape5s(object):
         return 0
     
     def __generate_tape5s(self, num_points, NARRindices, lat, lon, pressures):
-        """do the messy work of generating the tape5 files and caselist.
+        """do the messy work of generating the tape5 files and caselist. """
         
-        Args:
-            self:
-            num_points:
-            NARRindices:
-            lat:
-            lon:
-            pressures:
-            temperature:
-            geometricHeight:
-            relativeHumidity:
-        
-        Returns:
-            case_list
-        """
         # initialize arrays
         case_list = ['']*num_points
         entry = 0
@@ -941,10 +863,11 @@ class MakeTape5s(object):
             else:
                 lonString = '%2.3f' % (360.0 - lon[NARRindices[i,0], NARRindices[i,1]])
 
-            currentPoint = os.path.join(self.directory, 'points/'+latString+'_'+lonString)
-            if not os.path.exists(os.path.join(self.directory, 'points/')): 
-                os.mkdir(os.path.join(self.directory, 'points/'))
-            if not os.path.exists(currentPoint): os.mkdir(currentPoint)
+            currentPoint = os.path.join(self.scene_dir, 'points/'+latString+'_'+lonString)
+            try:
+                os.makedirs(currentPoint)
+            except OSError:
+                pass
             
             if self.geometricHeight[0,i] < 0: gdalt = 0.000 
             else:  gdalt = self.geometricHeight[0,i]
@@ -957,7 +880,7 @@ class MakeTape5s(object):
             numLevels = len(p)
             maxLevel = numLevels-1
           
-            command = "cat "+self.directory+"/tail.txt | sed 's/latitu/"+latString+"/' > "+self.directory+"/newTail.txt"
+            command = "cat "+self.directory+"tail.txt | sed 's/latitu/"+latString+"/' > "+self.directory+"newTail.txt"
             subprocess.check_call(command, shell=True)
             
             command = "cat "+self.directory+"/newTail.txt | sed 's/longit/"+lonString+"/' > "+self.directory+"/newTail2.txt"
@@ -1161,10 +1084,10 @@ class MakeTape5s(object):
             entry += 1
 
 
-            numpy.savetxt('atmo_interp_%s.txt'%(i), plot_list[i])
+            numpy.savetxt(os.path.join(self.scene_dir,'atmo_interp_%s.txt'%(i)), plot_list[i])
     
         # write commandList and caseList to file
-        case_list_file = os.path.join(self.directory,'caseList')
+        case_list_file = os.path.join(self.scene_dir,'points/caseList')
     
         with open(case_list_file, 'w') as f:
             for i in range(len(case_list)):

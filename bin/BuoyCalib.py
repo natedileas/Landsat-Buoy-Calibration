@@ -1,4 +1,3 @@
-import logging
 import os
 import subprocess
 import sys
@@ -8,54 +7,66 @@ import re
 import shutil
 import NarrData
 import ModeledRadProcessing
+import LandsatData
+import BuoyData
 
 
-class CalCon:
-    def __init__(self, ):
+class CalCon(object):
+    _buoy_id = None
+    buoy_location = None  # lat, lon
+    skin_temp = None   # calculated from buoy dataset
+    buoy_press = None
+    buoy_airtemp = None
+    buoy_dewpnt = None
+    
+    metadata = None    # landsat metadata
+    
+    _modeled_radiance = None
+    narr_coor = None
+    
+    _image_radiance = None
+    cloud_cover = None
+    poi = None
+    
+    # attributes that make up the lansat id
+    satelite = None
+    wrs2 = None
+    date = None
+    version = None
+        
+    def __init__(self, LID, verbose=True, reprocess=False):
+        self.scene_id = LID
+                
         self.filepath_base = os.path.realpath(__file__)
         match = re.search('/bin/BuoyCalib.pyc?', self.filepath_base)
         if match:
             self.filepath_base = self.filepath_base.replace(match.group(), '')
 
-        self._buoy_id = None  # buoy_info call it is the actual dataset used
-        self.buoy_location = None  # lat, lon
-        self.buoy_temperature = None   # calculated from buoy dataset
-
-        self.metadata = None   # landsat metadata
+        self.scene_dir = os.path.join(self.filepath_base, './data/scenes/%s' % self.scene_id)
         
-        self.modeled_temperature = None
-        self.modeled_radiance = None
-        self.narr_coor = None
+        self.verbose = verbose   # option for command line output
         
-        self.image_temperature = None
-        self.image_radiance = None
-
-        self.satelite = None
-        self.WRS2 = None
-        self.date = None
-        self.version = None
-
-        self.cloud_cover = None
-        self.poi = None
+        if reprocess is False:
+            self.read_latest()
         
-        self.image_file_extension = 'data/landsat'
-        self.output_txt = True   # option for output
-        self.verbose = True   # option for command line output
-
+        if verbose is False:
+            log_file = open('log.txt', 'w')
+            self.stdout = sys.stdout
+            sys.stdout = log_file
+        
     @property
     def scene_id(self):
-        lid = '%s%s%sLGN%2f' % (self.satelite, self.WRS2, self.date.strftime('%Y%j'), self.version)
-        print 5
+        lid = '%s%s%sLGN%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'), self.version)
         return lid
 
     @scene_id.setter
     def scene_id(self, new_id):
-        match = re.match('L[CE][78]\d*\w\w\w0[0-5]', new_id)
+        match = re.match('L[CE][78]\d{13}LGN0[0-5]', new_id)
 
         if match:
             new_id = match.group()
             self.satelite = new_id[0:3]
-            self.WRS2 = new_id[3:9]
+            self.wrs2 = new_id[3:9]
             self.date = datetime.datetime.strptime(new_id[9:16], '%Y%j')
             self.version = new_id[-2:]
             return 0
@@ -72,9 +83,7 @@ class CalCon:
     def buoy_id(self, new_id):
         """ check for correct format in buoy_id. """
         if new_id is not None:
-            chars = ['\n', ' ', '"', '\\', '/']   # unwanted characters
-            new_id = new_id.translate(None, ''.join(chars))   #rm chars
-            match = re.match('\d\d\d\d\d', new_id)
+            match = re.match('\d{5}', new_id)
 
             if match:   # if it matches the pattern
                 self._buoy_id = match.group()
@@ -87,54 +96,106 @@ class CalCon:
             self._buoy_id = None
             return 0
             
+    @property
+    def modeled_radiance(self):
+        if not self._modeled_radiance:
+            # do everything necesary to calculate mod_radiance
+            
+            if not self.metadata:
+                download_img_data(self)
+            if not self.buoy_location:
+                calculate_buoy_information(self)
+                
+            # download
+            download_mod_data(self)
+            
+            # process
+            return_vals = ModeledRadProcessing.ModeledRadProcessing(self).do_processing()   # make call
+    
+            if return_vals == -1:
+                print 'calc_mod_radiance: return_vals were -1'
+                return
+            else:
+                self._modeled_radiance, self.narr_coor = return_vals
+            
+        return self._modeled_radiance
+    
+    @modeled_radiance.setter
+    def modeled_radiance(self, new_rad):
+        self._modeled_radiance = new_rad
+        
+    @property
+    def image_radiance(self):
+        if not self._image_radiance:
+            if not self.metadata:
+                download_img_data(self)
+            if not self.buoy_location:
+                calculate_buoy_information(self)
+            calc_img_radiance(self)
+        return self._image_radiance
+        
+    @image_radiance.setter
+    def image_radiance(self, new_rad):
+        self._image_radiance = new_rad
+        
+    def __repr__(self):
+        return self.__str__()
+        
+    def __str__(self):
+        """ print calculated values. """
+        if self.verbose is False:
+            sys.stdout = self.stdout
+            
+        output_items = ['Scene ID: %s'%self.scene_id]
+        
+        if self.modeled_radiance:
+            output_items.append('Modeled: Band 10: %2.6f Band 11: %2.6f' % (self.modeled_radiance[0], self.modeled_radiance[1]))
+        
+        if self.image_radiance:
+            output_items.append('Image:   Band 10: %2.6f Band 11: %2.6f' % (self.image_radiance[0], self.image_radiance[1]))
+        
+        if self._buoy_id:
+            output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %4.4f' %(self.buoy_id, self.buoy_location, self.skin_temp))
+            
+        return '\n'.join(output_items)
+
     def output(self):
-        """ Output calculated values to command line or txt file. """
-        if self.output_txt:
-            outfile = os.path.join(self.filepath_base, 'logs/output.txt')
-            header = '%21s' % (self.scene_id)
-            buoy_info = ' %7s%8s%7s %4.4f' %(self.buoy_latitude, self.buoy_longitude, self.buoy_id, self.buoy_temperature)
-            radiances = ' %2.6f %2.6f %2.6f %2.6f' % (self.image_radiance[0], self.modeled_radiance[0], self.image_radiance[1], self.modeled_radiance[1])
-            narr_coor = ' %14s, %14s, %14s, %14s' % (self.narr_coor[0], self.narr_coor[1], self.narr_coor[2], self.narr_coor[3])
-            timestamp = '   '+datetime.datetime.now().strftime('%m/%d/%y-%H:%M:%S')
-
-            with open(outfile, 'a') as f:
-                f.write(header + buoy_info + radiances + narr_coor + '\n')
-        else:
-            print 'Scene ID: ', self.scene_id
-            if self.buoy_latitude: print 'Buoy Latitude:', self.buoy_latitude
-            if self.buoy_longitude: print 'Buoy Longitde:', self.buoy_longitude
-            if self.poi: print 'POI: ', self.poi
-            if self.image_radiance: print 'Band 10:\n\tImage Radiance: ', self.image_radiance[0]
-            if self.modeled_radiance: print '\tModeled Radiance: ', self.modeled_radiance[0]
-            if self.image_radiance: print 'Band 11:\n\tImage Radiance: ', self.image_radiance[1]
-            if self.modeled_radiance: print '\tModeled Radiance: ', self.modeled_radiance[1]
-            print 'Absolute Temperature: ', self.buoy_temperature
-        return 0
-
-    def cleanup(self, execute=False, *args):
-        """ Remove temporary files. """
-
-        if execute is True:
-            for rm_file in self.cleanup_list:
-                try:
-                    if os.path.exists(rm_file):
-                        if os.path.isfile(rm_file):
-                            os.remove(rm_file)
-                        elif os.path.isdir(rm_file):
-                            shutil.rmtree(rm_file)
-                except OSError as e:
-                    self.logger.warning('cleanup: OSError: %s: %s: %s' % (e.errno, e.strerror, rm_file))
-        else:
-            for add_file in args:
-                self.cleanup_list.append(os.path.join(self.filepath_base, add_file))
-
-        return 0
-
+        out_file = os.path.join(self.scene_dir, 'latest_rad.txt')
+        
+        with open(out_file, 'w') as f:
+            if self.buoy_id:
+                f.write('BID: %7s BLL: %8s temp: %4.4f\n' %(self.buoy_id, self.buoy_location, self.skin_temp))
+            
+            if self.modeled_radiance:
+                f.write('M10: %2.6f M11: %2.6f\n' % (self.modeled_radiance[0], self.modeled_radiance[1]))
+        
+            if self.image_radiance:
+                f.write('I10: %2.6f I11: %2.6f\n' % (self.image_radiance[0], self.image_radiance[1]))
+                
+    def read_latest(self):
+        out_file = os.path.join(self.scene_dir, 'latest_rad.txt')
+        
+        try:
+            with open(out_file, 'r') as f:
+                for line in f:
+                    data = line.split()
+                    if 'BID' in line:
+                        self.buoy_id = data[1]
+                        self.buoy_location = [data[3], data[4]]
+                        self.skin_temp = float(data[-1])
+                    if 'M10' in line:
+                        self.modeled_radiance = float(data[1]), float(data[3])
+                    if 'I10' in line:
+                        self.image_radiance = float(data[1]), float(data[3])
+                    
+        except OSError:
+            pass
+                    
 def download_mod_data(cc):
 
     print 'download_mod_data: Downloading NARR Data'
 
-    ret_val = nd.start_download(cc)   # make call
+    ret_val = NarrData.download(cc)   # make call
     
     if ret_val == -1:
         print 'download_mod_data: missing wgrib issue'
@@ -142,34 +203,18 @@ def download_mod_data(cc):
 
     return 0
 
-def calc_mod_radiance(cc):
-    """ calculate modeled radiance. """
-
-    print 'calc_mod_radiance: Calculating Modeled Radiance'
-    return_vals = mrp.do_processing(cc)   # make call
-    
-    if return_vals == -1:
-        print 'calc_mod_radiance: return_vals were -1'
-        return -1
-    else:
-        cc.modeled_radiance, cc.narr_coor = return_vals
-
-    return 0
-
 def download_img_data(cc):
     """ download landsat image and parse metadata. """
-    import LandsatData
-
     print '.download_img_data: Dealing with Landsat Data'
 
-    return_vals = ld.download(cc)   # make call
+    return_vals = LandsatData.download(cc)   # make call
 
     if return_vals:   # make sure return_vals exist and are good returns
         if return_vals == -1:
             print 'WARNING .download_img_data: something went wrong'
             return -1
         else:          # otherwise, assign values
-            cc.satelite = int(return_vals[0][2:3])
+            cc.satelite = return_vals[0][2:3]
             cc.scene_id = return_vals[0]
             cc.metadata = return_vals[1]
             return 0
@@ -181,7 +226,7 @@ def calc_img_radiance(cc):
     import ImageRadProcessing
 
     print '.calc_img_radiance: Calculating Image Radiance'
-    return_vals = irp.do_processing(cc)
+    return_vals = ImageRadProcessing.ImageRadProcessing(cc).do_processing()
 
     cc.image_radiance = return_vals[0]
     cc.poi = return_vals[1]
@@ -189,22 +234,16 @@ def calc_img_radiance(cc):
     
 def calculate_buoy_information(cc):
     """pick buoy dataset, download, and calculate skin_temp. """
-    import BuoyData
-
     print 'calculate_buoy_information: Downloading Buoy Data'
-    if not cc.metadata:
-      return -1
-      
-    return_vals = BuoyData.start_download(cc)
+    return_vals = BuoyData.BuoyData(cc).start_download()
 
     if return_vals:
         if return_vals == -1:
             return -1
         else:
             cc.buoy_id = return_vals[0]
-            cc.buoy_latitude = return_vals[1][0]
-            cc.buoy_longitude = return_vals[1][1]
-            cc.buoy_temperature = return_vals[2]
+            cc.buoy_location = return_vals[1]
+            cc.skin_temp = return_vals[2]
             cc.buoy_press = return_vals[3]
             cc.buoy_airtemp = return_vals[4]
             cc.buoy_dewpnt = return_vals[5]

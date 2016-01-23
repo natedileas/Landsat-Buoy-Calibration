@@ -1,15 +1,13 @@
 import os
-import subprocess
 import sys
 import datetime
-import math
 import re
-import shutil
+import csv
+
 import NarrData
 import ModeledRadProcessing
 import LandsatData
 import BuoyData
-
 
 class CalCon(object):
     _buoy_id = None
@@ -47,10 +45,13 @@ class CalCon(object):
         self.verbose = verbose   # option for command line output
         
         if reprocess is False:
-            self.read_latest()
+            try:
+                self.read_latest()
+            except IOError:
+                pass
         
         if verbose is False:
-            log_file = open('log.txt', 'w')
+            log_file = open(os.path.join(self.scene_dir, 'log.txt'), 'w')
             self.stdout = sys.stdout
             sys.stdout = log_file
         
@@ -107,8 +108,10 @@ class CalCon(object):
                 calculate_buoy_information(self)
                 
             # download
-            download_mod_data(self)
-            
+            ret_val=download_mod_data(self)
+            if ret_val == -1:
+                return
+                
             # process
             return_vals = ModeledRadProcessing.ModeledRadProcessing(self).do_processing()   # make call
     
@@ -172,7 +175,7 @@ class CalCon(object):
         
             if self.image_radiance:
                 f.write('I10: %2.6f I11: %2.6f\n' % (self.image_radiance[0], self.image_radiance[1]))
-                
+        
     def read_latest(self):
         out_file = os.path.join(self.scene_dir, 'latest_rad.txt')
         
@@ -191,6 +194,38 @@ class CalCon(object):
                     
         except OSError:
             pass
+            
+    def to_csv(self, f):
+        w = csv.writer(f, quoting=csv.QUOTE_NONE, )
+        w.writerow(self.fmt_items(', '))
+        
+    def fmt_items(self, delim=', '):
+        items = [self.scene_id]
+        
+        if self._buoy_id:
+            items.append(str(self.buoy_location[0]))   # lat
+            items.append(str(self.buoy_location[1]))   # lon
+                
+        items.append(self.date.strftime('%m/%d/%Y'))   # year
+        items.append(self.date.strftime('%j'))   # doy
+        items.append(self.wrs2[0:3])   # path
+        items.append(self.wrs2[3:6])   # row
+        items.append(' ')   # day/ night
+        items.append(self.buoy_id)   # buoy id
+        items.append(' ')   # sca
+        items.append(' ')   # detector
+        items.append(' ')   # temp difference band 10
+        items.append(' ')   # temp difference band 11
+        
+        if self.modeled_radiance and self.image_radiance:
+            items.append(str(self.image_radiance[0]))  # band 10
+            items.append(str(self.modeled_radiance[0]))   # band 10
+            items.append(str(self.image_radiance[1]))   # band 11
+            items.append(str(self.modeled_radiance[1]))   # band 11
+            items.append(str(self.skin_temp))   # buoy (skin) temp
+
+        return items
+        
                     
 def download_mod_data(cc):
 

@@ -90,17 +90,17 @@ mv $scene_dir/$fileSHUM1 $grib/script_SHUM
 #  change to appropriate GRIB directory and run scripts
 cd $grib
 
-./script_HGT >/dev/null 2>>$home/logs/CalibrationController.log
+./script_HGT >/dev/null 2>>$scene_dir/log.txt
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [1 / 12] \r'; fi
 
 #check if 'missing wgrib inventory' is in log file
-if grep -q "missing wgrib inventory" $home/logs/CalibrationController.log; then
+if grep -q "missing wgrib inventory" $scene_dir/log.txt; then
     exit 1
 fi
 
-./script_SHUM >/dev/null 2>>$home/logs/CalibrationController.log
+./script_SHUM >/dev/null 2>>$scene_dir/log.txt
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [2 / 12] \r'; fi
-./script_TMP >/dev/null 2>>$home/logs/CalibrationController.log
+./script_TMP >/dev/null 2>>$scene_dir/log.txt
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [3 / 12] \r'; fi
 ./HGT_grb2txt >/dev/null 2>/dev/null
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [4 / 12] \r'; fi
@@ -138,11 +138,11 @@ mv $scene_dir/$fileSHUM2 $grib/script_SHUM
 
 #  change to appropriate GRIB directory and run scripts
 cd $grib
-./script_HGT >/dev/null 2>>$home/logs/CalibrationController.log
+./script_HGT >/dev/null 2>>$scene_dir/log.txt
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [7 / 12] \r'; fi
-./script_SHUM >/dev/null 2>>$home/logs/CalibrationController.log
+./script_SHUM >/dev/null 2>>$scene_dir/log.txt
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [8 / 12] \r'; fi
-./script_TMP >/dev/null 2>>$home/logs/CalibrationController.log
+./script_TMP >/dev/null 2>>$scene_dir/log.txt
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [9 / 12] \r'; fi
 ./HGT_grb2txt >/dev/null 2>/dev/null
 if [ ${verbose} -gt -1 ]; then echo -ne '        DOWNLOADING NARR DATA: [10 / 12] \r'; fi

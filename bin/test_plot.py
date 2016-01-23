@@ -100,8 +100,30 @@ def _calc_temperature_array(wavelengths):
             
     return Lt
 
+def compare_narr(scene1, scene2):
+    figure = matplotlib.pyplot.figure('TITLE', (18, 18)) #make figure
+
+    axes1 = matplotlib.pyplot.subplot(2, 2, 1)
+    axes1 = matplotlib.pyplot.plot(scene1[1], scene1[0], 'b')
+    axes1 = matplotlib.pyplot.plot(scene2[1], scene2[0], 'r')
+
+    axes2 = matplotlib.pyplot.subplot(2, 2, 2) #2 rows, 1 column, 2nd plot
+    axes2 = matplotlib.pyplot.plot(scene1[2], scene1[0], 'b')
+    axes2 = matplotlib.pyplot.plot(scene2[2], scene2[0], 'r')
+
+    axes3 = matplotlib.pyplot.subplot(2, 2, 3) #2 rows, 1 column, 3rd element
+    axes3 = matplotlib.pyplot.plot(scene1[3], scene1[0], 'b')
+    axes3 = matplotlib.pyplot.plot(scene2[3], scene2[0], 'r')
+
+    axes4 = matplotlib.pyplot.subplot(2, 2, 4) #2 rows, 1 column, 4th element
+    #axes4 = matplotlib.pyplot.plot(scene1[0], scene1[4], 'b')
+    #axes4 = matplotlib.pyplot.plot(scene2[0], scene2[4], 'r')
+    
+    matplotlib.pyplot.show()
     
 if __name__ =='__main__':
-    a = numpy.arange(8,14,.05)
-    b = _calc_temperature_array(a)
-    plot(a, b)
+    
+    scene1 = numpy.loadtxt("/cis/ugrad/nid4986/summer_2015/BuoyCalib_Cmd/data/scenes/LC80130332013145LGN00/atmo_interp_1.txt")
+    scene2 = numpy.loadtxt("/cis/ugrad/nid4986/summer_2015/BuoyCalib_Cmd/data/scenes/LC80410372013101LGN01/atmo_interp_1.txt")
+    #print scene1
+    compare_narr(scene1, scene2)

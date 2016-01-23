@@ -6,7 +6,7 @@ import re
 import subprocess
 import sys
 import utm
-
+import linecache
 
 class ModeledRadProcessing(object):
     def __init__(self, other):
@@ -439,6 +439,14 @@ class MakeTape5s(object):
             narr_coor.append([lat[narr_indices[i,0], narr_indices[i,1]],lon[narr_indices[i,0], narr_indices[i,1]]])
             
         # read in NARR data
+        # read in NARR data
+        if os.path.exists(os.path.join(self.scene_dir, 'narr/HGT_1/1000.txt')):
+            print 'NARR Data Successful Download'
+            
+        else:
+            print 'NARR data not downloaded, no wgrib?'
+            return -1
+            
         pressures = self.__narr_read(narr_indices, lat)
         
         # interplolate in time and load standard atmo
@@ -448,105 +456,41 @@ class MakeTape5s(object):
         case_list = self.__generate_tape5s(num_points, narr_indices, lat, lon, pressures)
     
         return case_list, narr_coor
-    
+        
     def __narr_read(self, narr_indices, lat):
-        """Read in downloaded narr data, perform processing and return.
-        
-        Args:
-            self
-        
-        Returns:
-            geometricHeight_1:
-            geometricHeight_2:
-            relativeHumidity_1:
-            relativeHumidity_2:
-            landsatTMP_1:
-            landsatTMP_2:
-            
-        Helper Functions:
-            narr_read_read: helper for reading in data
-            convert_geopotential_geometric: convert geopotential height to geometric height
-            convert_sh_rh: convert specific humidity to relative humidity
-        """
-        hgt_1 = numpy.zeros((96673, 29))
-        shum_1 = numpy.zeros((96673, 29))
-        tmp_1 = numpy.zeros((96673, 29))
-
-        hgt_2 = numpy.zeros((96673, 29))
-        shum_2 = numpy.zeros((96673, 29))
-        tmp_2 = numpy.zeros((96673, 29))
-
         p = numpy.asarray([1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 125, 100])
         pressures = numpy.reshape([p]*4, (4,29))
-
-        # read in NARR data
-        if os.path.exists(os.path.join(self.scene_dir, 'narr/HGT_1/1000.txt')):
-            print 'NARR Data Successful Download'
-        else:
-            print 'NARR data not downloaded, no wgrib?'
-            return -1
-
-        for i in xrange(0,29):
-            hgt_1[:,i] = self.__narr_read_read('HGT_1/'+str(p[i]) + '.txt')
-            if self.verbose is True:
-                print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 1),
-
-            shum_1[:,i] = self.__narr_read_read('SHUM_1/'+str(p[i]) + '.txt')
-            if self.verbose:
-                print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 2),
-
-            tmp_1[:,i] = self.__narr_read_read('TMP_1/'+str(p[i]) + '.txt')
-            if self.verbose:
-                print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 3),
-
-            hgt_2[:,i] = self.__narr_read_read('HGT_2/'+str(p[i]) + '.txt')
-            if self.verbose:
-                print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 4),
-
-            shum_2[:,i] = self.__narr_read_read('SHUM_2/'+str(p[i]) + '.txt')
-            if self.verbose:
-                print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 5),
-
-            tmp_2[:,i] = self.__narr_read_read('TMP_2/'+str(p[i]) + '.txt')
-            if self.verbose:
-                print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 6),
-
-        if self.verbose:
-            print '\x1b[2K\r', '        READING IN NARR DATA: [%s / 174] \r' % (i * 6 + 6),
-            print
-
-        landsatHGT_1 = numpy.reshape(hgt_1, (277,349, 29))[narr_indices[:,0],narr_indices[:,1],:]
-        landsatHGT_2 = numpy.reshape(hgt_2, (277,349, 29))[narr_indices[:,0],narr_indices[:,1],:]
-
-        landsatSHUM_1 = numpy.reshape(shum_1, (277,349, 29))[narr_indices[:,0],narr_indices[:,1],:]
-        landsatSHUM_2 = numpy.reshape(shum_2, (277,349, 29))[narr_indices[:,0],narr_indices[:,1],:]
-
-        self.temperature_1 = numpy.reshape(tmp_1, (277,349, 29))[narr_indices[:,0],narr_indices[:,1],:]
-        self.temperature_2 = numpy.reshape(tmp_2, (277,349, 29))[narr_indices[:,0],narr_indices[:,1],:]
-
-        self.relativeHumidity_1 = self.__convert_sh_rh(landsatSHUM_1, self.temperature_1, pressures)
-        self.relativeHumidity_2 = self.__convert_sh_rh(landsatSHUM_2, self.temperature_2, pressures)
-
-        self.geometricHeight_1 = numpy.divide(landsatHGT_1, 1000.0)   # convert m to km
-        self.geometricHeight_2 = numpy.divide(landsatHGT_2, 1000.0)   # convert m to km
-
-        return pressures
-
-    def __narr_read_read(self, g):
-        data = []
-     
-        filename = os.path.join(self.scene_dir, 'narr/%s' % g)
+        dirs = ['HGT_1', 'HGT_2', 'TMP_1', 'TMP_2', 'SHUM_1', 'SHUM_2']
         
-        with open(filename, 'r') as f:
-            f.readline()
-            for line in f:
-                data.append(line)
-                
-        return data
+        shape = [277,349]
+        indices = [numpy.ravel_multi_index(idx, shape) for idx in narr_indices]
+        
+        data = [[] for i in range(6)]
+        
+        for d in dirs:
+            print d
+            for i in indices:
+                for press in p:
+                    filename = os.path.join(self.scene_dir, 'narr', d, str(press)+'.txt')
+                    data[dirs.index(d)].append(float(linecache.getline(filename, i+2)))
+        
+        data = numpy.reshape(data, (6, 4, 29))  # reshape
+        hgt_1, hgt_2, self.temperature_1, self.temperature_2, shum_1, shum_2 = data   # unpack
+        
+        self.relativeHumidity_1 = self.__convert_sh_rh(shum_1, self.temperature_1, pressures)
+        self.relativeHumidity_2 = self.__convert_sh_rh(shum_2, self.temperature_2, pressures)
+        
+        self.geometricHeight_1 = numpy.divide(hgt_1, 1000.0)   # convert m to km
+        self.geometricHeight_2 = numpy.divide(hgt_2, 1000.0)   # convert m to km
+        
+        return pressures
         
     def __convert_sh_rh(self, specHum, T_k, pressure):
         # Given array of specific humidities, temperature, and pressure, generate array of relative humidities
         # source: http://earthscience.stackexchange.com/questions/2360/how-do-i-convert-specific-humidity-to-relative-humidity
+        print numpy.shape(specHum)
+        print numpy.shape(pressure)
+        print specHum.dtype
         
         T_k = numpy.asarray(T_k, dtype=numpy.float64)  #numpy.float64
         
@@ -557,7 +501,9 @@ class MakeTape5s(object):
         
         # compute relative humidity
         a = numpy.divide(numpy.multiply(17.67, T_c), numpy.subtract(T_k, 29.65))
-        RH = 26.3 * p * q * numpy.power(numpy.exp(a), -1)   #orginally .263, *100 for units
+        RH = 26.3 * p
+        RH = RH * q 
+        RH = RH * numpy.power(numpy.exp(a), -1)   #orginally .263, *100 for units
         
         return RH
         
@@ -1036,9 +982,9 @@ class MakeTape5s(object):
             #########################################################################
             with open(filename, 'w') as f:
                 for k in range(numpy.shape(tempGeoHeight)[0]):
-                    line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%16s\n' % \
-                    (tempGeoHeight[k], tempPress[k], tempTemp[k], dewpoint_k[k] \
-                    ,'0.000E+00','0.000E+00', 'AAF2222222222 2')
+                    line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%15s\n' % \
+                    (tempGeoHeight[k], tempPress[k], tempTemp[k], tempRelHum[k] \
+                    ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
                     
                     line = line.replace('e', 'E')
                     f.write(line)

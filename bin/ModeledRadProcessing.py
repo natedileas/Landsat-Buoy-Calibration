@@ -468,7 +468,6 @@ class MakeTape5s(object):
         data = [[] for i in range(6)]
         
         for d in dirs:
-            print d
             for i in indices:
                 for press in p:
                     filename = os.path.join(self.scene_dir, 'narr', d, str(press)+'.txt')

@@ -3,26 +3,32 @@ import sys
 import datetime
 import re
 import csv
+import subprocess
 
-import NarrData
 import ModeledRadProcessing
-import LandsatData
+import ImageRadProcessing
 import BuoyData
+import NarrData
+import landsatdata
 
-class CalCon(object):
+
+class CalibrationController(object):
+    ############## ATTRIBUTES ##########################################################
+    # buoy and related attributes
     _buoy_id = None
-    buoy_location = None  # lat, lon
+    buoy_location = None  # [lat, lon]
     skin_temp = None   # calculated from buoy dataset
     buoy_press = None
     buoy_airtemp = None
     buoy_dewpnt = None
     
-    metadata = None    # landsat metadata
-    
+    # modeled radiance and related attributes
     _modeled_radiance = None
     narr_coor = None
     
+    # image radiance and related attributes
     _image_radiance = None
+    metadata = None    # landsat metadata
     cloud_cover = None
     poi = None
     
@@ -32,15 +38,14 @@ class CalCon(object):
     date = None
     version = None
         
-    def __init__(self, LID, verbose=True, reprocess=False):
+    ############## ENTRY POINT ##########################################################
+    def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False, reprocess=False):
+        """ set up CalibrationController object. """
+        
         self.scene_id = LID
                 
-        self.filepath_base = os.path.realpath(__file__)
-        match = re.search('/bin/BuoyCalib.pyc?', self.filepath_base)
-        if match:
-            self.filepath_base = self.filepath_base.replace(match.group(), '')
-
-        self.scene_dir = os.path.join(self.filepath_base, './data/scenes/%s' % self.scene_id)
+        self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
+        self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
         
         self.verbose = verbose   # option for command line output
         
@@ -51,17 +56,26 @@ class CalCon(object):
                 pass
         
         if verbose is False:
-            log_file = open(os.path.join(self.scene_dir, 'log.txt'), 'w')
-            self.stdout = sys.stdout
-            sys.stdout = log_file
-        
+            try:
+                log_file = open(os.path.join(self.scene_dir, 'log.txt'), 'w')
+                self.stdout = sys.stdout
+                sys.stdout = log_file
+            except IOError:
+                pass
+                
+    ############## GETTERS AND SETTERS ##########################################################
     @property
     def scene_id(self):
+        """ scene_id getter. stored internally as different parts. """
+        
         lid = '%s%s%sLGN%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'), self.version)
         return lid
 
+
     @scene_id.setter
     def scene_id(self, new_id):
+        """ scene_id setter. check for validity before assignment. """
+        
         match = re.match('L[CE][78]\d{13}LGN0[0-5]', new_id)
 
         if match:
@@ -70,45 +84,45 @@ class CalCon(object):
             self.wrs2 = new_id[3:9]
             self.date = datetime.datetime.strptime(new_id[9:16], '%Y%j')
             self.version = new_id[-2:]
-            return 0
 
         else:
             print 'WARNING scene_id.setter: %s is the wrong format' % new_id
-            return -1
-        
+
+
     @property
     def buoy_id(self):
+        """ buoy_id getter. """
+        
         return self._buoy_id
+
 
     @buoy_id.setter
     def buoy_id(self, new_id):
-        """ check for correct format in buoy_id. """
-        if new_id is not None:
-            match = re.match('\d{5}', new_id)
+        """ buoy_id setter. check for validity before assignment. """
+        
+        match = re.match('\d{5}', new_id)
 
-            if match:   # if it matches the pattern
-                self._buoy_id = match.group()
-                return 0
-            else:
-                self._buoy_id = new_id
-                print 'WARNING .buoy_id: @buoy_id.setter: the given buoy id is the wrong format'
-                return -1
+        if match:   # if it matches the pattern
+            self._buoy_id = match.group()
         else:
-            self._buoy_id = None
-            return 0
+            self._buoy_id = new_id
+            print 'WARNING .buoy_id: @buoy_id.setter: the given buoy id is the wrong format'
+     
             
     @property
     def modeled_radiance(self):
+        """ modeled_radiance getter. calulates it if not already calculated. """
+        
         if not self._modeled_radiance:
             # do everything necesary to calculate mod_radiance
             
             if not self.metadata:
-                download_img_data(self)
+                self.download_img_data()
             if not self.buoy_location:
-                calculate_buoy_information(self)
+                self.calculate_buoy_information()
                 
             # download
-            ret_val=download_mod_data(self)
+            ret_val = self.download_mod_data()
             if ret_val == -1:
                 return
                 
@@ -123,26 +137,38 @@ class CalCon(object):
             
         return self._modeled_radiance
     
+    
     @modeled_radiance.setter
     def modeled_radiance(self, new_rad):
+        """ modeled_radiance setter. """
+        
         self._modeled_radiance = new_rad
+        
         
     @property
     def image_radiance(self):
+        """ image_radiance getter. calulates it if not already calculated. """
+        
         if not self._image_radiance:
             if not self.metadata:
-                download_img_data(self)
+                self.download_img_data()
             if not self.buoy_location:
-                calculate_buoy_information(self)
-            calc_img_radiance(self)
+                self.calculate_buoy_information()
+            self.calc_img_radiance()
         return self._image_radiance
+        
         
     @image_radiance.setter
     def image_radiance(self, new_rad):
+        """ image_radiance setter. """
+        
         self._image_radiance = new_rad
         
+        
+    ############## MEMBER FUNCTIONS ##########################################################
     def __repr__(self):
         return self.__str__()
+        
         
     def __str__(self):
         """ print calculated values. """
@@ -163,7 +189,10 @@ class CalCon(object):
             
         return '\n'.join(output_items)
 
+
     def output(self):
+        """ output results to a file. """
+
         out_file = os.path.join(self.scene_dir, 'latest_rad.txt')
         
         with open(out_file, 'w') as f:
@@ -176,7 +205,10 @@ class CalCon(object):
             if self.image_radiance:
                 f.write('I10: %2.6f I11: %2.6f\n' % (self.image_radiance[0], self.image_radiance[1]))
         
+        
     def read_latest(self):
+        """ read in results from the file. """
+        
         out_file = os.path.join(self.scene_dir, 'latest_rad.txt')
         
         try:
@@ -194,12 +226,18 @@ class CalCon(object):
                     
         except OSError:
             pass
+      
             
     def to_csv(self, f):
+        """ write results to csv format. """
+        
         w = csv.writer(f, quoting=csv.QUOTE_NONE, )
         w.writerow(self.fmt_items(', '))
         
+        
     def fmt_items(self, delim=', '):
+        """ helper function for self.to_csv. """
+        
         items = [self.scene_id]
         
         if self._buoy_id:
@@ -227,66 +265,61 @@ class CalCon(object):
         return items
         
                     
-def download_mod_data(cc):
-
-    print 'download_mod_data: Downloading NARR Data'
-
-    ret_val = NarrData.download(cc)   # make call
+    def download_mod_data(self):
+        """ download NARR Data. """
     
-    if ret_val == -1:
-        print 'download_mod_data: missing wgrib issue'
-        return -1
-
-    return 0
-
-def download_img_data(cc):
-    """ download landsat image and parse metadata. """
-    print '.download_img_data: Dealing with Landsat Data'
-
-    return_vals = LandsatData.download(cc)   # make call
-
-    if return_vals:   # make sure return_vals exist and are good returns
-        if return_vals == -1:
-            print 'WARNING .download_img_data: something went wrong'
-            return -1
-        else:          # otherwise, assign values
-            cc.satelite = return_vals[0][2:3]
-            cc.scene_id = return_vals[0]
-            cc.metadata = return_vals[1]
+        print 'download_mod_data: Downloading NARR Data'
+    
+        if os.path.exists(os.path.join(self.scene_dir, 'narr/HGT_1/1000.txt')):
             return 0
-    else:
-        return -1
-
-def calc_img_radiance(cc):
-    """ calculate image radiance. """
-    import ImageRadProcessing
-
-    print '.calc_img_radiance: Calculating Image Radiance'
-    return_vals = ImageRadProcessing.ImageRadProcessing(cc).do_processing()
-
-    cc.image_radiance = return_vals[0]
-    cc.poi = return_vals[1]
-    return 0
     
-def calculate_buoy_information(cc):
-    """pick buoy dataset, download, and calculate skin_temp. """
-    print 'calculate_buoy_information: Downloading Buoy Data'
-    return_vals = BuoyData.BuoyData(cc).start_download()
+        # begin download of NARR data
 
-    if return_vals:
-        if return_vals == -1:
-            return -1
-        else:
-            cc.buoy_id = return_vals[0]
-            cc.buoy_location = return_vals[1]
-            cc.skin_temp = return_vals[2]
-            cc.buoy_press = return_vals[3]
-            cc.buoy_airtemp = return_vals[4]
-            cc.buoy_dewpnt = return_vals[5]
-            return 0
-    else:
-        return -1
+        subprocess.check_call('chmod u+x ./bin/NARR_py.bash', shell=True)
+        
+        v = -1
+        if self.verbose:
+          v = 0
+          
+        ret_val = subprocess.call('./bin/NARR_py.bash %s %s %s' % (self.scene_dir, self.scene_id, v), shell=True)
+        if ret_val == 1:
+            print 'missing wgrib error' 
+            sys.exit(-1)
+    
+    def download_img_data(self):
+        """ download landsat images and parse metadata. """
+        
+        print '.download_img_data: Dealing with Landsat Data'
+    
+        # download landsat image data and assign returns
+        downloaded_LID = landsatdata.download(self)
 
-    return 0
+        self.satelite = downloaded_LID[2:3]
+        self.scene_id = downloaded_LID
+
+        # read in landsat metadata
+        self.metadata = landsatdata.read_metadata(self)
 
     
+    def calc_img_radiance(self):
+        """ calculate image radiance. """
+    
+        print '.calc_img_radiance: Calculating Image Radiance'
+        self.image_radiance, self.poi = ImageRadProcessing.ImageRadProcessing(self).do_processing()
+        
+        
+    def calculate_buoy_information(self):
+        """ pick buoy dataset, download, and calculate skin_temp. """
+        
+        print 'calculate_buoy_information: Downloading Buoy Data'
+        return_vals = BuoyData.BuoyData(self).start_download()
+    
+        try:
+            self.buoy_id = return_vals[0]
+            self.buoy_location = return_vals[1]
+            self.skin_temp = return_vals[2]
+            self.buoy_press = return_vals[3]
+            self.buoy_airtemp = return_vals[4]
+            self.buoy_dewpnt = return_vals[5]
+        except TypeError:
+            print 'TypeError: BuoyData returns incorrect.'

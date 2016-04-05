@@ -31,7 +31,7 @@ do
   popd >>$log 2>>$log
   
 	#Create link
-	ln -f $home/$directory/elim2.sed "${case}"
+	ln -fs $home/$directory/elim2.sed "${case}"
  
    echo $case >>$log 2>>$log
 	./bin/tape6parser.bash ${case} >>$log 2>>$log

@@ -1,8 +1,6 @@
 if __name__=='__main__':
     import argparse
     import bin.BuoyCalib as bc
-    import cProfile
-    import re
 
     parser = argparse.ArgumentParser(description='Compute and compare the radiance values of \
      a landsat image to the radiance of a NOAA buoy. ')
@@ -21,8 +19,8 @@ if __name__=='__main__':
     #true optionals
     parser.add_argument('-c', '--cloud' , help="Maximum desired cloud coverage in percent", type=int, default=100)
     parser.add_argument('-v', '--verbose', help="Verbose: Specify to see command line output. Otherwise, view it in ./logs", action='store_true', default=False)
-    parser.add_argument('-r', '--reprocess', help="Verbose: Specify to reprocess Otherwise, a previous calculated version will be outputted.", action='store_true', default=False)
-
+    parser.add_argument('-r', '--reprocess', help="Add to explicitly reprocess. Otherwise, a previous calculated version will be outputted.", action='store_true', default=False)
+    parser.add_argument('-d', '--directory', help="Directory to search for landsat images.", default='./data/scenes/')
     args = parser.parse_args()
     
     # assemble id
@@ -32,7 +30,8 @@ if __name__=='__main__':
     else:
         sat = {7:'LE7', 8:'LC8'}
         LID = '%3s%6s%7s%3s%2s' % (sat[args.satelite], args.WRS2, args.date, args.station, args.version)
-        
-    x = bc.CalCon(LID, verbose=args.verbose, reprocess=args.reprocess)  # initialize
+     
+    x = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, reprocess=args.reprocess)  # initialize
     print str(x)   # sorry, str() necesary for now. calculate and assign
-    x.output()    # write out values
+    x.output()    # write out values"""
+    

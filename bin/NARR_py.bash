@@ -3,22 +3,23 @@
 
 home=`pwd`
 imageBase=$1
-verbose=$2
+LID=$2
+verbose=$3
 
 #  define Landsat metadata file
-metaFile=$home/data/scenes/$imageBase/$imageBase'_MTL.txt'
+metaFile=$imageBase/$LID'_MTL.txt'
 
 narr=$home/data/shared/narr
 grib=$home/data/shared/narr/GRIB
 
-scene_dir=$home/data/scenes/$imageBase/narr
+scene_dir=$imageBase/narr
 
 if [ ! -d  $scene_dir ]; then
 mkdir $scene_dir
 fi
 
-cat $metaFile | grep -a = | sed s/\ =\ /=/g > ./data/scenes/${imageBase}/${imageBase}'_meta.txt'
-source ./data/scenes/${imageBase}/${imageBase}'_meta.txt'
+cat $metaFile | grep -a = | sed s/\ =\ /=/g > ${imageBase}/${LID}'_meta.txt'
+source ${imageBase}/${LID}'_meta.txt'
 
 #  parse date and hour of acquisition from Landsat metadata
 year=`echo ${DATE_ACQUIRED} | awk -F'-' '{print $1}'`
@@ -83,9 +84,18 @@ chmod 755 $grib/TMP_grb2txt
 chmod 755 $grib/a.out
 
 #  copy script files for time one to appropriate GRIB directory
-mv $scene_dir/$fileHGT1 $grib/script_HGT
-mv $scene_dir/$fileTMP1 $grib/script_TMP
-mv $scene_dir/$fileSHUM1 $grib/script_SHUM
+#mv $scene_dir/$fileHGT1 $grib/script_HGT
+#mv $scene_dir/$fileTMP1 $grib/script_TMP
+#mv $scene_dir/$fileSHUM1 $grib/script_SHUM
+
+cp --no-preserve=mode $scene_dir/$fileHGT1 $grib/script_HGT
+rm $scene_dir/$fileHGT1
+
+cp --no-preserve=mode $scene_dir/$fileTMP1 $grib/script_TMP
+rm $scene_dir/$fileTMP1
+
+cp --no-preserve=mode $scene_dir/$fileSHUM1 $grib/script_SHUM
+rm $scene_dir/$fileSHUM1
 
 #  change to appropriate GRIB directory and run scripts
 cd $grib
@@ -121,9 +131,18 @@ fi
 
 # 'move results from GRIB directory to directory for this specific Landsat image'
 if [ -d  $scene_dir/HGT_1 ]; then
-    mv $grib/HGT/* $scene_dir/HGT_1
-    mv $grib/TMP/* $scene_dir/TMP_1
-    mv $grib/SHUM/* $scene_dir/SHUM_1
+    #mv $grib/HGT/* $scene_dir/HGT_1
+    #mv $grib/TMP/* $scene_dir/TMP_1
+    #mv $grib/SHUM/* $scene_dir/SHUM_1
+    
+    cp --no-preserve=mode $grib/HGT/* $scene_dir/HGT_1
+    rm $grib/HGT/*
+
+    cp --no-preserve=mode $grib/TMP/* $scene_dir/TMP_1
+    rm $grib/TMP/*
+
+    cp --no-preserve=mode $grib/SHUM/* $scene_dir/SHUM_1
+    rm $grib/SHUM/*
 fi
 
 #  change permissions on script files
@@ -132,9 +151,18 @@ chmod 755 $scene_dir/$fileTMP2
 chmod 755 $scene_dir/$fileSHUM2
 
 #  copy script files for time after to appropriate GRIB directory
-mv $scene_dir/$fileHGT2 $grib/script_HGT
-mv $scene_dir/$fileTMP2 $grib/script_TMP
-mv $scene_dir/$fileSHUM2 $grib/script_SHUM
+#mv $scene_dir/$fileHGT2 $grib/script_HGT
+#mv $scene_dir/$fileTMP2 $grib/script_TMP
+#mv $scene_dir/$fileSHUM2 $grib/script_SHUM
+
+cp --no-preserve=mode $scene_dir/$fileHGT2 $grib/script_HGT
+rm $scene_dir/$fileHGT2
+
+cp --no-preserve=mode $scene_dir/$fileTMP2 $grib/script_TMP
+rm $scene_dir/$fileTMP2
+
+cp --no-preserve=mode $scene_dir/$fileSHUM2 $grib/script_SHUM
+rm $scene_dir/$fileSHUM2
 
 #  change to appropriate GRIB directory and run scripts
 cd $grib
@@ -162,10 +190,19 @@ mkdir $scene_dir/SHUM_2
 fi
 
 #  move results from GRIB directory to directory for this specific Landsat image
-mv $grib/HGT/* $scene_dir/HGT_2
-mv $grib/TMP/* $scene_dir/TMP_2
-mv $grib/SHUM/* $scene_dir/SHUM_2
+#mv $grib/HGT/* $scene_dir/HGT_2
+#mv $grib/TMP/* $scene_dir/TMP_2
+#mv $grib/SHUM/* $scene_dir/SHUM_2
 
-rm ./data/scenes/${imageBase}/${imageBase}'_meta.txt'
+cp --no-preserve=mode $grib/HGT/* $scene_dir/HGT_2
+rm $grib/HGT/*
+
+cp --no-preserve=mode $grib/TMP/* $scene_dir/TMP_2
+rm $grib/TMP/*
+
+cp --no-preserve=mode $grib/SHUM/* $scene_dir/SHUM_2
+rm $grib/SHUM/*
+
+rm ${imageBase}/${LID}'_meta.txt'
 
 if [ ${verbose} -gt -1 ]; then echo -ne '\n'; fi

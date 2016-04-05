@@ -114,15 +114,12 @@ class ModeledRadProcessing(object):
             #RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
             #spec_reflectivity = numpy.interp(wavelengths, spec_r_wvlens, spec_r)
             
+            
             upwell_rad = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)
             downwell_rad = numpy.interp(RSR_wavelengths, wavelengths, downwell_rad)
             transmission = numpy.interp(RSR_wavelengths, wavelengths, transmission)
             gnd_reflect = numpy.interp(RSR_wavelengths, wavelengths, gnd_reflect)
             spec_reflectivity = numpy.interp(RSR_wavelengths, spec_r_wvlens, spec_r)
-            
-            #print numpy.size(RSR)
-            #print numpy.size(spec_reflectivity)
-            #print numpy.size(transmission)
             
             spec_emissivity = 1 - spec_reflectivity   # calculate emissivity
 
@@ -224,7 +221,7 @@ class ModeledRadProcessing(object):
         if numpy.sum(numpy.absolute(check)) >= .05:
            print 'Error in modtran module. Total Radiance minus upwelled radianc \
            e is not (approximately) equal to downwelled radiance*transmission'
-           sys.exit()
+           sys.exit(-1)
 
         wavelength = numpy.asarray(wavelength)
         
@@ -487,9 +484,9 @@ class MakeTape5s(object):
     def __convert_sh_rh(self, specHum, T_k, pressure):
         # Given array of specific humidities, temperature, and pressure, generate array of relative humidities
         # source: http://earthscience.stackexchange.com/questions/2360/how-do-i-convert-specific-humidity-to-relative-humidity
-        print numpy.shape(specHum)
-        print numpy.shape(pressure)
-        print specHum.dtype
+        #print numpy.shape(specHum)
+        #print numpy.shape(pressure)
+        #print specHum.dtype
         
         T_k = numpy.asarray(T_k, dtype=numpy.float64)  #numpy.float64
         

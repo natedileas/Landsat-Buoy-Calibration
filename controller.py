@@ -39,4 +39,4 @@ if __name__=='__main__':
     
     if args.image:
         x.write_im()
-        print 'Image with NARR points and buoy written to %s' % (x.scene_dir + x.scene_id + '_mod.TIF')
+        print 'Image with NARR points and buoy written to %s' % (x.scene_dir + '/' + x.scene_id + '_mod.TIF')

@@ -1,9 +1,9 @@
 #!/bin/sh
 # download NARR data
 
-yymm=201409
-date=20140929
-hr=15        	#specify in 3 hour increments
+yymm=201305
+date=20130525
+hr=18        	#specify in 3 hour increments
 
 a="http://nomads.ncdc.noaa.gov/data/narr/$yymm/$date/narr-a_221_${date}_${hr}00_000"
 echo $a.inv 

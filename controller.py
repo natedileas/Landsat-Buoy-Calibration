@@ -21,6 +21,8 @@ if __name__=='__main__':
     parser.add_argument('-v', '--verbose', help="Verbose: Specify to see command line output. Otherwise, view it in ./logs", action='store_true', default=False)
     parser.add_argument('-r', '--reprocess', help="Add to explicitly reprocess. Otherwise, a previous calculated version will be outputted.", action='store_true', default=False)
     parser.add_argument('-d', '--directory', help="Directory to search for landsat images.", default='./data/scenes/')
+    parser.add_argument('-i','--image', help="draw NARR points and Buoy location on landsat image.", action='store_true')
+
     args = parser.parse_args()
     
     # assemble id
@@ -35,3 +37,6 @@ if __name__=='__main__':
     print str(x)   # sorry, str() necesary for now. calculate and assign
     x.output()    # write out values"""
     
+    if args.image:
+        x.write_im()
+        print 'Image with NARR points and buoy written to %s' % (x.scene_dir + x.scene_id + '_mod.TIF')

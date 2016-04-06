@@ -9,7 +9,7 @@ import ModeledRadProcessing
 import ImageRadProcessing
 import BuoyData
 import landsatdata
-
+from PIL import Image, ImageDraw
 
 class CalibrationController(object):
     ############## ATTRIBUTES ##########################################################
@@ -226,7 +226,38 @@ class CalibrationController(object):
         except OSError:
             pass
       
+    def write_im(self):
+        img = os.path.join(self.scene_dir, self.scene_id+'_B10.TIF')
+        zone = self.metadata['UTM_ZONE']
+        narr_pix = []
+        
+        # get narr point locations
+        for lat, lon in self.narr_coor:
+            narr_pix.append(ImageRadProcessing.find_roi(img, lat, lon, zone))
+
+        # draw circle on top of image to signify narr points
+        image = Image.open(img)
+        draw = ImageDraw.Draw(image)
+        rx = 50
+        ry = 23
+        
+        for x, y in narr_pix:
+            draw.ellipse((x*2-rx, y-ry, x*2+rx, y+ry), fill=255)
             
+        # draw buoy onto image
+        x = self.poi[0]
+        y = self.poi[1]
+        draw.ellipse((x*2-rx, y-ry, x*2+rx, y+ry), fill=0)
+
+        # downsample
+        image.mode = 'I'
+        image = image.point(lambda i:i*(1./256)).convert('L')
+        image = image.resize((500, 486), Image.ANTIALIAS)
+        
+        # save
+        save_path = os.path.join(self.scene_dir, self.scene_id+'_mod.TIF')
+        image.save(save_path)
+        
     def to_csv(self, f):
         """ write results to csv format. """
         

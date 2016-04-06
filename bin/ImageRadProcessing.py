@@ -3,6 +3,8 @@ from PIL import Image
 import numpy
 import os
 import utm
+import ogr
+import osr
 
 class ImageRadProcessing(object):
     """ Calculate Image Radiance.
@@ -50,7 +52,7 @@ class ImageRadProcessing(object):
         for i in range(num_bands):
            print 'do_processing: band %s of %s' % (i+1, num_bands)
            
-           poi = self.__find_roi()
+           poi = find_roi(self.filename, self.buoy_coor[0], self.buoy_coor[1], self.metadata['UTM_ZONE'])
 
            dc_avg = self.__calc_dc_avg(poi)
            image_radiance.append(self.__dc_to_rad(dc_avg))
@@ -83,55 +85,6 @@ class ImageRadProcessing(object):
         dc_avg = dc_sum / 9.0   #calculate dc_avg
    
         return dc_avg
-        
-    def __find_roi(self):
-        """ find the region of interest in pixel coordinates. """
-        # open image
-        ds = gdal.Open(self.filename)
-        #get data transform
-        gt = ds.GetGeoTransform()
-        
-        #change lat_lon to same projection
-        ret_val = utm.from_latlon(self.buoy_coor[0], self.buoy_coor[1])
-        
-        l_x = ret_val[0]
-        l_y = ret_val[1]
-            
-        if self.metadata['UTM_ZONE'] != ret_val[2]:
-            l_x, l_y = self.__convert_utm_zones(l_x, l_y, ret_val[2], self.metadata['UTM_ZONE'])
-        
-        #calculate pixel locations- 
-        #source:http://www.gdal.org/gdal_datamodel.html
-        x = int((l_x - gt[0]) / gt[1])
-        y = int((l_y - gt[3]) / gt[5])
-        
-        return x, y
-        
-    def __convert_utm_zones(self, x, y, zone_from, zone_to):
-        """ convert lat/lon to appropriate utm zone. """
-        import ogr, osr
-    
-        # Spatial Reference System
-        inputEPSG = int(float('326' + str(zone_from)))
-        outputEPSG = int(float('326' + str(zone_to)))
-    
-        # create a geometry from coordinates
-        point = ogr.Geometry(ogr.wkbPoint)
-        point.AddPoint(x, y)
-    
-        # create coordinate transformation
-        inSpatialRef = osr.SpatialReference()
-        inSpatialRef.ImportFromEPSG(inputEPSG)
-    
-        outSpatialRef = osr.SpatialReference()
-        outSpatialRef.ImportFromEPSG(outputEPSG)
-    
-        coordTransform = osr.CoordinateTransformation(inSpatialRef, outSpatialRef)
-    
-        # transform point
-        point.Transform(coordTransform)
-    
-        return point.GetX(), point.GetY()
     
     def __dc_to_rad(self, DCavg):
         """ Convert digital count average to radiance. """
@@ -153,3 +106,51 @@ class ImageRadProcessing(object):
         LLambdaaddmult = DCavg * L_mult + L_add
             
         return LLambdaaddmult        
+
+def find_roi(img_file, lat, lon, zone):
+    """ find the region of interest in pixel coordinates. """
+    # open image
+    ds = gdal.Open(img_file)
+    #get data transform
+    gt = ds.GetGeoTransform()
+    
+    #change lat_lon to same projection
+    ret_val = utm.from_latlon(lat, lon)
+    
+    l_x = ret_val[0]
+    l_y = ret_val[1]
+        
+    if zone != ret_val[2]:
+        l_x, l_y = convert_utm_zones(l_x, l_y, ret_val[2], zone)
+
+    #calculate pixel locations- 
+    #source:http://www.gdal.org/gdal_datamodel.html
+    x = int((l_x - gt[0]) / gt[1])
+    y = int((l_y - gt[3]) / gt[5])
+    
+    return x, y
+    
+def convert_utm_zones(x, y, zone_from, zone_to):
+    """ convert lat/lon to appropriate utm zone. """
+
+    # Spatial Reference System
+    inputEPSG = int(float('326' + str(zone_from)))
+    outputEPSG = int(float('326' + str(zone_to)))
+
+    # create a geometry from coordinates
+    point = ogr.Geometry(ogr.wkbPoint)
+    point.AddPoint(x, y)
+
+    # create coordinate transformation
+    inSpatialRef = osr.SpatialReference()
+    inSpatialRef.ImportFromEPSG(inputEPSG)
+
+    outSpatialRef = osr.SpatialReference()
+    outSpatialRef.ImportFromEPSG(outputEPSG)
+
+    coordTransform = osr.CoordinateTransformation(inSpatialRef, outSpatialRef)
+
+    # transform point
+    point.Transform(coordTransform)
+
+    return point.GetX(), point.GetY()

@@ -36,7 +36,7 @@ def download(cc):
         repert = '3373'
         stations = ['EDC', 'SGS', 'AGS', 'ASN', 'SG1']
 
-    scene_ids = []
+    scene_ids = [cc.scene_id]
     date = datetime.datetime.strftime(cc.date, '%Y%j')
     
     for station in stations:

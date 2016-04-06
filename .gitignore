@@ -32,3 +32,6 @@ data/shared/buoy/*
 
 # landsat images
 data/scenes/
+
+# cookies
+cookies.txt

@@ -1,4 +1,6 @@
 import bin.BuoyCalib as bc
+import sys
+import time
 
 filename = 'output.csv'
 scenes = ["LC80130332013145LGN00",
@@ -60,8 +62,11 @@ v = False
 r = False
 
 with open(filename, 'wb') as f:
+    start_time = time.time()
     for s in scenes:
         try:
+            #sys.stdout.write('\rScene: %s Elapsed Time: %2.2f Scene: %d of %d' % (s, (time.time() - start_time)/60, scenes.index(s), len(scenes)))
+            #sys.stdout.flush()
             cc = bc.CalibrationController(s, None, d, verbose=v, reprocess=r)
             cc.to_csv(f)
         except:

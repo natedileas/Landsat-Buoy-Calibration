@@ -1,6 +1,6 @@
 import bin.BuoyCalib as bc
 
-filename = 'out.csv'
+filename = 'output.csv'
 scenes = ["LC80130332013145LGN00",
 "LC80140332013104LGN01",
 "LC80140332013200LGN00",
@@ -55,8 +55,14 @@ scenes = ["LC80130332013145LGN00",
 "LC80170302014272LGN00",
 "LC80200292013226LGN00"]
 
+d = '/dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/'
+v = False
+r = False
 
 with open(filename, 'wb') as f:
     for s in scenes:
-        cc = bc.CalCon(s)
-        cc.to_csv(f)
+        try:
+            cc = bc.CalibrationController(s, None, d, verbose=v, reprocess=r)
+            cc.to_csv(f)
+        except:
+            pass

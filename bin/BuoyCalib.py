@@ -4,6 +4,7 @@ import datetime
 import re
 import csv
 import subprocess
+import pickle
 
 import ModeledRadProcessing
 import ImageRadProcessing
@@ -28,7 +29,6 @@ class CalibrationController(object):
     # image radiance and related attributes
     _image_radiance = None
     metadata = None    # landsat metadata
-    cloud_cover = None
     poi = None
     
     # attributes that make up the lansat id
@@ -38,7 +38,7 @@ class CalibrationController(object):
     version = None
         
     ############## ENTRY POINT ##########################################################
-    def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False, reprocess=False):
+    def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False):
         """ set up CalibrationController object. """
         
         self.scene_id = LID
@@ -47,13 +47,7 @@ class CalibrationController(object):
         self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
         
         self.verbose = verbose   # option for command line output
-        
-        if reprocess is False:
-            try:
-                self.read_latest()
-            except IOError:
-                pass
-        
+
         if verbose is False:
             try:
                 log_file = open(os.path.join(self.scene_dir, 'log.txt'), 'w')
@@ -187,44 +181,6 @@ class CalibrationController(object):
             sys.stdout = self.stdout
             
         return '\n'.join(output_items)
-
-
-    def output(self):
-        """ output results to a file. """
-
-        out_file = os.path.join(self.scene_dir, 'latest_rad.txt')
-        
-        with open(out_file, 'w') as f:
-            if self.buoy_id:
-                f.write('BID: %7s BLL: %4s %4s temp: %4.4f\n' %(self.buoy_id, self.buoy_location[0], self.buoy_location[1], self.skin_temp))
-            
-            if self.modeled_radiance:
-                f.write('M10: %2.6f M11: %2.6f\n' % (self.modeled_radiance[0], self.modeled_radiance[1]))
-        
-            if self.image_radiance:
-                f.write('I10: %2.6f I11: %2.6f\n' % (self.image_radiance[0], self.image_radiance[1]))
-        
-        
-    def read_latest(self):
-        """ read in results from the file. """
-        
-        out_file = os.path.join(self.scene_dir, 'latest_rad.txt')
-        
-        try:
-            with open(out_file, 'r') as f:
-                for line in f:
-                    data = line.split()
-                    if 'BID' in line:
-                        self.buoy_id = data[1]
-                        self.buoy_location = [float(data[3]), float(data[4])]
-                        self.skin_temp = float(data[-1])
-                    if 'M10' in line:
-                        self.modeled_radiance = float(data[1]), float(data[3])
-                    if 'I10' in line:
-                        self.image_radiance = float(data[1]), float(data[3])
-                    
-        except OSError:
-            pass
       
     def write_im(self):
         img = os.path.join(self.scene_dir, self.scene_id+'_B10.TIF')
@@ -336,7 +292,7 @@ class CalibrationController(object):
     
         print '.calc_img_radiance: Calculating Image Radiance'
         self.image_radiance, self.poi = ImageRadProcessing.ImageRadProcessing(self).do_processing()
-        
+
         
     def calculate_buoy_information(self):
         """ pick buoy dataset, download, and calculate skin_temp. """

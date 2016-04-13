@@ -23,7 +23,6 @@ def download(cc):
         print 'ERROR: usgs password file problem'
         sys.exit(-1)
         
-    clouds = cc.cloud_cover
     prefix = 'LC8'
 
     # assign prefix,  repert, stations

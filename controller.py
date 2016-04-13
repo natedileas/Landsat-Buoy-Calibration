@@ -1,3 +1,27 @@
+import pickle
+import os
+
+def output(cc):
+    """ output results to a file. """
+
+    out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
+
+    with open(out_file, 'w') as f:
+        pickle.dump(cc, f)
+
+
+def read_cache(cc):
+    """ read in results from the file. """
+
+    out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
+
+    if not os.path.isfile(out_file):
+        return
+
+    with open(out_file, 'r') as f:
+        return pickle.load(f)
+
+
 if __name__=='__main__':
     import argparse
     import bin.BuoyCalib as bc
@@ -33,10 +57,15 @@ if __name__=='__main__':
         sat = {7:'LE7', 8:'LC8'}
         LID = '%3s%6s%7s%3s%2s' % (sat[args.satelite], args.WRS2, args.date, args.station, args.version)
      
-    x = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, reprocess=args.reprocess)  # initialize
-    print str(x)   # sorry, str() necesary for now. calculate and assign
-    x.output()    # write out values"""
-    
+    x = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose)  # initialize
+
+    if not args.reprocess:
+        x = read_cache(x)
+
+    print x   # calculate and assign
+    output(x)    # write out values
+
     if args.image:
         x.write_im()
         print 'Image with NARR points and buoy written to %s' % (x.scene_dir + '/' + x.scene_id + '_mod.TIF')
+

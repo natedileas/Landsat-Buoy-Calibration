@@ -407,7 +407,7 @@ class MakeTape5s(object):
         self.buoy_coors = other.buoy_coors
         self.skin_temp = '%3.3f' % (other.skin_temp)
         self.whichLandsat = other.which_landsat
-        self.directory = os.path.join(other.filepath_base, 'data/shared/modtran/')
+        self.directory = os.path.join(other.filepath_base, 'data/shared/modtran')
         self.home = os.path.join(self.filepath_base, 'data')
         self.buoy_params = [other.buoy_press, other.buoy_airtemp, other.buoy_dewpnt]
         self.verbose = other.verbose
@@ -442,7 +442,7 @@ class MakeTape5s(object):
             
         else:
             print 'NARR data not downloaded, no wgrib?'
-            return -1
+            sys.exit(-1)
             
         pressures = self.__narr_read(narr_indices, lat)
         
@@ -748,7 +748,7 @@ class MakeTape5s(object):
         month = int(date[5:7])
         day = int(date[8:10])
     
-        self.date = '%s/%s/%s' % (year, month, day)
+        self.date = datetime.datetime.strptime('%s/%s/%s' % (year, month, day), '%Y/%m/%d')
         rem1 = hour % 3
         rem2 = 3 - rem1
         hour1 = hour - rem1
@@ -793,73 +793,35 @@ class MakeTape5s(object):
         """do the messy work of generating the tape5 files and caselist. """
         
         # initialize arrays
-        case_list = ['']*num_points
-        entry = 0
+        case_list = [''] * num_points
     
-        plot_list = [0]*4
-        for i in range(num_points):
-            latString = '%2.3f' % (lat[NARRindices[i,0], NARRindices[i,1]])
+        plot_list = [0] * num_points
+        for point_idx in range(num_points):
+            latString = '%2.3f' % (lat[NARRindices[point_idx,0], NARRindices[point_idx,1]])
             
-            if lon[NARRindices[i,0], NARRindices[i,1]] < 0:
-                lonString = '%2.2f' % lon[NARRindices[i,0], NARRindices[i,1]]
+            if lon[NARRindices[point_idx,0], NARRindices[point_idx,1]] < 0:
+                lonString = '%2.2f' % lon[NARRindices[point_idx,0], NARRindices[point_idx,1]]
             else:
-                lonString = '%2.3f' % (360.0 - lon[NARRindices[i,0], NARRindices[i,1]])
+                lonString = '%2.3f' % (360.0 - lon[NARRindices[point_idx,0], NARRindices[point_idx,1]])
 
-            currentPoint = os.path.join(self.scene_dir, 'points/'+latString+'_'+lonString)
+            currentPoint = os.path.join(self.scene_dir, 'points/%s_%s' % (latString, lonString))
+            
             try:
                 os.makedirs(currentPoint)
             except OSError:
                 pass
             
-            if self.geometricHeight[0,i] < 0: gdalt = 0.000 
-            else:  gdalt = self.geometricHeight[0,i]
-              
+            if self.geometricHeight[0,point_idx] < 0: gdalt = 0.000 
+            else:  gdalt = self.geometricHeight[0,point_idx]
+            
+            # write to middle file
             p = pressures[0]
-            t = self.temperature[i]
-            hgt = self.geometricHeight[i]
-            rh = self.relativeHumidity[i]
+            t = self.temperature[point_idx]
+            hgt = self.geometricHeight[point_idx]
+            rh = self.relativeHumidity[point_idx]
             
-            numLevels = len(p)
-            maxLevel = numLevels-1
-          
-            command = "cat "+self.directory+"tail.txt | sed 's/latitu/"+latString+"/' > "+self.directory+"newTail.txt"
-            subprocess.check_call(command, shell=True)
+            maxLevel = len(p) - 1
             
-            command = "cat "+self.directory+"/newTail.txt | sed 's/longit/"+lonString+"/' > "+self.directory+"/newTail2.txt"
-            subprocess.check_call(command, shell=True)
-            
-            # assign julian day
-            dt = datetime.datetime.strptime(self.date, '%Y/%m/%d')
-            tt = dt.timetuple()
-            JDAY = tt.tm_yday                
-            jay = str(JDAY)
-            
-            if self.whichLandsat == [7,1]:
-                start = '10.000'
-                stop = '12.987'
-                step = '0.063'
-            if self.whichLandsat == [8,1]:
-                start = '09.000'
-                stop = '14.000'
-                step = '0.050'
-            if self.whichLandsat == [8,2]:
-                start = '09.000'
-                stop = '14.000'
-                step = '0.050'
-            else:
-                start = '09.000'
-                stop = '14.000'
-                step = '0.050'
-                
-            command = "cat "+self.directory+"/newTail2.txt | sed 's/jay/"+jay+"/' > "+self.directory+"/newTail3.txt"
-            subprocess.check_call(command, shell=True)
-            command = "cat "+self.directory+"/newTail3.txt | sed 's/startp/"+start+"/' > "+self.directory+"/newTail4.txt" 
-            subprocess.check_call(command, shell=True)
-            command = "cat "+self.directory+"/newTail4.txt | sed 's/stoppp/"+stop+"/' > "+self.directory+"/newTail5.txt" 
-            subprocess.check_call(command, shell=True)
-            command = "cat "+self.directory+"/newTail5.txt | sed 's/stepp/"+step+"/' > "+self.directory+"/newTail6.txt" 
-            subprocess.check_call(command, shell=True)
-      
             delete = numpy.where(hgt < gdalt)
             
             indexBelow = 0
@@ -905,56 +867,11 @@ class MakeTape5s(object):
                 
                 last = len(tempGeoHeight) - 1
                     
-            # write to middle file
             filename = os.path.join(self.directory, 'tempLayers.txt')
             
             dewpoint_k = tempTemp - ((100 - tempRelHum) / 5)   #kelvin
             #source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
             
-            
-#            #########################  RADIOSONDE CORRECTION   ##################################
-#            radiosonde = []
-#            rad_file = '../testing/radiosonde_test/4_14_13.rsd'
-#            with open(rad_file, 'r') as f:
-#                lines = f.readlines()
-#                for line in lines[5:]:
-#                    if not '99999' in line:
-#                        #line = line.replace('99999', '0')
-#                        data=line.split()
-#                
-#                        radiosonde.append([float(data[2])/1000.0, float(data[1])/10.0, float(data[3])/10.0+273.15, float(data[4])/10.0+273.15])
-#                    
-#            radiosonde = numpy.asarray(radiosonde)
-#            #radiosonde = numpy.reshape(radiosonde, (4, numpy.shape(radiosonde)[0]))
-#            rad_height = radiosonde[:, 0]
-#            rad_press = radiosonde[:, 1]
-#            rad_temp = radiosonde[:, 2]
-#            rad_dewpoint = radiosonde[:, 3]
-#            
-#            radiosonde = numpy.array([rad_height, rad_press, rad_temp, rad_dewpoint])
-#            
-#            sorts_idxs = numpy.argsort(rad_height)
-#            
-#            find_nearest = lambda a, a0: (numpy.abs(a - a0)).argmin()
-#            
-#            j = 0
-#            indexs = []
-#            while len(indexs) < 3:
-#                idx = numpy.where(sorts_idxs == j)
-#                if rad_press[idx] != 0.0:
-#                    if rad_temp[idx] != 0.0:
-#                        if rad_height[idx] != 0.0:
-#                            if rad_dewpoint[idx] != 0.0:
-#                                 indexs.append(idx)
-#                j += 1
-#            indexs = [x[0][0] for x in indexs]
-#            
-#            a = find_nearest(tempGeoHeight, rad_height[indexs[-1]])
-#            tempGeoHeight = numpy.insert(tempGeoHeight[a:], 0, rad_height[indexs])
-#            tempPress = numpy.insert(tempPress[a:], 0, rad_press[indexs])
-#            tempTemp = numpy.insert(tempTemp[a:], 0, rad_temp[indexs])
-#            dewpoint_k = numpy.insert(dewpoint_k[a:], 0, rad_dewpoint[indexs])
-            #######################################################################
 
             ##################### BUOY CORRECTION #################################
             
@@ -967,15 +884,7 @@ class MakeTape5s(object):
 #            dewpoint_k[0] = self.buoy_params[2] + 273.15
 #            
 #            #######################################################################
-#            
-#            ################### RADIOSONDE TEST ##################################
-#            
-#            tempGeoHeight = rad_height
-#            tempPress = rad_press
-#            tempTemp = rad_temp
-#            dewpoint_k = rad_dewpoint
-            
-            #########################################################################
+
             with open(filename, 'w') as f:
                 for k in range(numpy.shape(tempGeoHeight)[0]):
                     line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%15s\n' % \
@@ -985,61 +894,28 @@ class MakeTape5s(object):
                     line = line.replace('e', 'E')
                     f.write(line)
             
-            plot_list[i] = (tempGeoHeight, tempPress, tempTemp, dewpoint_k)
+            plot_list[point_idx] = (tempGeoHeight, tempPress, tempTemp, dewpoint_k)
             
+            case_list[point_idx] = currentPoint
             
+            numpy.savetxt(os.path.join(self.scene_dir,'atmo_interp_%s.txt'%(point_idx)), plot_list[point_idx])
             
-            #print plot_list[i]
-            # determine number of layers for current ground altitude and insert into head file
-            numLayers = numpy.shape(tempGeoHeight)[0]
-    
-            nml = str(numLayers)
-            gdalt = '%1.3f' % (float(str(gdalt)))
-                  
-            command = "cat "+self.directory+"/head.txt | sed 's/nml/"+nml+"/' > "+self.directory+"/newHead.txt"
-            subprocess.call(command, shell=True)
+            # assign julian day
+            jay = datetime.datetime.strftime(self.date, '%j')
             
-            command = "cat "+self.directory+"/newHead.txt | sed 's/gdalt/"+str(gdalt)+"/' > "+self.directory+"/newHead2.txt"
-            subprocess.call(command, shell=True)
+            nml = str(numpy.shape(tempGeoHeight)[0])
 
-            command = "cat "+self.directory+"/newHead2.txt | sed 's/tmp____/"+str(self.skin_temp)+"/' > "+self.directory+"/newHead3.txt"
-            subprocess.call(command, shell=True)
-                  
-            command = "cat "+self.directory+"/newHead3.txt | sed 's/albe/1.00/' > "+self.directory+"/newHead4.txt"
-            subprocess.call(command, shell=True)
-                  
-            headFile = os.path.join(self.directory,'newHead4.txt')
-            tailFile = os.path.join(self.directory, 'newTail6.txt')
-            tempLayers = os.path.join(self.directory, 'tempLayers.txt')
+            gdalt = '%1.3f' % float(gdalt)
             
-            newFile = os.path.join(currentPoint, 'tape5')
-            command = ' '.join(['cat', headFile, tempLayers, tailFile, '>', newFile])
+            # write header and footer parts of tape5 and concatenate
+            command = './bin/write_tape5.bash %s %s %s %s %s %s %s %s' % (self.directory, currentPoint, latString, lonString, jay, nml, gdalt, str(self.skin_temp))
             subprocess.check_call(command, shell=True)
             
-            newfiles = ['newHead.txt','newHead1.txt','newHead2.txt','newHead3.txt','newHead4.txt'
-            'newTail.txt','newTail1.txt','newTail2.txt','newTail3.txt','newTail4.txt' ,'newTail5.txt' ,'newTail6.txt']
-            try:
-                for asdf in newfiles:
-                    os.remove(os.path.join(self.directory, asdf))
-            except OSError:
-                pass
-            
-            case_list[entry] = currentPoint
-            entry += 1
-
-
-            numpy.savetxt(os.path.join(self.scene_dir,'atmo_interp_%s.txt'%(i)), plot_list[i])
-    
-        # write commandList and caseList to file
+        # write caseList to file
         case_list_file = os.path.join(self.scene_dir,'points/caseList')
     
         with open(case_list_file, 'w') as f:
-            for i in range(len(case_list)):
-                f.write(case_list[i])
-                f.write('\n')
-
-
-        #import test_plot
-        #test_plot.plot_atmo(plot_list, radiosonde, show=True)
+            for case in case_list:
+                f.write(case + '\n')
 
         return case_list

@@ -6,7 +6,7 @@ def output(cc):
 
     out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
 
-    with open(out_file, 'w') as f:
+    with open(out_file, 'wb') as f:
         pickle.dump(cc, f)
 
 
@@ -18,7 +18,7 @@ def read_cache(cc):
     if not os.path.isfile(out_file):
         return
 
-    with open(out_file, 'r') as f:
+    with open(out_file, 'rb') as f:
         return pickle.load(f)
 
 
@@ -62,7 +62,7 @@ if __name__=='__main__':
     if not args.reprocess:
         x = read_cache(x)
 
-    print x   # calculate and assign
+    print str(x)   # calculate and assign
     output(x)    # write out values
 
     if args.image:

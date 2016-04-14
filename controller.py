@@ -60,10 +60,13 @@ if __name__=='__main__':
     x = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose)  # initialize
 
     if not args.reprocess:
-        x = read_cache(x)
+        x = read_cache(x)   # try to read in from pickle
 
-    print str(x)   # calculate and assign
-    output(x)    # write out values
+    else:
+        __ = str(x)   # sorry, future me.
+
+    print x   # calculate and assign
+    output(x)    # write out values to pickle
 
     if args.image:
         x.write_im()

@@ -1,6 +1,8 @@
 import bin.BuoyCalib as bc
 import sys
 import time
+import os
+import pickle
 
 filename = 'output.csv'
 scenes = ["LC80130332013145LGN00",
@@ -58,16 +60,30 @@ scenes = ["LC80130332013145LGN00",
 "LC80200292013226LGN00"]
 
 d = '/dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/'
-v = False
-r = False
+v = True
+
+def read_cache(cc):
+    """ read in results from the file. """
+
+    out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
+
+    if not os.path.isfile(out_file):
+        print 'No cached data at %s' % out_file
+        return
+
+    with open(out_file, 'rb') as f:
+        return pickle.load(f)
+        
 
 with open(filename, 'wb') as f:
     start_time = time.time()
     for s in scenes:
         try:
-            #sys.stdout.write('\rScene: %s Elapsed Time: %2.2f Scene: %d of %d' % (s, (time.time() - start_time)/60, scenes.index(s), len(scenes)))
-            #sys.stdout.flush()
-            cc = bc.CalibrationController(s, None, d, verbose=v, reprocess=r)
-            cc.to_csv(f)
-        except:
+            print s, '%s of %s' % (scenes.index(s) + 1, len(scenes))
+            cc = bc.CalibrationController(s, None, d, verbose=v)
+            cc_loaded = read_cache(cc)
+            cc_loaded.to_csv(f)
+        except AttributeError:
             pass
+        except KeyboardInterrupt:
+            break

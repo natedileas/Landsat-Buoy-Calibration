@@ -36,7 +36,8 @@ class CalibrationController(object):
     wrs2 = None
     date = None
     version = None
-        
+    _verbose = False
+    
     ############## ENTRY POINT ##########################################################
     def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False):
         """ set up CalibrationController object. """
@@ -46,17 +47,9 @@ class CalibrationController(object):
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
         self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
         
-        self.verbose = verbose   # option for command line output
-
-        if verbose is False:
-            try:
-                log_file = open(os.path.join(self.scene_dir, 'log.txt'), 'w')
-                self.stdout = sys.stdout
-                sys.stdout = log_file
-            except IOError:
-                pass
-                
-    ############## GETTERS AND SETTERS ##########################################################
+        self.verbose = verbose                
+    
+############## GETTERS AND SETTERS ##########################################################
     @property
     def scene_id(self):
         """ scene_id getter. stored internally as different parts. """
@@ -157,7 +150,27 @@ class CalibrationController(object):
         
         self._image_radiance = new_rad
         
-        
+    @property
+    def verbose(self):
+        return self._verbose
+
+    @verbose.setter
+    def verbose(self, v):
+        self._verbose = v   # option for command line output
+
+        if v is False:
+            try:
+                log_file = open(os.path.join(self.scene_dir, 'log.txt'), 'w')
+                self.stdout = sys.stdout
+                sys.stdout = log_file
+            except IOError:
+                pass
+        if v is True:
+            try:
+                sys.stdout = self.stdout
+            except:
+                pass
+
     ############## MEMBER FUNCTIONS ##########################################################
     def __repr__(self):
         return self.__str__()
@@ -181,7 +194,13 @@ class CalibrationController(object):
             sys.stdout = self.stdout
             
         return '\n'.join(output_items)
-      
+    
+    def calc_all(self):
+        __ = self.modeled_radiance
+        __ = self.image_radiance
+        __ = self.buoy_id
+        
+
     def write_im(self):
         img = os.path.join(self.scene_dir, self.scene_id+'_B10.TIF')
         zone = self.metadata['UTM_ZONE']

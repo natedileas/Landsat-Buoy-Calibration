@@ -8,7 +8,7 @@ import pickle
 
 import ModeledRadProcessing
 import image_processing as img_proc
-import BuoyData
+import buoy_data
 import landsatdata
 from PIL import Image, ImageDraw
 
@@ -345,16 +345,14 @@ class CalibrationController(object):
                    'Sep/', 'Oct/', 'Nov/', 'Dec/']
                    
         year = self.date.strftime('%Y')
-        month = self.date.strftime('%j')
-        
+        month = self.date.strftime('%m')
         urls = []
         
-
         if self.buoy:
             urls.append('%s%sh%s.txt.gz'%(url_base[0], self.buoy_id, year))
             urls.append('%s%s%s%s2015.txt.gz' % (url_base[1], mon_str[int(month)-1], self.buoy, str(int(month))))
             
-            ret_vals = buoy_data.search_stationtable(self.buoy_id)
+            ret_vals = buoy_data.search_stationtable(save_dir, self.buoy_id)
             if ret_vals != -1:
                 datasets, buoy_coors, depths = ret_vals
             else: 
@@ -367,17 +365,30 @@ class CalibrationController(object):
                 urls.append(url_base[1] + mon_str[int(month)-1] + dataset +
                             str(int(month)) + '2015.txt.gz')
         
-        """
-        print 'calculate_buoy_information: Downloading Buoy Data'
-        return_vals = BuoyData.BuoyData(self).start_download()
-    
-        try:
-            self.buoy_id = return_vals[0]
-            self.buoy_location = return_vals[1]
-            self.skin_temp = return_vals[2]
-            self.buoy_press = return_vals[3]
-            self.buoy_airtemp = return_vals[4]
-            self.buoy_dewpnt = return_vals[5]
-        except TypeError:
-            print 'TypeError: BuoyData returns incorrect.'
-        """
+        for url in urls:
+            dataset = os.path.basename(url)
+            zipped_file = os.path.join(save_dir, dataset)
+            unzipped_file = zipped_file.replace('.gz', '')
+            
+            try:
+                buoy_data.get_buoy_data(dataset, url)   # download and unzip
+                temp, pres, atemp, dewp = buoy_data.find_skin_temp(unzipped_file, self.metadata['DATE_ACQUIRED'], url, depths[urls.index(url)])
+                
+                self.buoy_id = datasets[urls.index(url)]
+                self.buoy_location = buoy_coors[urls.index(url)]
+                self.skin_temp = temp
+                self.buoy_press = pres
+                self.buoy_airtemp = atemp
+                self.buoy_dewpnt = dewp
+                  
+                print '.start_download: used dataset %s, good exit.'% self.dataset
+                break
+                
+            except BuoyDataError:
+                print 'Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (dataset)
+                pass
+            except ValueError:
+                print 'Dataset %s didn\'t work (ValueError). Trying a new one' % (dataset)
+                pass
+
+        

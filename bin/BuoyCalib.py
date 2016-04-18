@@ -7,8 +7,8 @@ import subprocess
 import pickle
 
 import ModeledRadProcessing
-import ImageRadProcessing
-import BuoyData
+import image_processing as img_proc
+import buoy_data
 import landsatdata
 from PIL import Image, ImageDraw
 
@@ -208,7 +208,7 @@ class CalibrationController(object):
         
         # get narr point locations
         for lat, lon in self.narr_coor:
-            narr_pix.append(ImageRadProcessing.find_roi(img, lat, lon, zone))
+            narr_pix.append(img_proc.find_roi(img, lat, lon, zone))
 
         # draw circle on top of image to signify narr points
         image = Image.open(img)
@@ -307,24 +307,85 @@ class CalibrationController(object):
 
     
     def calc_img_radiance(self):
-        """ calculate image radiance. """
-    
-        print '.calc_img_radiance: Calculating Image Radiance'
-        self.image_radiance, self.poi = ImageRadProcessing.ImageRadProcessing(self).do_processing()
+        """ calculate image radiance for band 10 and 11. """
+        
+        img_files = [os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10']), \
+                     os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]
+        
+        for band in img_files:
+           print 'Image Radiance Processing: %s' % (band)
+           
+           # find Region Of Interest (PixelOI return)
+           self.poi = img_proc.find_roi(band, self.buoy_location[0], self.buoy_location[1], self.metadata['UTM_ZONE'])
+            
+           # calculate digital count average and convert to radiance of 3x3 area around poi
+           dc_avg = img_proc.calc_dc_avg(band, poi)
+           self.image_radiance.append(img_proc.dc_to_rad(self.dc_avg))
 
         
     def calculate_buoy_information(self):
         """ pick buoy dataset, download, and calculate skin_temp. """
         
-        print 'calculate_buoy_information: Downloading Buoy Data'
-        return_vals = BuoyData.BuoyData(self).start_download()
-    
-        try:
-            self.buoy_id = return_vals[0]
-            self.buoy_location = return_vals[1]
-            self.skin_temp = return_vals[2]
-            self.buoy_press = return_vals[3]
-            self.buoy_airtemp = return_vals[4]
-            self.buoy_dewpnt = return_vals[5]
-        except TypeError:
-            print 'TypeError: BuoyData returns incorrect.'
+        corners = numpy.asarray([[0, 0]]*2, dtype=numpy.float32)
+        corners[0] = self.metadata['CORNER_UR_LAT_PRODUCT'], \
+            self.metadata['CORNER_UR_LON_PRODUCT']
+
+        corners[1] = self.metadata['CORNER_LL_LAT_PRODUCT'], \
+            self.metadata['CORNER_LL_LON_PRODUCT']
+
+        save_dir = os.path.join(self.filepath_base, 'data/shared/buoy')
+        dataset = None
+        
+        buoy_data.get_stationtable(save_dir)   # download staion_table.txt
+        datasets, buoy_coors, depths = buoy_data.find_datasets(save_dir, corners)
+        
+        url_base = ['http://www.ndbc.noaa.gov/data/historical/stdmet/',
+                    'http://www.ndbc.noaa.gov/data/stdmet/']
+        mon_str = ['Jan/', 'Feb/', 'Apr/', 'May/', 'Jun/', 'Jul/', 'Aug/',
+                   'Sep/', 'Oct/', 'Nov/', 'Dec/']
+                   
+        year = self.date.strftime('%Y')
+        month = self.date.strftime('%m')
+        urls = []
+        
+        if self.buoy:
+            urls.append('%s%sh%s.txt.gz'%(url_base[0], self.buoy_id, year))
+            urls.append('%s%s%s%s2015.txt.gz' % (url_base[1], mon_str[int(month)-1], self.buoy, str(int(month))))
+            
+            ret_vals = buoy_data.search_stationtable(save_dir, self.buoy_id)
+            if ret_vals != -1:
+                datasets, buoy_coors, depths = ret_vals
+            else: 
+                print '.start_download: _save_buoy_data failed'
+   
+        for dataset in datasets:
+            if year != '2015':
+                urls.append(url_base[0] + dataset + 'h' + year + '.txt.gz')
+            else:
+                urls.append(url_base[1] + mon_str[int(month)-1] + dataset +
+                            str(int(month)) + '2015.txt.gz')
+        
+        for url in urls:
+            dataset = os.path.basename(url)
+            zipped_file = os.path.join(save_dir, dataset)
+            unzipped_file = zipped_file.replace('.gz', '')
+            
+            try:
+                buoy_data.get_buoy_data(dataset, url)   # download and unzip
+                buoy_info = buoy_data.find_skin_temp(unzipped_file, self.metadata['DATE_ACQUIRED'], url, depths[urls.index(url)])
+                
+                self.buoy_id = datasets[urls.index(url)]
+                self.buoy_location = buoy_coors[urls.index(url)]
+                self.skin_temp, self.buoy_press, self.buoy_airtemp, self.buoy_dewpnt = buoy_info
+                  
+                print '.start_download: used dataset %s, good exit.'% self.dataset
+                break
+                
+            except BuoyDataError:
+                print 'Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (dataset)
+                pass
+            except ValueError:
+                print 'Dataset %s didn\'t work (ValueError). Trying a new one' % (dataset)
+                pass
+
+        

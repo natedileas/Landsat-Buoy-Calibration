@@ -147,79 +147,110 @@ class BuoyData(object):
         else:
             print 'ERROR .start_download: No usable datasets were found'
             return -1
+            
+            
+def get_stationtable(save_dir):
+    """ download and unzip station_table.txt. """
+    # define names
+    filename = os.path.join(save_dir, 'station_table.txt')
+    url = "http://www.ndbc.noaa.gov/data/stations/station_table.txt"
 
-    def __find_datasets(self):
-        """ get list of possible datasets. """
-        # define names
-        filename = os.path.join(self.save_dir, 'station_table.txt')
+    if not os.path.exists(filename):
+        try:
+            # open url
+            f = urllib2.urlopen(url)
+
+            data = f.read()
+            
+            # write data to file
+            with open(filename, "wb") as local_file:
+                local_file.write(data)
+                
+            return 0
+            
+        except urllib2.HTTPError, e:
+            print "HTTP Error:", e.code, url
+            return -1
+        except urllib2.URLError, e:
+            print "URL Error:", e.reason, url
+            return -1
+        except OSError, e:
+            print 'OSError: ', e.reason
+            return -1
+    else:
+        return 0
         
-        __ = self.__get_stationtable()
 
-        # read in and zip coordinates and buoy SIDs
-        # use reg expressions to find matching strings in lines
-        # search for lat/lon
-        lat_lon_search = re.compile('\d\d\.\d\d\d [NS] \d?\d\d\.\d\d\d [WE]')
-        # search for SID (station ID)
-        sid_search = re.compile('\A\w*')
-        buoy_stations = []
-        SID = []
-        depth = 0.5
+def find_datasets(save_dir, corners):
+    """ get list of possible datasets. """
+    # define names
+    filename = os.path.join(save_dir, 'station_table.txt')
 
-        with open(filename, 'r') as f:
-            f.readline()
-            f.readline()
+    # read in and zip coordinates and buoy SIDs
+    # use reg expressions to find matching strings in lines
+    # search for lat/lon
+    lat_lon_search = re.compile('\d\d\.\d\d\d [NS] \d?\d\d\.\d\d\d [WE]')
+    # search for SID (station ID)
+    sid_search = re.compile('\A\w*')
+    buoy_stations = []
+    SID = []
+    depth = 0.5
 
-            for line in f:
-                lat_lon = lat_lon_search.search(line)  # latitude and longitude
-                sid = sid_search.search(line)   # station ID
+    with open(filename, 'r') as f:
+        f.readline()
+        f.readline()
 
-                if lat_lon and sid:
-                    lat_lon = lat_lon.group()
-                    lat_lon = lat_lon.split()
+        for line in f:
+            lat_lon = lat_lon_search.search(line)  # latitude and longitude
+            sid = sid_search.search(line)   # station ID
 
-                    sid = sid.group()
-                    lat_lon.append(sid)
+            if lat_lon and sid:
+                lat_lon = lat_lon.group()
+                lat_lon = lat_lon.split()
 
-                    if lat_lon[3] == 'W':
-                        lat_lon[2] = float(lat_lon[2]) * (-1)
-                    else:
-                        lat_lon[2] = float(lat_lon[2])
+                sid = sid.group()
+                lat_lon.append(sid)
 
-                    if lat_lon[1] == 'S':
-                        lat_lon[0] = float(lat_lon[0]) * (-1)
-                    else:
-                        lat_lon[0] = float(lat_lon[0])
+                if lat_lon[3] == 'W':
+                    lat_lon[2] = float(lat_lon[2]) * (-1)
+                else:
+                    lat_lon[2] = float(lat_lon[2])
 
-                    if 'ARES' in line:
-                        depth = 1.0
-                    elif 'AMPS' in line:   # TODO add more payload options
-                        depth = 0.6
-                    else:
-                        depth = 0.8
+                if lat_lon[1] == 'S':
+                    lat_lon[0] = float(lat_lon[0]) * (-1)
+                else:
+                    lat_lon[0] = float(lat_lon[0])
 
-                    buoy_stations.append([lat_lon[4], [lat_lon[0],
-                                          lat_lon[2]], depth])  # SID, LAT, LON
+                if 'ARES' in line:
+                    depth = 1.0
+                elif 'AMPS' in line:   # TODO add more payload options
+                    depth = 0.6
+                else:
+                    depth = 0.8
 
-        datasets = []
-        coordinates = []
-        depths = []
+                buoy_stations.append([lat_lon[4], [lat_lon[0],
+                                      lat_lon[2]], depth])  # SID, LAT, LON
 
-        # keep buoy stations and coordinates that fall within the corners
-        # of the image, save to datasets, coordinates, depths
-        for i in range(len(buoy_stations)):
-            buoy_lat = buoy_stations[i][1][0]
-            buoy_lon = buoy_stations[i][1][1]
+    datasets = []
+    coordinates = []
+    depths = []
 
-            # check for latitude
-            if buoy_lat > self.corners[1, 0] and buoy_lat < self.corners[0, 0]:
-                # check for longitude
-                if buoy_lon > self.corners[1, 1]:
-                    if buoy_lon < self.corners[0, 1]:
-                        datasets.append(buoy_stations[i][0])
-                        coordinates.append(buoy_stations[i][1])
-                        depths.append(buoy_stations[i][2])
+    # keep buoy stations and coordinates that fall within the corners
+    # of the image, save to datasets, coordinates, depths
+    for i in range(len(buoy_stations)):
+        buoy_lat = buoy_stations[i][1][0]
+        buoy_lon = buoy_stations[i][1][1]
 
-        return datasets, coordinates, depths
+        # check for latitude
+        if buoy_lat > corners[1, 0] and buoy_lat < corners[0, 0]:
+            # check for longitude
+            if buoy_lon > corners[1, 1]:
+                if buoy_lon < corners[0, 1]:
+                    datasets.append(buoy_stations[i][0])
+                    coordinates.append(buoy_stations[i][1])
+                    depths.append(buoy_stations[i][2])
+
+    return datasets, coordinates, depths
         
     def __save_buoy_data(self, sid):
         """ last-ditch attempt at getting buoy data. """
@@ -267,37 +298,7 @@ class BuoyData(object):
                         self.logger.warning('lat_lon search returned none')
                         return -1
             return -1
-            
-    def __get_stationtable(self):
-        """ download and unzip station_table.txt. """
-        # define names
-        filename = os.path.join(self.save_dir, 'station_table.txt')
-        url = "http://www.ndbc.noaa.gov/data/stations/station_table.txt"
 
-        if not os.path.exists(filename):
-            try:
-                # open url
-                f = urllib2.urlopen(url)
-
-                data = f.read()
-                
-                # write data to file
-                with open(filename, "wb") as local_file:
-                    local_file.write(data)
-                    
-                return 0
-                
-            except urllib2.HTTPError, e:
-                print "HTTP Error:", e.code, url
-                return -1
-            except urllib2.URLError, e:
-                print "URL Error:", e.reason, url
-                return -1
-            except OSError, e:
-                print 'OSError: ', e.reason
-                return -1
-        else:
-            return 0
 
     def __get_buoy_data(self, url):
         """ download/ unzip appripriate buoy data from url. """

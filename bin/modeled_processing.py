@@ -8,24 +8,10 @@ import sys
 import utm
 import linecache
 
+### POST MODTRAN FUNCTIONS ###
+
 def read_tape6(case):
-    """read in tape6 files and return values
-    
-    read in parsed files, parse relative spectral response files, etc.
-    
-    Args:
-        caselist: sliced version of caselist, contains values for a narr point
-        which_landsat: which landsat band is calculated for currently, list
-    
-    Returns:
-        radiance_up: upwelled radiance, list
-        radiance_dn: downwelled radiance, list
-        wavelength: wavelengths from parsed tape6, list
-        transission_up: upwelled transmission, list
-        transission_dn: downwelled transmission, list
-        RSR: relative spectral response of appropriate band
-        wavelength_RSR: relative spectral response wavelengths
-    """
+    """ parse tape6 files and return values. """
 
     wavelengths = numpy.zeros(0)
     radiance_up = numpy.zeros(0)
@@ -96,6 +82,7 @@ def read_tape6(case):
     return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
         
 def offset_bilinear_interp(array, narr_cor, buoy_coors):
+    """ interpolate to buoy location. """
     narr_coor = numpy.absolute(narr_cor)   # 1, 2 , 3, 4
     buoy_coors = numpy.absolute(buoy_coors)
     array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
@@ -186,7 +173,7 @@ def integrate(x, y, method='trap'):
                 
     return total
 
-
+### PRE MODTRAN FUNCTIONS ###
 class MakeTape5s(object):
 
     geometricHeight_1 = None
@@ -287,9 +274,6 @@ class MakeTape5s(object):
     def __convert_sh_rh(self, specHum, T_k, pressure):
         # Given array of specific humidities, temperature, and pressure, generate array of relative humidities
         # source: http://earthscience.stackexchange.com/questions/2360/how-do-i-convert-specific-humidity-to-relative-humidity
-        #print numpy.shape(specHum)
-        #print numpy.shape(pressure)
-        #print specHum.dtype
         
         T_k = numpy.asarray(T_k, dtype=numpy.float64)  #numpy.float64
         
@@ -674,19 +658,6 @@ class MakeTape5s(object):
             
             dewpoint_k = tempTemp - ((100 - tempRelHum) / 5)   #kelvin
             #source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
-            
-
-            ##################### BUOY CORRECTION #################################
-            
-#            print tempPress[0], ' ', self.buoy_params[0]
-#            print tempTemp[0], ' ', self.buoy_params[1] + 273.15
-#            print dewpoint_k[0], ' ', self.buoy_params[2] + 273.15
-            
-#            tempPress[0] = self.buoy_params[0]
-#            tempTemp[0] = self.buoy_params[1] + 273.15
-#            dewpoint_k[0] = self.buoy_params[2] + 273.15
-#            
-#            #######################################################################
 
             with open(filename, 'w') as f:
                 for k in range(numpy.shape(tempGeoHeight)[0]):

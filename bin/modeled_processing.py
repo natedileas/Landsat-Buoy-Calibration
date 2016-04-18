@@ -95,36 +95,36 @@ def read_tape6(case):
     
     return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
         
-    def __offset_bilinear_interp(self, array, narr_cor):
-        narr_coor = numpy.absolute(narr_cor)   # 1, 2 , 3, 4
-        buoy_coors = numpy.absolute(self.buoy_coors)
-        array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
+def offset_bilinear_interp(array, narr_cor, buoy_coors):
+    narr_coor = numpy.absolute(narr_cor)   # 1, 2 , 3, 4
+    buoy_coors = numpy.absolute(buoy_coors)
+    array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
+    
+    a = -narr_coor[0,0] + narr_coor[2,0]
+    b = -narr_coor[0,0] + narr_coor[1,0]
+    c = narr_coor[0,0] - narr_coor[1,0] - narr_coor[2,0] + narr_coor[3,0]
+    d = buoy_coors[0] - narr_coor[0,0]
+    e = -narr_coor[0,1] + narr_coor[2,1]
+    f = -narr_coor[0,1] + narr_coor[1,1]
+    g = narr_coor[0,1] - narr_coor[1,1] - narr_coor[2,1] + narr_coor[3,1]
+    h = buoy_coors[1] - narr_coor[0,1]
+    
+    i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
+    # i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
+    
+    alpha = -(b*e - a*f + d*g - c*h + i)/(2*c*e - 2*a*g)    
+    beta  = -(b*e - a*f - d*g + c*h + i)/(2*c*f - 2*b*g)
+    
+    return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + alpha * ((1 - beta) * array[2] + beta * array[3]))
         
-        a = -narr_coor[0,0] + narr_coor[2,0]
-        b = -narr_coor[0,0] + narr_coor[1,0]
-        c = narr_coor[0,0] - narr_coor[1,0] - narr_coor[2,0] + narr_coor[3,0]
-        d = buoy_coors[0] - narr_coor[0,0]
-        e = -narr_coor[0,1] + narr_coor[2,1]
-        f = -narr_coor[0,1] + narr_coor[1,1]
-        g = narr_coor[0,1] - narr_coor[1,1] - narr_coor[2,1] + narr_coor[3,1]
-        h = buoy_coors[1] - narr_coor[0,1]
-        
-        i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
-        # i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
-        
-        alpha = -(b*e - a*f + d*g - c*h + i)/(2*c*e - 2*a*g)    
-        beta  = -(b*e - a*f - d*g + c*h + i)/(2*c*f - 2*b*g)
-        
-        return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + alpha * ((1 - beta) * array[2] + beta * array[3]))
-        
-def __read_RSR(rsr_file):
+def read_RSR(rsr_file):
     """ read in RSR data and return it to the caller. """
     wavelength_RSR = []
     RSR = []
     trans_RSR = []
     data = []
     
-    with open(filename_RSR, 'r') as f:
+    with open(rsr_file, 'r') as f:
         for line in f:    
             data = line.split()
             data = filter(None, data)
@@ -132,91 +132,59 @@ def __read_RSR(rsr_file):
             RSR.append(float(data[1]))
     
     return RSR, wavelength_RSR
-        
-    def __find_nearest(self, array,value):
-        """Find nearest element to value in array.
-        """
-        if array != []:
-            index = numpy.argmin(numpy.abs(numpy.subtract(array,value)))
-            return index
     
-    def __calc_temperature_array(self, wavelengths):
-        """make array of blackbody radiances.
-        """
-        Lt= []
+def calc_temperature_array(wavelengths, temperature):
+    """ make array of blackbody radiances. """
+    Lt= []
+
+    for d_lambda in wavelengths:
+        x = radiance(d_lambda, temperature)
+        Lt.append(x)
+        
+    return Lt
+        
+def radiance(wvlen, temp, units='microns'):
+    """calculate blackbody radiance given wavelength (in meters) and temperature. """
     
-        for i in wavelengths:
-            x = self.__radiance(i)
-            Lt.append(x)
-            
-        return Lt
-        
-    def __radiance(self, wvlen, units='microns'):
-        """calculate blackbody radiance given wavelength (in meters) and temperature.
-        """
-        
-        # define constants
-        c = 3e8   # speed of light, m s-1
-        h = 6.626e-34	# J*s = kg m2 s-1
-        k = 1.38064852e-23 # m2 kg s-2 K-1, boltzmann
-        
-        c1 = 2 * (c * c) * h   # units = kg m4 s-3
-        c2 = (h * c) / k    # (h * c) / k, units = m K    
-            
-        # calculate radiance
-        rad = c1 / (((wvlen**5)) * (math.e**((c2 / (self.skin_temp * wvlen))) - 1))
-        
-        # UNITS
-        # (W / m^2 * sr) * <wavelength unit>
-        return rad
-        
-    def __integrate(self, x, y, method='trap'):
-        """approximate integration given two arrays.
-        """
-        total = 0
-        
-        if method == 'trap':
-            for i in xrange(len(x)):
-                try:
-                    # calculate area of trapezoid and add to total
-                    area = .5*(x[i+1]-x[i])*(y[i]+y[i+1])
-                    total += area
-                except IndexError:
-                    break
-                    
-        if method == 'rect':
-            for i in xrange(0, len(x)):
-                try:
-                    # calculate area of rectangle and add to total
-                    area = (x[i+1]-x[i])*(y[i])
-                    total += abs(area)
-                except IndexError:
-                    break
-                    
-        return total
+    # define constants
+    c = 3e8   # speed of light, m s-1
+    h = 6.626e-34	# J*s = kg m2 s-1
+    k = 1.38064852e-23 # m2 kg s-2 K-1, boltzmann
     
-    def __interpolate_radiance(self, modeled_rad_list, narr_coor):
-        """interpolate radiance of narr points to POI
-        """
-        narr_coor = numpy.absolute(narr_coor)
-        buoy_coors = numpy.absolute(self.buoy_coors)
+    c1 = 2 * (c * c) * h   # units = kg m4 s-3
+    c2 = (h * c) / k    # (h * c) / k, units = m K    
         
-        diffs_x = numpy.absolute(numpy.subtract(narr_coor[:, 0], buoy_coors[0]))
-        diffs_y = numpy.absolute(numpy.subtract(narr_coor[:, 1], buoy_coors[1]))
+    # calculate radiance
+    rad = c1 / (((wvlen**5)) * (math.e**((c2 / (temp * wvlen))) - 1))
+    
+    # UNITS
+    # (W / m^2 * sr) * <wavelength unit>
+    return rad
         
-        total_x = numpy.sum(diffs_x)
-        total_y = numpy.sum(diffs_y)
-        
-        poi_rad_x = 0
-        poi_rad_y = 0
-        
-        for j in range(4):
-            poi_rad_x += modeled_rad_list[j] * (diffs_x[j] / total_x)
-            poi_rad_y += modeled_rad_list[j] * (diffs_y[j] / total_y)
-            
-        poi_rad =(poi_rad_x + poi_rad_y) / 2.0
-        
-        return poi_rad
+def integrate(x, y, method='trap'):
+    """approximate integration given two arrays.
+    """
+    total = 0
+    
+    if method == 'trap':
+        for i in xrange(len(x)):
+            try:
+                # calculate area of trapezoid and add to total
+                area = .5*(x[i+1]-x[i])*(y[i]+y[i+1])
+                total += area
+            except IndexError:
+                break
+                
+    if method == 'rect':
+        for i in xrange(0, len(x)):
+            try:
+                # calculate area of rectangle and add to total
+                area = (x[i+1]-x[i])*(y[i])
+                total += abs(area)
+            except IndexError:
+                break
+                
+    return total
 
 
 class MakeTape5s(object):
@@ -240,9 +208,8 @@ class MakeTape5s(object):
         self.filepath_base = other.filepath_base
         
         self.metadata = other.metadata
-        self.buoy_coors = other.buoy_coors
+        self.buoy_coors = other.buoy_location
         self.skin_temp = '%3.3f' % (other.skin_temp)
-        self.whichLandsat = other.which_landsat
         self.directory = os.path.join(other.filepath_base, 'data/shared/modtran')
         self.home = os.path.join(self.filepath_base, 'data')
         self.buoy_params = [other.buoy_press, other.buoy_airtemp, other.buoy_dewpnt]

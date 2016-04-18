@@ -6,6 +6,7 @@ import utm
 import re
 import sys
 import shutil
+import math
 
 class BuoyDataError(Exception):
     pass
@@ -172,15 +173,9 @@ def get_buoy_data(filename, url):
         with open(filename, "wb") as local_file:
             local_file.write(f.read())
 
-        # move file to save_dir
-        save_file = os.path.join(self.save_dir, filename)
-        if not os.path.exists(save_file):
-            subprocess.check_call('mv ' + filename + ' ' + self.save_dir,
-                                  shell=True)
-
         # unzip if it is still zipped
         if '.gz' in filename:
-            subprocess.check_call('gzip -d -f '+save_file, shell=True)
+            subprocess.check_call('gzip -d -f '+filename, shell=True)
             # subprocess.Popen('rm '+filename, shell=True)
 
     except urllib2.HTTPError, e:
@@ -196,10 +191,8 @@ def get_buoy_data(filename, url):
 
 def find_skin_temp(filename, date, url, depth):
     """ compute skin temperature. """
-    import math
 
     # parse year, month, day
-    date = date['DATE_ACQUIRED']
     year = date[0:4]
     month = date[5:7]
     day = date[8:10]

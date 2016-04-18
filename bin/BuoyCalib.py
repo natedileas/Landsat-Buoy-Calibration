@@ -5,12 +5,15 @@ import re
 import csv
 import subprocess
 import pickle
+from PIL import Image, ImageDraw
+import numpy
 
 import ModeledRadProcessing
+import modeled_processing as mod_proc
 import image_processing as img_proc
 import buoy_data
 import landsatdata
-from PIL import Image, ImageDraw
+
 
 class CalibrationController(object):
     ############## ATTRIBUTES ##########################################################
@@ -27,7 +30,7 @@ class CalibrationController(object):
     narr_coor = None
     
     # image radiance and related attributes
-    _image_radiance = None
+    _image_radiance = []
     metadata = None    # landsat metadata
     poi = None
     
@@ -108,9 +111,7 @@ class CalibrationController(object):
                 self.calculate_buoy_information()
                 
             # download
-            ret_val = self.download_mod_data()
-            if ret_val == -1:
-                return
+            self.download_mod_data()
                 
             # process
             return_vals = ModeledRadProcessing.ModeledRadProcessing(self).do_processing()   # make call
@@ -195,6 +196,7 @@ class CalibrationController(object):
             
         return '\n'.join(output_items)
     
+    ### helper functions ###
     def calc_all(self):
         __ = self.modeled_radiance
         __ = self.image_radiance
@@ -268,7 +270,8 @@ class CalibrationController(object):
             items.append(str(self.skin_temp))   # buoy (skin) temp
 
         return items
-        
+
+    ### real work functions ###
                     
     def download_mod_data(self):
         """ download NARR Data. """
@@ -279,17 +282,127 @@ class CalibrationController(object):
             return 0
     
         # begin download of NARR data
-
-        subprocess.check_call('chmod u+x ./bin/NARR_py.bash', shell=True)
-        
-        v = -1
-        if self.verbose:
-          v = 0
+        os.chmod('./bin/NARR_py.bash', 0755)
           
-        ret_val = subprocess.call('./bin/NARR_py.bash %s %s %s' % (self.scene_dir, self.scene_id, v), shell=True)
+        ret_val = subprocess.call('./bin/NARR_py.bash %s %s %s' % (self.scene_dir, self.scene_id, int(self.verbose)), shell=True)
         if ret_val == 1:
             print 'missing wgrib error' 
             sys.exit(-1)
+            
+    def calc_mod_radiance(self):
+        """ calculate modeled radiance for band 10 and 11. """
+            
+        print 'Generating tape5 files.'
+        # read in narr data and generate tape5 files and caseList
+        mt5 = mod_proc.MakeTape5s(self)
+        caseList, narr_coor = mt5.main()   # first_files equivalent
+
+        print 'Running modtran.'
+        # change access to prevent errors
+        modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
+        os.chmod(modtran_bash_path, 0755)
+           
+        subprocess.check_call('./bin/modtran.bash %s %s' % (int(self.verbose), os.path.join(self.scene_dir, 'points')), shell=True)
+        
+        return_radiance = []
+        radiances = []
+        
+        # Load Emissivity / Reflectivity
+        spec_r = numpy.array(0)
+        spec_r_wvlens = numpy.array(0)
+        water_file = './data/shared/water.txt'
+        
+        with open(water_file, 'r') as f:
+            water_file = f.readlines()
+            for line in water_file[3:]:
+                data = line.split()
+                spec_r_wvlens = numpy.append(spec_r_wvlens, float(data[0]))
+                spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
+        
+
+        for i in range(2):
+            upwell_rad = []
+            downwell_rad = []
+            wavelengths = []
+            transmission = []
+            gnd_reflect = []
+            
+            print 'Modeled Radiance Processing: Band %s' % (i+1)
+            print 'Parsing tape6 files.'
+            for i in range(4):
+                # read relevant tape6 files
+                caseList_p = caseList[i]
+                ret_vals = mod_proc.read_tape6(caseList_p)
+                
+                upwell_rad = numpy.append(upwell_rad, ret_vals[0])   # W cm-2 sr-1 um-1
+                downwell_rad = numpy.append(downwell_rad, ret_vals[1])   # W cm-2 sr-1 um-1
+                wavelengths = ret_vals[2]   # microns
+                transmission = numpy.append(transmission, ret_vals[3])   # no units
+                gnd_reflect = numpy.append(gnd_reflect, ret_vals[4])   # W cm-2 sr-1 um-1
+                
+            # interpolate to buoy location
+            upwell_rad = mod_proc.__offset_bilinear_interp(upwell_rad, narr_coor)
+            downwell_rad = self.__offset_bilinear_interp(downwell_rad, narr_coor)
+            transmission = self.__offset_bilinear_interp(transmission, narr_coor)
+            gnd_reflect = self.__offset_bilinear_interp(gnd_reflect, narr_coor)
+            
+            
+            filename_RSR = './data/shared/L8_B10.rsp'
+            if i == 1:   # i.e. it is band 11
+                filename_RSR = './data/shared/L8_B11.rsp'
+
+            RSR, RSR_wavelengths = mod_proc.read_RSR(filename_RSR)
+                
+            # resample to rsr wavelength range
+            upwell_rad = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)
+            downwell_rad = numpy.interp(RSR_wavelengths, wavelengths, downwell_rad)
+            transmission = numpy.interp(RSR_wavelengths, wavelengths, transmission)
+            gnd_reflect = numpy.interp(RSR_wavelengths, wavelengths, gnd_reflect)
+            spec_reflectivity = numpy.interp(RSR_wavelengths, spec_r_wvlens, spec_r)
+            
+            spec_emissivity = 1 - spec_reflectivity   # calculate emissivity
+
+            RSR_wavelengths = numpy.asarray(RSR_wavelengths) / 1e6   # convert to meters
+            
+            # calculate temperature array
+            Lt = self.__calc_temperature_array(RSR_wavelengths)  # w m-2 sr-1 m-1
+            # calculate top of atmosphere radiance
+            
+            # OLD METHOD
+            #term1 = numpy.multiply(Lt, spec_emissivity)
+            #term2 = numpy.multiply(downwell_rad, spec_reflectivity)
+            #term1_2 = numpy.add(term1,term2)
+            #term3 = numpy.multiply(transmission, term1_2)
+            #Ltoa = numpy.add(upwell_rad, term3)
+            
+            # NEW METHOD 
+            ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
+            term1 = Lt * spec_emissivity * transmission # W m-2 sr-1 m-1
+            term2 = spec_reflectivity * (gnd_reflect * 1e10) # W m-2 sr-1 m-1
+            Ltoa = (upwell_rad * 1e10) + term1 + term2   # W m-2 sr-1 m-1
+            
+            #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
+                
+            # calculate observed radiance
+            numerator = self.__integrate(RSR_wavelengths, numpy.multiply(Ltoa, RSR))
+            denominator = self.__integrate(RSR_wavelengths, RSR)
+            
+            try:
+                modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
+            except ZeroDivisionError:
+                print 'ZeroDivisionError, modeled_rad_procssing'
+                return -1
+                
+            return_radiance.append(modeled_rad)
+            
+            if self.which_landsat == [8,2]: self.which_landsat = [8,1]
+            else: break
+        
+        if return_vals == -1:
+            print 'calc_mod_radiance: return_vals were -1'
+            return
+        else:
+            self._modeled_radiance, self.narr_coor = return_vals
     
     def download_img_data(self):
         """ download landsat images and parse metadata. """
@@ -309,18 +422,19 @@ class CalibrationController(object):
     def calc_img_radiance(self):
         """ calculate image radiance for band 10 and 11. """
         
-        img_files = [os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10']), \
-                     os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]
+        img_files = [[10, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10'])], \
+                     [11, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]]
         
-        for band in img_files:
-           print 'Image Radiance Processing: %s' % (band)
+        for band, img_file in img_files:
+           print 'Image Radiance Processing: Band %s' % (band)
            
            # find Region Of Interest (PixelOI return)
-           self.poi = img_proc.find_roi(band, self.buoy_location[0], self.buoy_location[1], self.metadata['UTM_ZONE'])
+           self.poi = img_proc.find_roi(img_file, self.buoy_location[0], self.buoy_location[1], self.metadata['UTM_ZONE'])
             
            # calculate digital count average and convert to radiance of 3x3 area around poi
-           dc_avg = img_proc.calc_dc_avg(band, poi)
-           self.image_radiance.append(img_proc.dc_to_rad(self.dc_avg))
+           dc_avg = img_proc.calc_dc_avg(img_file, self.poi)
+           im_rad = img_proc.dc_to_rad(band, self.metadata, dc_avg)
+           self._image_radiance.append(im_rad)
 
         
     def calculate_buoy_information(self):
@@ -348,9 +462,9 @@ class CalibrationController(object):
         month = self.date.strftime('%m')
         urls = []
         
-        if self.buoy:
+        if self.buoy_id:
             urls.append('%s%sh%s.txt.gz'%(url_base[0], self.buoy_id, year))
-            urls.append('%s%s%s%s2015.txt.gz' % (url_base[1], mon_str[int(month)-1], self.buoy, str(int(month))))
+            urls.append('%s%s%s%s2015.txt.gz' % (url_base[1], mon_str[int(month)-1], self.buoy_id, str(int(month))))
             
             ret_vals = buoy_data.search_stationtable(save_dir, self.buoy_id)
             if ret_vals != -1:
@@ -371,7 +485,7 @@ class CalibrationController(object):
             unzipped_file = zipped_file.replace('.gz', '')
             
             try:
-                buoy_data.get_buoy_data(dataset, url)   # download and unzip
+                buoy_data.get_buoy_data(zipped_file, url)   # download and unzip
                 temp, pres, atemp, dewp = buoy_data.find_skin_temp(unzipped_file, self.metadata['DATE_ACQUIRED'], url, depths[urls.index(url)])
                 
                 self.buoy_id = datasets[urls.index(url)]
@@ -381,14 +495,17 @@ class CalibrationController(object):
                 self.buoy_airtemp = atemp
                 self.buoy_dewpnt = dewp
                   
-                print '.start_download: used dataset %s, good exit.'% self.dataset
+                print 'Used buoy dataset %s.'% dataset
                 break
                 
-            except BuoyDataError:
+            except buoy_data.BuoyDataError:
                 print 'Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (dataset)
-                pass
+                continue
             except ValueError:
                 print 'Dataset %s didn\'t work (ValueError). Trying a new one' % (dataset)
-                pass
+                continue
+            except IOError:
+                print 'Dataset %s didn\'t work (IOError). Trying a new one' % (dataset)
+                continue
 
         

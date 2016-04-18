@@ -8,246 +8,92 @@ import sys
 import utm
 import linecache
 
-class ModeledRadProcessing(object):
-    def __init__(self, other):
-        # for tape5 generation 
-        self.metadata = other.metadata
-        self.buoy_coors = other.buoy_location
-
-        # for modradprocesing
-        self.filepath_base = other.filepath_base
-        self.scene_dir = other.scene_dir
-
-        # both
-        self.skin_temp = other.skin_temp
-        self.verbose = other.verbose
-        
-        self.buoy_press = other.buoy_press
-        self.buoy_airtemp = other.buoy_airtemp
-        self.buoy_dewpnt = other.buoy_dewpnt
-
-        if other.satelite == 'LC8':
-            self.which_landsat = [8,2]
-        else: 
-            self.which_landsat = [7,1]
-
-        self.verbose = other.verbose
-
-    def do_processing(self):
-        print 'do_processing: generating tape5 files'
-         
-        # read in narr data and generate tape5 files and caseList
-        current_dir = os.getcwd()
-        os.chdir(self.filepath_base)
-        mt5 = MakeTape5s(self)
-        ret_vals = mt5.main()   # first_files equivalent
-        
-        if ret_vals != -1:
-            caseList, narr_coor = ret_vals
-        else:
-            return -1
-
-        print 'do_processing: running modtran and parsing tape6 files'
-        
-        # change access to prevent errors
-        modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
-        os.chmod(modtran_bash_path, 0755)
-        
-        v = -1
-        if self.verbose:
-            v = 0                                        
-        subprocess.check_call('./bin/modtran.bash %s %s' % (v, os.path.join(self.scene_dir, 'points')), shell=True)
-
-        return_radiance = []
-        radiances = []
-        
-        # OLD Emissivity
-        # emissivity = .986
-        # reflectivity = 1 - emissivity
-        
-        # New Emissivity
-        spec_r = numpy.array(0)
-        spec_r_wvlens = numpy.array(0)
-        water_file = './data/shared/water.txt'
-        
-        with open(water_file, 'r') as f:
-            water_file = f.readlines()
-            for line in water_file[3:]:
-                data = line.split()
-                spec_r_wvlens = numpy.append(spec_r_wvlens, float(data[0]))
-                spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
-        
-        num_bands = self.which_landsat[1]
-
-        for i in range(num_bands):
-            upwell_rad = []
-            downwell_rad = []
-            wavelengths = []
-            transmission = []
-            gnd_reflect = []
-            
-            print 'do_processing: band %s of %s' % (i+1, num_bands)
-            
-            for i in range(4):
-                # read relevant tape6 files
-                caseList_p = caseList[i]
-                ret_vals = self.__read_tape6(caseList_p)
-                
-                upwell_rad = numpy.append(upwell_rad, ret_vals[0])   # W cm-2 sr-1 um-1
-                downwell_rad = numpy.append(downwell_rad, ret_vals[1])   # W cm-2 sr-1 um-1
-                wavelengths = ret_vals[2]   # microns
-                transmission = numpy.append(transmission, ret_vals[3])   # no units
-                gnd_reflect = numpy.append(gnd_reflect, ret_vals[4])   # W cm-2 sr-1 um-1
-                
-            upwell_rad = self.__offset_bilinear_interp(upwell_rad, narr_coor)
-            downwell_rad = self.__offset_bilinear_interp(downwell_rad, narr_coor)
-            transmission = self.__offset_bilinear_interp(transmission, narr_coor)
-            gnd_reflect = self.__offset_bilinear_interp(gnd_reflect, narr_coor)
-            
-            #save_a = array([wavelengths, upwell_rad, downwell_rad, transmission, gnd_reflect])
-            #numpy.savetxt('atmo_interp.txt', save_a, fmt='%.4e %+.4j %.4e %+.4j %.4e %+.4j %.4e %+.4j')
-            
-            RSR, RSR_wavelengths = self.__read_RSR()
-                
-            # interpolate RSR and reflectivity to match wavelength range
-            # upsampling the rsr may be causing issues.
-            #RSR = numpy.interp(wavelengths, RSR_wavelengths, RSR)
-            #spec_reflectivity = numpy.interp(wavelengths, spec_r_wvlens, spec_r)
-            
-            
-            upwell_rad = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)
-            downwell_rad = numpy.interp(RSR_wavelengths, wavelengths, downwell_rad)
-            transmission = numpy.interp(RSR_wavelengths, wavelengths, transmission)
-            gnd_reflect = numpy.interp(RSR_wavelengths, wavelengths, gnd_reflect)
-            spec_reflectivity = numpy.interp(RSR_wavelengths, spec_r_wvlens, spec_r)
-            
-            spec_emissivity = 1 - spec_reflectivity   # calculate emissivity
-
-            RSR_wavelengths = numpy.asarray(RSR_wavelengths) / 1e6   # convert to meters
-            
-            # calculate temperature array
-            Lt = self.__calc_temperature_array(RSR_wavelengths)  # w m-2 sr-1 m-1
-            # calculate top of atmosphere radiance
-            
-            # OLD METHOD
-            #term1 = numpy.multiply(Lt, spec_emissivity)
-            #term2 = numpy.multiply(downwell_rad, spec_reflectivity)
-            #term1_2 = numpy.add(term1,term2)
-            #term3 = numpy.multiply(transmission, term1_2)
-            #Ltoa = numpy.add(upwell_rad, term3)
-            
-            # NEW METHOD 
-            ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
-            term1 = Lt * spec_emissivity * transmission # W m-2 sr-1 m-1
-            term2 = spec_reflectivity * (gnd_reflect * 1e10) # W m-2 sr-1 m-1
-            Ltoa = (upwell_rad * 1e10) + term1 + term2   # W m-2 sr-1 m-1
-            
-            #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
-                
-            # calculate observed radiance
-            numerator = self.__integrate(RSR_wavelengths, numpy.multiply(Ltoa, RSR))
-            denominator = self.__integrate(RSR_wavelengths, RSR)
-            
-            try:
-                modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
-            except ZeroDivisionError:
-                print 'ZeroDivisionError, modeled_rad_procssing'
-                return -1
-                
-            return_radiance.append(modeled_rad)
-            
-            if self.which_landsat == [8,2]: self.which_landsat = [8,1]
-            else: break
-
-        os.chdir(current_dir)
-        return return_radiance, narr_coor
-
-    def __read_tape6(self, case):
-        """read in tape6 files and return values
-        
-        read in parsed files, parse relative spectral response files, etc.
-        
-        Args:
-            caselist: sliced version of caselist, contains values for a narr point
-            which_landsat: which landsat band is calculated for currently, list
-        
-        Returns:
-            radiance_up: upwelled radiance, list
-            radiance_dn: downwelled radiance, list
-            wavelength: wavelengths from parsed tape6, list
-            transission_up: upwelled transmission, list
-            transission_dn: downwelled transmission, list
-            RSR: relative spectral response of appropriate band
-            wavelength_RSR: relative spectral response wavelengths
-        """
+def read_tape6(case):
+    """read in tape6 files and return values
     
-        wavelengths = numpy.zeros(0)
-        radiance_up = numpy.zeros(0)
-        radiance_dn = numpy.zeros(0)
-        transission = numpy.zeros(0)
-        
-        filename = os.path.join(case, 'parsed')
-        
-        wavelength = []
-        upwelled_radiance = []
-        gnd_reflected_radiance = []
-        transmission_parsed = []
-        total = []
+    read in parsed files, parse relative spectral response files, etc.
     
-        # read data from file     
-        with open(filename, 'r') as f:
-            for line in f:
-                w, ur, grr, tot, t = line.split(' ')
-                wavelength.append(float(w))
-                upwelled_radiance.append(float(ur))
-                gnd_reflected_radiance.append(float(grr))
-                total.append(float(tot))
-                transmission_parsed.append(float(t))
-        
-        # calculate upwelled radiance and transmission
-        transission = numpy.asarray(transmission_parsed)
-        radiance_up = numpy.asarray(upwelled_radiance)
-            
-        # calculate downwelled radiance
-        transission[numpy.where(transission==0.0000)[0]] = 0.00001
-        gnd_reflected_radiance = numpy.asarray(gnd_reflected_radiance)
-        radiance_dn = numpy.divide(gnd_reflected_radiance, transission)
-        
-        # sanity check
-        total = numpy.asarray(total)
-        radiance_dn_check = numpy.divide(numpy.subtract(total, radiance_up), transission)
-        check = numpy.subtract(radiance_dn, radiance_dn_check)
-        
-        if numpy.sum(numpy.absolute(check)) >= .05:
-           print 'Error in modtran module. Total Radiance minus upwelled radianc \
-           e is not (approximately) equal to downwelled radiance*transmission'
-           sys.exit(-1)
+    Args:
+        caselist: sliced version of caselist, contains values for a narr point
+        which_landsat: which landsat band is calculated for currently, list
+    
+    Returns:
+        radiance_up: upwelled radiance, list
+        radiance_dn: downwelled radiance, list
+        wavelength: wavelengths from parsed tape6, list
+        transission_up: upwelled transmission, list
+        transission_dn: downwelled transmission, list
+        RSR: relative spectral response of appropriate band
+        wavelength_RSR: relative spectral response wavelengths
+    """
 
-        wavelength = numpy.asarray(wavelength)
+    wavelengths = numpy.zeros(0)
+    radiance_up = numpy.zeros(0)
+    radiance_dn = numpy.zeros(0)
+    transission = numpy.zeros(0)
+    
+    filename = os.path.join(case, 'parsed')
+    
+    wavelength = []
+    upwelled_radiance = []
+    gnd_reflected_radiance = []
+    transmission_parsed = []
+    total = []
+
+    # read data from file     
+    with open(filename, 'r') as f:
+        for line in f:
+            w, ur, grr, tot, t = line.split(' ')
+            wavelength.append(float(w))
+            upwelled_radiance.append(float(ur))
+            gnd_reflected_radiance.append(float(grr))
+            total.append(float(tot))
+            transmission_parsed.append(float(t))
+    
+    # calculate upwelled radiance and transmission
+    transission = numpy.asarray(transmission_parsed)
+    radiance_up = numpy.asarray(upwelled_radiance)
         
-        # flip wavelength, radiance, and transmission arrays...
-        # Tape6parser returns them backwards
-        wavelength = numpy.tile(wavelength,(1,1))
-        wavelength = numpy.fliplr(wavelength)
-        wavelength = wavelength[0]
-        
-        radiance_up = numpy.tile(radiance_up,(1,1))
-        radiance_up = numpy.fliplr(radiance_up)
-        radiance_up = radiance_up[0]
-        
-        radiance_dn = numpy.tile(radiance_dn,(1,1))
-        radiance_dn = numpy.fliplr(radiance_dn)
-        radiance_dn = radiance_dn[0]
-        
-        transission = numpy.tile(transission,(1,1))
-        transission = numpy.fliplr(transission)
-        transission = transission[0]
-        
-        gnd_reflected_radiance = numpy.tile(gnd_reflected_radiance,(1,1))
-        gnd_reflected_radiance = numpy.fliplr(gnd_reflected_radiance)
-        gnd_reflected_radiance = gnd_reflected_radiance[0]
-        
-        return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
+    # calculate downwelled radiance
+    transission[numpy.where(transission==0.0000)[0]] = 0.00001
+    gnd_reflected_radiance = numpy.asarray(gnd_reflected_radiance)
+    radiance_dn = numpy.divide(gnd_reflected_radiance, transission)
+    
+    # sanity check
+    total = numpy.asarray(total)
+    radiance_dn_check = numpy.divide(numpy.subtract(total, radiance_up), transission)
+    check = numpy.subtract(radiance_dn, radiance_dn_check)
+    
+    if numpy.sum(numpy.absolute(check)) >= .05:
+       print 'Error in modtran module. Total Radiance minus upwelled radianc \
+       e is not (approximately) equal to downwelled radiance*transmission'
+       sys.exit(-1)
+
+    wavelength = numpy.asarray(wavelength)
+    
+    # flip wavelength, radiance, and transmission arrays...
+    # Tape6parser returns them backwards
+    wavelength = numpy.tile(wavelength,(1,1))
+    wavelength = numpy.fliplr(wavelength)
+    wavelength = wavelength[0]
+    
+    radiance_up = numpy.tile(radiance_up,(1,1))
+    radiance_up = numpy.fliplr(radiance_up)
+    radiance_up = radiance_up[0]
+    
+    radiance_dn = numpy.tile(radiance_dn,(1,1))
+    radiance_dn = numpy.fliplr(radiance_dn)
+    radiance_dn = radiance_dn[0]
+    
+    transission = numpy.tile(transission,(1,1))
+    transission = numpy.fliplr(transission)
+    transission = transission[0]
+    
+    gnd_reflected_radiance = numpy.tile(gnd_reflected_radiance,(1,1))
+    gnd_reflected_radiance = numpy.fliplr(gnd_reflected_radiance)
+    gnd_reflected_radiance = gnd_reflected_radiance[0]
+    
+    return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
         
     def __offset_bilinear_interp(self, array, narr_cor):
         narr_coor = numpy.absolute(narr_cor)   # 1, 2 , 3, 4
@@ -271,31 +117,21 @@ class ModeledRadProcessing(object):
         
         return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + alpha * ((1 - beta) * array[2] + beta * array[3]))
         
-    def __read_RSR(self):
-        """read in RSR data and return it to the caller.
-        """
-        wavelength_RSR = []
-        RSR = []
-        trans_RSR = []
-        data = []
-        
-        if self.which_landsat == [8,1]:
-            filename_RSR = './data/shared/L8_B11.rsp'
-        if self.which_landsat == [8,2]:
-            filename_RSR = './data/shared/L8_B10.rsp'
-        if self.which_landsat == [7,1]:
-            filename_RSR = './data/shared/L7.rsp'
-            
-        # read data from file 
-        
-        with open(filename_RSR, 'r') as f:
-            for line in f:    
-                data = line.split()
-                data = filter(None, data)
-                wavelength_RSR.append(float(data[0]))
-                RSR.append(float(data[1]))
-        
-        return RSR, wavelength_RSR
+def __read_RSR(rsr_file):
+    """ read in RSR data and return it to the caller. """
+    wavelength_RSR = []
+    RSR = []
+    trans_RSR = []
+    data = []
+    
+    with open(filename_RSR, 'r') as f:
+        for line in f:    
+            data = line.split()
+            data = filter(None, data)
+            wavelength_RSR.append(float(data[0]))
+            RSR.append(float(data[1]))
+    
+    return RSR, wavelength_RSR
         
     def __find_nearest(self, array,value):
         """Find nearest element to value in array.

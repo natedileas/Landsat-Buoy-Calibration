@@ -73,18 +73,15 @@ def calc_dc_avg(filename, poi):
 
     return dc_avg
 
-def dc_to_rad(cc, DCavg):
+def dc_to_rad(band, metadata, DCavg):
     """ Convert digital count average to radiance. """
     
-    if cc.which_landsat == [8,2]:
-        L_add = cc.metadata['RADIANCE_ADD_BAND_10']
-        L_mult = cc.metadata['RADIANCE_MULT_BAND_10']
-    if cc.which_landsat == [8,1]:
-        L_add = cc.metadata['RADIANCE_ADD_BAND_11']
-        L_mult = cc.metadata['RADIANCE_MULT_BAND_11']
-    if cc.which_landsat == [7,1]:
-        L_add = cc.metadata['RADIANCE_ADD_BAND_6_VCID_2']
-        L_mult = cc.metadata['RADIANCE_MULT_BAND_6_VCID_2']
+    if band == 10:
+        L_add = metadata['RADIANCE_ADD_BAND_10']
+        L_mult = metadata['RADIANCE_MULT_BAND_10']
+    if band == 11:
+        L_add = metadata['RADIANCE_ADD_BAND_11']
+        L_mult = metadata['RADIANCE_MULT_BAND_11']
 
     #calculate LLambda
     LLambdaaddmult = DCavg * L_mult + L_add

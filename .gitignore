@@ -6,7 +6,7 @@ bin/landsatdata.pyc
 bin/ModeledRadProcessing.pyc
 bin/test_plot.pyc
 bin/__init__.pyc
-
+bin/*.pyc
 # modtran
 
 data/shared/modtran/newHead2.txt

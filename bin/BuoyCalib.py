@@ -304,9 +304,6 @@ class CalibrationController(object):
            
         subprocess.check_call('./bin/modtran.bash %s %s' % (int(self.verbose), os.path.join(self.scene_dir, 'points')), shell=True)
         
-        return_radiance = []
-        radiances = []
-        
         # Load Emissivity / Reflectivity
         spec_r = numpy.array(0)
         spec_r_wvlens = numpy.array(0)
@@ -319,40 +316,38 @@ class CalibrationController(object):
                 spec_r_wvlens = numpy.append(spec_r_wvlens, float(data[0]))
                 spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
         
+        print 'Parsing tape6 files.'
+        upwell_rad = []
+        downwell_rad = []
+        wavelengths = []
+        transmission = []
+        gnd_reflect = []
+        
+        for i in range(4):
+            # read relevant tape6 files
+            caseList_p = caseList[i]
+            ret_vals = mod_proc.read_tape6(caseList_p)
+            
+            upwell_rad = numpy.append(upwell_rad, ret_vals[0])   # W cm-2 sr-1 um-1
+            downwell_rad = numpy.append(downwell_rad, ret_vals[1])   # W cm-2 sr-1 um-1
+            wavelengths = ret_vals[2]   # microns
+            transmission = numpy.append(transmission, ret_vals[3])   # no units
+            gnd_reflect = numpy.append(gnd_reflect, ret_vals[4])   # W cm-2 sr-1 um-1
+            
+        # interpolate to buoy location
+        upwell_rad = mod_proc.offset_bilinear_interp(upwell_rad, narr_coor)
+        downwell_rad = mod_proc.offset_bilinear_interp(downwell_rad, narr_coor)
+        transmission = mod_proc.offset_bilinear_interp(transmission, narr_coor)
+        gnd_reflect = mod_proc.offset_bilinear_interp(gnd_reflect, narr_coor)
 
-        for i in range(2):
-            upwell_rad = []
-            downwell_rad = []
-            wavelengths = []
-            transmission = []
-            gnd_reflect = []
+        rsr_files = [[10, './data/shared/L8_B10.rsp'], \
+                     [11, './data/shared/L8_B11.rsp']]
+        for band, rsr_file in rsr_files):
             
-            print 'Modeled Radiance Processing: Band %s' % (i+1)
-            print 'Parsing tape6 files.'
-            for i in range(4):
-                # read relevant tape6 files
-                caseList_p = caseList[i]
-                ret_vals = mod_proc.read_tape6(caseList_p)
-                
-                upwell_rad = numpy.append(upwell_rad, ret_vals[0])   # W cm-2 sr-1 um-1
-                downwell_rad = numpy.append(downwell_rad, ret_vals[1])   # W cm-2 sr-1 um-1
-                wavelengths = ret_vals[2]   # microns
-                transmission = numpy.append(transmission, ret_vals[3])   # no units
-                gnd_reflect = numpy.append(gnd_reflect, ret_vals[4])   # W cm-2 sr-1 um-1
-                
-            # interpolate to buoy location
-            upwell_rad = mod_proc.__offset_bilinear_interp(upwell_rad, narr_coor)
-            downwell_rad = self.__offset_bilinear_interp(downwell_rad, narr_coor)
-            transmission = self.__offset_bilinear_interp(transmission, narr_coor)
-            gnd_reflect = self.__offset_bilinear_interp(gnd_reflect, narr_coor)
-            
-            
-            filename_RSR = './data/shared/L8_B10.rsp'
-            if i == 1:   # i.e. it is band 11
-                filename_RSR = './data/shared/L8_B11.rsp'
+            print 'Modeled Radiance Processing: Band %s' % (band)
 
-            RSR, RSR_wavelengths = mod_proc.read_RSR(filename_RSR)
-                
+            RSR, RSR_wavelengths = mod_proc.read_RSR(rsr_file)
+            
             # resample to rsr wavelength range
             upwell_rad = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)
             downwell_rad = numpy.interp(RSR_wavelengths, wavelengths, downwell_rad)
@@ -365,44 +360,22 @@ class CalibrationController(object):
             RSR_wavelengths = numpy.asarray(RSR_wavelengths) / 1e6   # convert to meters
             
             # calculate temperature array
-            Lt = self.__calc_temperature_array(RSR_wavelengths)  # w m-2 sr-1 m-1
-            # calculate top of atmosphere radiance
+            Lt = mod_proc.calc_temperature_array(RSR_wavelengths)  # w m-2 sr-1 m-1
             
-            # OLD METHOD
-            #term1 = numpy.multiply(Lt, spec_emissivity)
-            #term2 = numpy.multiply(downwell_rad, spec_reflectivity)
-            #term1_2 = numpy.add(term1,term2)
-            #term3 = numpy.multiply(transmission, term1_2)
-            #Ltoa = numpy.add(upwell_rad, term3)
-            
+            # calculate top of atmosphere radiance (Ltoa)
             # NEW METHOD 
             ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
             term1 = Lt * spec_emissivity * transmission # W m-2 sr-1 m-1
             term2 = spec_reflectivity * (gnd_reflect * 1e10) # W m-2 sr-1 m-1
             Ltoa = (upwell_rad * 1e10) + term1 + term2   # W m-2 sr-1 m-1
             
-            #modplot(wavelengths, downwell_rad, upwell_rad, transmission, Ltoa, save_name=str(self.which_landsat))
-                
             # calculate observed radiance
-            numerator = self.__integrate(RSR_wavelengths, numpy.multiply(Ltoa, RSR))
-            denominator = self.__integrate(RSR_wavelengths, RSR)
-            
-            try:
-                modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
-            except ZeroDivisionError:
-                print 'ZeroDivisionError, modeled_rad_procssing'
-                return -1
+            numerator = mod_proc.integrate(RSR_wavelengths, Ltoa * RSR)
+            denominator = mod_proc.integrate(RSR_wavelengths, RSR)
+            modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
                 
-            return_radiance.append(modeled_rad)
-            
-            if self.which_landsat == [8,2]: self.which_landsat = [8,1]
-            else: break
-        
-        if return_vals == -1:
-            print 'calc_mod_radiance: return_vals were -1'
-            return
-        else:
-            self._modeled_radiance, self.narr_coor = return_vals
+            self._modeled_radiance.append(modeled_rad)
+            self.narr_coor = narr_corr
     
     def download_img_data(self):
         """ download landsat images and parse metadata. """

@@ -8,11 +8,10 @@ import pickle
 from PIL import Image, ImageDraw
 import numpy
 
-import ModeledRadProcessing
 import modeled_processing as mod_proc
 import image_processing as img_proc
 import buoy_data
-import landsatdata
+import landsat_data
 
 
 class CalibrationController(object):
@@ -384,13 +383,13 @@ class CalibrationController(object):
         print '.download_img_data: Dealing with Landsat Data'
     
         # download landsat image data and assign returns
-        downloaded_LID = landsatdata.download(self)
+        downloaded_LID = landsat_data.download(self)
 
         self.satelite = downloaded_LID[2:3]
         self.scene_id = downloaded_LID
 
         # read in landsat metadata
-        self.metadata = landsatdata.read_metadata(self)
+        self.metadata = landsat_data.read_metadata(self)
 
     
     def calc_img_radiance(self):

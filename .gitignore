@@ -1,25 +1,9 @@
 # .pyc files
-bin/BuoyCalib.pyc
-bin/BuoyData.pyc
-bin/ImageRadProcessing.pyc
-bin/landsatdata.pyc
-bin/ModeledRadProcessing.pyc
-bin/test_plot.pyc
-bin/__init__.pyc
 bin/*.pyc
 # modtran
-
-data/shared/modtran/newHead2.txt
-data/shared/modtran/newHead3.txt
-data/shared/modtran/newHead4.txt
-data/shared/modtran/newTail.txt
-data/shared/modtran/newTail2.txt
-data/shared/modtran/newTail3.txt
-data/shared/modtran/newTail4.txt
-data/shared/modtran/newTail5.txt
-data/shared/modtran/newTail6.txt
 data/shared/modtran/tempLayers.txt
-
+data/shared/modtran/newHead.txt
+data/shared/modtran/newTail.txt
 # narr
 data/shared/narr/GRIB/script_HGT
 data/shared/narr/GRIB/script_SHUM

@@ -2,11 +2,8 @@ import datetime
 import os
 import math
 import numpy
-import re
 import subprocess
 import sys
-import utm
-import linecache
 import narr_data
 
 ### POST MODTRAN FUNCTIONS ###
@@ -179,14 +176,14 @@ def integrate(x, y, method='trap'):
 def make_tape5s(cc):
     """ Reads narr data and generates tape5 files for modtran runs. """
 
-    if os.path.exists(os.path.join(self.scene_dir, 'narr/HGT_1/1000.txt')):
+    if os.path.exists(os.path.join(cc.scene_dir, 'narr/HGT_1/1000.txt')):
         print 'NARR Data Successful Download'
     else:
         print 'NARR data not downloaded, no wgrib?'
         sys.exit(-1)
         
     # choose narr points
-    filename = os.path.join(self.filepath_base, './data/shared/narr/coordinates.txt')
+    filename = os.path.join(cc.filepath_base, './data/shared/narr/coordinates.txt')
     narr_indices, num_points, lat, lon = narr_data.choose_points(filename, cc.metadata, cc.buoy_location)
             
     narr_coor = []
@@ -202,13 +199,17 @@ def make_tape5s(cc):
     stan_atmo = narr_data.read_stan_atmo()
     
     # actually generate tape5 files
-    case_list = generate_tape5s(cc, num_points, narr_indices, lat, lon, *interp_atmo, *stan_atmo, data[6])
+    case_list = generate_tape5s(cc, num_points, narr_indices, lat, lon, interp_atmo, stan_atmo, data[6])
 
     return case_list, narr_coor
     
     
-def generate_tape5s(cc, num_points, NARRindices, lat, lon, height, rhum, temp, stan_height, stan_press, stan_temp, stan_rhum, pressures):
+def generate_tape5s(cc, num_points, NARRindices, lat, lon, interp_atmo, stan_atmo, pressures):
     """do the messy work of generating the tape5 files and caselist. """
+    
+    # unpack
+    height, rhum, temp = interp_atmo
+    stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
     
     modtran_directory = os.path.join(cc.filepath_base, 'data/shared/modtran')
     # initialize arrays
@@ -286,7 +287,7 @@ def generate_tape5s(cc, num_points, NARRindices, lat, lon, height, rhum, temp, s
             
             last = len(tempGeoHeight) - 1
                 
-        filename = os.path.join(self.directory, 'tempLayers.txt')
+        filename = os.path.join(modtran_directory, 'tempLayers.txt')
         
         dewpoint_k = tempTemp - ((100 - tempRelHum) / 5)   #kelvin
         #source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
@@ -317,7 +318,7 @@ def generate_tape5s(cc, num_points, NARRindices, lat, lon, height, rhum, temp, s
         subprocess.check_call(command, shell=True)
         
     # write caseList to file
-    case_list_file = os.path.join(self.scene_dir,'points/caseList')
+    case_list_file = os.path.join(cc.scene_dir,'points/caseList')
 
     with open(case_list_file, 'w') as f:
         for case in case_list:

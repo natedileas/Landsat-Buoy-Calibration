@@ -295,15 +295,14 @@ class CalibrationController(object):
             
         print 'Generating tape5 files.'
         # read in narr data and generate tape5 files and caseList
-        mt5 = mod_proc.MakeTape5s(self)
-        caseList, self.narr_coor = mt5.main()   # first_files equivalent
-
+        caseList, self.narr_coor = mod_proc.make_tape5s(self)
+        
         print 'Running modtran.'
         # change access to prevent errors
         modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
         os.chmod(modtran_bash_path, 0755)
            
-        subprocess.check_call('./bin/modtran.bash %s %s' % (int(self.verbose), os.path.join(self.scene_dir, 'points')), shell=True)
+        subprocess.check_call('./bin/modtran.bash %s %s' % (-int(self.verbose), os.path.join(self.scene_dir, 'points')), shell=True)
         
         # Load Emissivity / Reflectivity
         spec_r = numpy.array(0)

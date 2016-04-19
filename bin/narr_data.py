@@ -1,6 +1,9 @@
 import numpy
 import linecache
 import image_processing as img_proc
+import utm
+import math
+import os
 
 def choose_points(coordinate_file, metadata, buoy_coors):
     """ Read in coordinates.txt, choose points within scene corners. """
@@ -16,18 +19,19 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     coordinates = numpy.asarray(coordinates)
     i_coor = numpy.empty((len(coordinates)))
     j_coor = numpy.empty((len(coordinates)))
-  
-    i_coor = [coordinates[x][0] for x in range(len(coordinates)-1)]
+    
+    i_coor = [c[0] for c in coordinates]
     i_coor = numpy.reshape(i_coor,(277,349)).astype(float)
 
-    j_coor = [coordinates[x][1] for x in range(len(coordinates)-1)]
+    j_coor = [c[1] for c in coordinates]
     j_coor = numpy.reshape(j_coor,(277,349)).astype(float)
      
-    narrLat = [coordinates[x][2] for x in range(len(coordinates)-1)]
+    narrLat = [c[2] for c in coordinates]
     lat = numpy.reshape(narrLat,(277,349)).astype(float)
 
-    narrLon = [coordinates[x][3] for x in range(len(coordinates)-1)]
+    narrLon = [c[3] for c in coordinates]
     east = numpy.where(narrLon > 180.0)
+    
     for x in range(len(east[0])):
         narrLon[east[0][x]] = 360.0 - float(narrLon[east[0][x]])
     west = numpy.where(narrLon < 180.0)
@@ -234,7 +238,7 @@ def distance_in_utm(e1, n1, e2, n2):
     
     return d
 
-def interpolate_time(metadata, h1, h2, t1, t2, r1, r2):
+def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
     # determine three hour-increment before and after scene center scan time
     time = metadata['SCENE_CENTER_TIME'].replace('"', '')
     hour = int(time[0:2])
@@ -264,7 +268,7 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2):
 
     return height, rhum, temp
     
-def read_stan_atmo(filename='.data/shared/modtran/stanAtm.txt'):
+def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
     # read in file containing standard mid lat summer atmosphere information 
     # to be used for upper layers of atmo profile
     stan_atmo = []

@@ -25,11 +25,11 @@ class CalibrationController(object):
     buoy_dewpnt = None
     
     # modeled radiance and related attributes
-    _modeled_radiance = []
+    _modeled_radiance = None
     narr_coor = None
     
     # image radiance and related attributes
-    _image_radiance = []
+    _image_radiance = None
     metadata = None    # landsat metadata
     poi = None
     
@@ -49,7 +49,7 @@ class CalibrationController(object):
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
         self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
         
-        self.verbose = verbose                
+        self._verbose = verbose
     
 ############## GETTERS AND SETTERS ##########################################################
     @property
@@ -113,14 +113,6 @@ class CalibrationController(object):
             self.download_mod_data()
                 
             # process
-            """return_vals = ModeledRadProcessing.ModeledRadProcessing(self).do_processing()   # make call
-    
-            if return_vals == -1:
-                print 'calc_mod_radiance: return_vals were -1'
-                return
-            else:
-                self._modeled_radiance, self.narr_coor = return_vals
-            """
             self.calc_mod_radiance()
             
         return self._modeled_radiance
@@ -183,27 +175,25 @@ class CalibrationController(object):
             
         output_items = ['Scene ID: %s'%self.scene_id]
         
-        if self.modeled_radiance:
-            output_items.append('Modeled: Band 10: %2.6f Band 11: %2.6f' % (self.modeled_radiance[0], self.modeled_radiance[1]))
+        if self._modeled_radiance:
+            output_items.append('Modeled: Band 10: %2.6f Band 11: %2.6f' % (self._modeled_radiance[0], self._modeled_radiance[1]))
         
-        if self.image_radiance:
-            output_items.append('Image:   Band 10: %2.6f Band 11: %2.6f' % (self.image_radiance[0], self.image_radiance[1]))
+        if self._image_radiance:
+            output_items.append('Image:   Band 10: %2.6f Band 11: %2.6f' % (self._image_radiance[0], self._image_radiance[1]))
         
         if self._buoy_id:
             output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %4.4f' %(self.buoy_id, self.buoy_location, self.skin_temp))
-            
-        if self.verbose is False:
-            sys.stdout = self.stdout
             
         return '\n'.join(output_items)
     
     ### helper functions ###
     def calc_all(self):
-        __ = self.modeled_radiance
-        __ = self.image_radiance
-        __ = self.buoy_id
-        
-
+         self.download_img_data()
+         self.calculate_buoy_information()
+         self.download_mod_data()
+         self.calc_mod_radiance() 
+         self.calc_img_radiance()
+    
     def write_im(self):
         img = os.path.join(self.scene_dir, self.scene_id+'_B10.TIF')
         zone = self.metadata['UTM_ZONE']
@@ -341,6 +331,7 @@ class CalibrationController(object):
 
         rsr_files = [[10, './data/shared/L8_B10.rsp'], \
                      [11, './data/shared/L8_B11.rsp']]
+        modeled_rad = []
         
         for band, rsr_file in rsr_files:
             
@@ -372,9 +363,9 @@ class CalibrationController(object):
             # calculate observed radiance
             numerator = mod_proc.integrate(RSR_wavelengths, Ltoa * RSR)
             denominator = mod_proc.integrate(RSR_wavelengths, RSR)
-            modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
+            modeled_rad.append((numerator / denominator) / 1e6)  # W m-2 sr-1 um-1
                 
-            self._modeled_radiance.append(modeled_rad)
+        self.modeled_radiance = modeled_rad
 
     def download_img_data(self):
         """ download landsat images and parse metadata. """
@@ -396,6 +387,7 @@ class CalibrationController(object):
         
         img_files = [[10, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10'])], \
                      [11, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]]
+        im_rad = []
         
         for band, img_file in img_files:
            print 'Image Radiance Processing: Band %s' % (band)
@@ -405,8 +397,9 @@ class CalibrationController(object):
             
            # calculate digital count average and convert to radiance of 3x3 area around poi
            dc_avg = img_proc.calc_dc_avg(img_file, self.poi)
-           im_rad = img_proc.dc_to_rad(band, self.metadata, dc_avg)
-           self._image_radiance.append(im_rad)
+           im_rad.append(img_proc.dc_to_rad(band, self.metadata, dc_avg))
+        
+        self.image_radiance = im_rad
 
         
     def calculate_buoy_information(self):

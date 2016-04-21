@@ -61,11 +61,10 @@ if __name__=='__main__':
 
     if not args.reprocess:
         x = read_cache(x)   # try to read in from pickle
-
     else:
-        __ = str(x)   # sorry, future me.
+        x.calc_all()
 
-    print x   # calculate and assign
+    print x
     output(x)    # write out values to pickle
 
     if args.image:

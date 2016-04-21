@@ -240,8 +240,6 @@ def generate_tape5s(cc, num_points, NARRindices, lat, lon, interp_atmo, stan_atm
         hgt = height[point_idx]
         rh = rhum[point_idx]
         
-        maxLevel = len(p) - 1
-        
         delete = numpy.where(hgt < gdalt)
         
         indexBelow = 0
@@ -252,40 +250,36 @@ def generate_tape5s(cc, num_points, NARRindices, lat, lon, interp_atmo, stan_atm
             indexAbove = delete[0][0]
 
         if abs(gdalt-hgt[indexAbove]) < 0.001:
-            tempGeoHeight = hgt[indexAbove:maxLevel]
-            tempPress = p[indexAbove:maxLevel]
-            tempTemp = t[indexAbove:maxLevel]
-            tempRelHum = rh[indexAbove:maxLevel]
+            tempGeoHeight = hgt[indexAbove:-1]
+            tempPress = p[indexAbove:-1]
+            tempTemp = t[indexAbove:-1]
+            tempRelHum = rh[indexAbove:-1]
         else:
             newPressure = numpy.add(p[indexBelow], (((p[indexAbove]-p[indexBelow])*gdalt-hgt[indexBelow])/(hgt[indexAbove]-hgt[indexBelow])))
 
             newTemperature = t[indexBelow]+(gdalt-hgt[indexBelow])*((t[indexAbove]-t[indexBelow])/(hgt[indexAbove]-hgt[indexBelow]))          
             newRelativeHumidity = rh[indexBelow]+(gdalt-hgt[indexBelow])*((rh[indexAbove]-rh[indexBelow])/(hgt[indexAbove]-hgt[indexBelow]))
               
-            tempGeoHeight = numpy.insert(hgt[indexAbove:maxLevel], 0, gdalt)
-            tempPress = numpy.insert(p[indexAbove:maxLevel], 0, newPressure)
+            tempGeoHeight = numpy.insert(hgt[indexAbove:-1], 0, gdalt)
+            tempPress = numpy.insert(p[indexAbove:-1], 0, newPressure)
             
-            tempTemp = numpy.insert(t[indexAbove:maxLevel], 0, newTemperature)
-            tempRelHum = numpy.insert(rh[indexAbove:maxLevel], 0, newRelativeHumidity)
+            tempTemp = numpy.insert(t[indexAbove:-1], 0, newTemperature)
+            tempRelHum = numpy.insert(rh[indexAbove:-1], 0, newRelativeHumidity)
               
-        above = numpy.where(stan_height > hgt[maxLevel])[0]
+        above = numpy.where(stan_height > hgt[-1])[0]
         
         if numpy.shape(above)[0] > 3:
             interpolateTo = above[0]
-            last = len(tempGeoHeight)-1
-            stanLast = numpy.shape(stan_height)[0]
           
-            newHeight = (stan_height[interpolateTo]+tempGeoHeight[last])/2.0
-            newPressure2 = tempPress[last]+(newHeight-tempGeoHeight[last])*((stan_press[interpolateTo]-tempPress[last])/(stan_height[interpolateTo]-tempGeoHeight[last]))
-            newTemperature2 = tempTemp[last]+(newHeight-tempGeoHeight[last])*((stan_temp[interpolateTo]-tempTemp[last])/(stan_height[interpolateTo]-tempGeoHeight[last]))                
-            newRelativeHumidity2 = tempRelHum[last]+(newHeight-tempGeoHeight[last])*((stan_rhum[interpolateTo]-tempRelHum[last])/(stan_height[interpolateTo]-tempGeoHeight[last]))
+            newHeight = (stan_height[interpolateTo]+tempGeoHeight[-1])/2.0
+            newPressure2 = tempPress[-1] + (newHeight - tempGeoHeight[-1]) * ((stan_press[interpolateTo] - tempPress[-1]) / (stan_height[interpolateTo] - tempGeoHeight[-1]))
+            newTemperature2 = tempTemp[-1] + (newHeight - tempGeoHeight[-1]) * ((stan_temp[interpolateTo] - tempTemp[-1]) / (stan_height[interpolateTo] - tempGeoHeight[-1]))                
+            newRelativeHumidity2 = tempRelHum[-1] + (newHeight - tempGeoHeight[-1]) * ((stan_rhum[interpolateTo] - tempRelHum[-1]) / (stan_height[interpolateTo] - tempGeoHeight[-1]))
             
-            tempGeoHeight = numpy.append(numpy.append(tempGeoHeight, newHeight), stan_height[interpolateTo:stanLast])
-            tempPress = numpy.append(numpy.append(tempPress, newPressure2), stan_press[interpolateTo:stanLast])
-            tempTemp = numpy.append(numpy.append(tempTemp, newTemperature2), stan_temp[interpolateTo:stanLast])
-            tempRelHum = numpy.append(numpy.append(tempRelHum, newRelativeHumidity2), stan_rhum[interpolateTo:stanLast])
-            
-            last = len(tempGeoHeight) - 1
+            tempGeoHeight = numpy.append(numpy.append(tempGeoHeight, newHeight), stan_height[interpolateTo:-1])
+            tempPress = numpy.append(numpy.append(tempPress, newPressure2), stan_press[interpolateTo:-1])
+            tempTemp = numpy.append(numpy.append(tempTemp, newTemperature2), stan_temp[interpolateTo:-1])
+            tempRelHum = numpy.append(numpy.append(tempRelHum, newRelativeHumidity2), stan_rhum[interpolateTo:-1])
                 
         filename = os.path.join(modtran_directory, 'tempLayers.txt')
         

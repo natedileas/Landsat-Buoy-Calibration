@@ -25,6 +25,7 @@ def read_cache(cc):
 if __name__=='__main__':
     import argparse
     import bin.BuoyCalib as bc
+    import bin.image_processing as img_proc
 
     parser = argparse.ArgumentParser(description='Compute and compare the radiance values of \
      a landsat image to the radiance of a NOAA buoy. ')
@@ -46,6 +47,7 @@ if __name__=='__main__':
     parser.add_argument('-r', '--reprocess', help="Add to explicitly reprocess. Otherwise, a previous calculated version will be outputted.", action='store_true', default=False)
     parser.add_argument('-d', '--directory', help="Directory to search for landsat images.", default='./data/scenes/')
     parser.add_argument('-i','--image', help="draw NARR points and Buoy location on landsat image.", action='store_true')
+    parser.add_argument('-o','--output', help="Serialize class, happens by default.", action='store_false', default=True)
 
     args = parser.parse_args()
     
@@ -64,10 +66,12 @@ if __name__=='__main__':
     else:
         x.calc_all()
 
-    print x
-    output(x)    # write out values to pickle
+    print x   # show values on screen
+    
+    if args.output:
+        output(x)    # write out values to pickle
 
     if args.image:
-        x.write_im()
+        img_proc.write_im(x)
         print 'Image with NARR points and buoy written to %s' % (x.scene_dir + '/' + x.scene_id + '_mod.TIF')
 

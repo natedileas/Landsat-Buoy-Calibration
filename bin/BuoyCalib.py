@@ -2,10 +2,7 @@ import os
 import sys
 import datetime
 import re
-import csv
 import subprocess
-import pickle
-from PIL import Image, ImageDraw
 import numpy
 
 import modeled_processing as mod_proc
@@ -49,7 +46,7 @@ class CalibrationController(object):
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
         self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
         
-        self._verbose = verbose
+        self.verbose = verbose
     
 ############## GETTERS AND SETTERS ##########################################################
     @property
@@ -150,20 +147,9 @@ class CalibrationController(object):
 
     @verbose.setter
     def verbose(self, v):
-        self._verbose = v   # option for command line output
-
-        if v is False:
-            try:
-                log_file = open(os.path.join(self.scene_dir, 'log.txt'), 'w')
-                self.stdout = sys.stdout
-                sys.stdout = log_file
-            except IOError:
-                pass
-        if v is True:
-            try:
-                sys.stdout = self.stdout
-            except:
-                pass
+        """ """
+        pass
+            
 
     ############## MEMBER FUNCTIONS ##########################################################
     def __repr__(self):
@@ -193,74 +179,6 @@ class CalibrationController(object):
          self.download_mod_data()
          self.calc_mod_radiance() 
          self.calc_img_radiance()
-    
-    def write_im(self):
-        img = os.path.join(self.scene_dir, self.scene_id+'_B10.TIF')
-        zone = self.metadata['UTM_ZONE']
-        narr_pix = []
-        
-        # get narr point locations
-        for lat, lon in self.narr_coor:
-            narr_pix.append(img_proc.find_roi(img, lat, lon, zone))
-
-        # draw circle on top of image to signify narr points
-        image = Image.open(img)
-        draw = ImageDraw.Draw(image)
-        rx = 50
-        ry = 23
-        
-        for x, y in narr_pix:
-            draw.ellipse((x*2-rx, y-ry, x*2+rx, y+ry), fill=255)
-            
-        # draw buoy onto image
-        x = self.poi[0]
-        y = self.poi[1]
-        draw.ellipse((x*2-rx, y-ry, x*2+rx, y+ry), fill=0)
-
-        # downsample
-        image.mode = 'I'
-        image = image.point(lambda i:i*(1./256)).convert('L')
-        image = image.resize((500, 486), Image.ANTIALIAS)
-        
-        # save
-        save_path = os.path.join(self.scene_dir, self.scene_id+'_mod.TIF')
-        image.save(save_path)
-        
-    def to_csv(self, f):
-        """ write results to csv format. """
-        
-        w = csv.writer(f, quoting=csv.QUOTE_NONE, )
-        w.writerow(self.fmt_items(', '))
-        
-        
-    def fmt_items(self, delim=', '):
-        """ helper function for self.to_csv. """
-        
-        items = [self.scene_id]
-        
-        if self._buoy_id:
-            items.append(str(self.buoy_location[0]))   # lat
-            items.append(str(self.buoy_location[1]))   # lon
-                
-        items.append(self.date.strftime('%m/%d/%Y'))   # year
-        items.append(self.date.strftime('%j'))   # doy
-        items.append(self.wrs2[0:3])   # path
-        items.append(self.wrs2[3:6])   # row
-        items.append(' ')   # day/ night
-        items.append(self.buoy_id)   # buoy id
-        items.append(' ')   # sca
-        items.append(' ')   # detector
-        items.append(' ')   # temp difference band 10
-        items.append(' ')   # temp difference band 11
-        
-        if self.modeled_radiance and self.image_radiance:
-            items.append(str(self.image_radiance[0]))  # band 10
-            items.append(str(self.modeled_radiance[0]))   # band 10
-            items.append(str(self.image_radiance[1]))   # band 11
-            items.append(str(self.modeled_radiance[1]))   # band 11
-            items.append(str(self.skin_temp))   # buoy (skin) temp
-
-        return items
 
     ### real work functions ###
                     

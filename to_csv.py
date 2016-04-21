@@ -3,8 +3,8 @@ import sys
 import time
 import os
 import pickle
+import csv
 
-filename = 'output.csv'
 scenes = ["LC80130332013145LGN00",
 "LC80140332013104LGN01",
 "LC80140332013200LGN00",
@@ -59,9 +59,6 @@ scenes = ["LC80130332013145LGN00",
 "LC80170302014272LGN00",
 "LC80200292013226LGN00"]
 
-d = '/dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/'
-v = True
-
 def read_cache(cc):
     """ read in results from the file. """
 
@@ -73,17 +70,58 @@ def read_cache(cc):
 
     with open(out_file, 'rb') as f:
         return pickle.load(f)
+
+def to_csv(cc, f):
+    """ write results to csv format. """
+    
+    w = csv.writer(f, quoting=csv.QUOTE_NONE, )
+    w.writerow(fmt_items(cc))
+    
+    
+def fmt_items(cc, delim=', '):
+    """ helper function for cc.to_csv. """
+    
+    items = [cc.scene_id]
+    
+    if cc._buoy_id:
+        items.append(str(cc.buoy_location[0]))   # lat
+        items.append(str(cc.buoy_location[1]))   # lon
+            
+    items.append(cc.date.strftime('%m/%d/%Y'))   # year
+    items.append(cc.date.strftime('%j'))   # doy
+    items.append(cc.wrs2[0:3])   # path
+    items.append(cc.wrs2[3:6])   # row
+    items.append(' ')   # day/ night
+    items.append(cc.buoy_id)   # buoy id
+    items.append(' ')   # sca
+    items.append(' ')   # detector
+    items.append(' ')   # temp difference band 10
+    items.append(' ')   # temp difference band 11
+    
+    if cc.modeled_radiance and cc.image_radiance:
+        items.append(str(cc.image_radiance[0]))  # band 10
+        items.append(str(cc.modeled_radiance[0]))   # band 10
+        items.append(str(cc.image_radiance[1]))   # band 11
+        items.append(str(cc.modeled_radiance[1]))   # band 11
+        items.append(str(cc.skin_temp))   # buoy (skin) temp
+
+    return items
         
 
-with open(filename, 'wb') as f:
-    start_time = time.time()
-    for s in scenes:
-        try:
-            print s, '%s of %s' % (scenes.index(s) + 1, len(scenes))
-            cc = bc.CalibrationController(s, None, d, verbose=v)
-            cc_loaded = read_cache(cc)
-            cc_loaded.to_csv(f)
-        except AttributeError:
-            pass
-        except KeyboardInterrupt:
-            break
+if __name__ == '__main__':
+    filename = 'output.csv'
+    d = '/dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/'
+    v = True
+    
+    with open(filename, 'wb') as f:
+        start_time = time.time()
+        for s in scenes:
+            try:
+                print s, '%s of %s' % (scenes.index(s) + 1, len(scenes))
+                cc = bc.CalibrationController(s, None, d, verbose=v)
+                cc_loaded = read_cache(cc)
+                to_csv(cc_loaded, f)
+            except AttributeError:
+                pass
+            except KeyboardInterrupt:
+                break

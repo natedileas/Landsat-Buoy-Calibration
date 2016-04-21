@@ -1,5 +1,5 @@
 from osgeo import gdal, osr
-from PIL import Image
+from PIL import Image, ImageDraw
 import numpy
 import os
 import utm
@@ -88,3 +88,35 @@ def dc_to_rad(band, metadata, DCavg):
         
     return LLambdaaddmult
 
+
+def write_im(cc):
+    img = os.path.join(cc.scene_dir, cc.scene_id+'_B10.TIF')
+    zone = cc.metadata['UTM_ZONE']
+    narr_pix = []
+    
+    # get narr point locations
+    for lat, lon in cc.narr_coor:
+        narr_pix.append(find_roi(img, lat, lon, zone))
+
+    # draw circle on top of image to signify narr points
+    image = Image.open(img)
+    draw = ImageDraw.Draw(image)
+    rx = 50
+    ry = 23
+    
+    for x, y in narr_pix:
+        draw.ellipse((x*2-rx, y-ry, x*2+rx, y+ry), fill=255)
+        
+    # draw buoy onto image
+    x = cc.poi[0]
+    y = cc.poi[1]
+    draw.ellipse((x*2-rx, y-ry, x*2+rx, y+ry), fill=0)
+
+    # downsample
+    image.mode = 'I'
+    image = image.point(lambda i:i*(1./256)).convert('L')
+    image = image.resize((500, 486), Image.ANTIALIAS)
+    
+    # save
+    save_path = os.path.join(cc.scene_dir, cc.scene_id+'_mod.TIF')
+    image.save(save_path)

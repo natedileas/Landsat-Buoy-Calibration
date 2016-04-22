@@ -19,3 +19,6 @@ data/scenes/
 
 # cookies
 cookies.txt
+
+.nfs*
+bin/.nfs*

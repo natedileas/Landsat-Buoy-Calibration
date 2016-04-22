@@ -100,23 +100,22 @@ def write_im(cc):
 
     # draw circle on top of image to signify narr points
     image = Image.open(img)
+    image = image.point(lambda i:i*(1./256)).convert('RGB')
     draw = ImageDraw.Draw(image)
     rx = 50
     ry = 23
     
     for x, y in narr_pix:
-        draw.ellipse((x*2-rx, y-ry, x*2+rx, y+ry), fill=255)
+        draw.ellipse((x-rx, y-ry, x+rx, y+ry), fill=(255, 0, 0))
         
     # draw buoy onto image
     x = cc.poi[0]
     y = cc.poi[1]
-    draw.ellipse((x*2-rx, y-ry, x*2+rx, y+ry), fill=0)
+    draw.ellipse((x-rx, y-ry, x+rx, y+ry), fill=(0, 255, 0))
 
     # downsample
-    image.mode = 'I'
-    image = image.point(lambda i:i*(1./256)).convert('L')
     image = image.resize((500, 486), Image.ANTIALIAS)
     
     # save
-    save_path = os.path.join(cc.scene_dir, cc.scene_id+'_mod.TIF')
+    save_path = os.path.join(cc.scene_dir, cc.scene_id+'_mod.jpg')
     image.save(save_path)

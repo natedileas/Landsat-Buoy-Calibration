@@ -36,7 +36,7 @@ do
    echo $case >>$log 2>>$log
 	./bin/tape6parser.bash ${case} >>$log 2>>$log
  
-  if [ ${verbose} -gt -1 ]; then echo -ne '\tMODTRAN RUNS ['$a' / 4] \r'; fi
+  if [ ${verbose} -eq 1 ]; then echo -ne '\tMODTRAN RUNS ['$a' / 4] \r'; fi
 done
 
-if [ ${verbose} -gt -1 ]; then echo -ne '\tMODTRAN RUNS [4 / 4]\r\n'; fi
+if [ ${verbose} -eq 1 ]; then echo -ne '\tMODTRAN RUNS [4 / 4]\r\n'; fi

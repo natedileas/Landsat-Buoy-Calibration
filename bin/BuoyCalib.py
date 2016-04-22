@@ -7,6 +7,7 @@ import subprocess
 import pickle
 from PIL import Image, ImageDraw
 import numpy
+import logging
 
 import modeled_processing as mod_proc
 import image_processing as img_proc
@@ -38,7 +39,9 @@ class CalibrationController(object):
     wrs2 = None
     date = None
     version = None
-    _verbose = False
+    
+    # verbosity
+    verbose = False
     
     ############## ENTRY POINT ##########################################################
     def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False):
@@ -50,6 +53,10 @@ class CalibrationController(object):
         self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
         
         self._verbose = verbose
+        if verbose is False:
+            logging.basicConfig(filename=os.path.join(self.scene_dir, 'log.txt'), level=logging.INFO, filemode='w')
+        else:
+            logging.basicConfig(level=logging.INFO)
     
 ############## GETTERS AND SETTERS ##########################################################
     @property
@@ -74,7 +81,7 @@ class CalibrationController(object):
             self.version = new_id[-2:]
 
         else:
-            print 'WARNING scene_id.setter: %s is the wrong format' % new_id
+            logging.warning('scene_id.setter: %s is the wrong format' % new_id)
 
 
     @property
@@ -94,7 +101,7 @@ class CalibrationController(object):
             self._buoy_id = match.group()
         else:
             self._buoy_id = new_id
-            print 'WARNING .buoy_id: @buoy_id.setter: the given buoy id is the wrong format'
+            logging.warning('.buoy_id: @buoy_id.setter: the given buoy id is the wrong format')
      
             
     @property
@@ -143,27 +150,6 @@ class CalibrationController(object):
         """ image_radiance setter. """
         
         self._image_radiance = new_rad
-        
-    @property
-    def verbose(self):
-        return self._verbose
-
-    @verbose.setter
-    def verbose(self, v):
-        self._verbose = v   # option for command line output
-
-        if v is False:
-            try:
-                log_file = open(os.path.join(self.scene_dir, 'log.txt'), 'w')
-                self.stdout = sys.stdout
-                sys.stdout = log_file
-            except IOError:
-                pass
-        if v is True:
-            try:
-                sys.stdout = self.stdout
-            except:
-                pass
 
     ############## MEMBER FUNCTIONS ##########################################################
     def __repr__(self):
@@ -267,7 +253,7 @@ class CalibrationController(object):
     def download_mod_data(self):
         """ download NARR Data. """
     
-        print 'download_mod_data: Downloading NARR Data'
+        logging.info('Downloading NARR Data')
     
         if os.path.exists(os.path.join(self.scene_dir, 'narr/HGT_1/1000.txt')):
             return 0
@@ -277,22 +263,22 @@ class CalibrationController(object):
           
         ret_val = subprocess.call('./bin/NARR_py.bash %s %s %s' % (self.scene_dir, self.scene_id, int(self.verbose)), shell=True)
         if ret_val == 1:
-            print 'missing wgrib error' 
+            logging.error('missing wgrib error')
             sys.exit(-1)
             
     def calc_mod_radiance(self):
         """ calculate modeled radiance for band 10 and 11. """
             
-        print 'Generating tape5 files.'
+        logging.info('Generating tape5 files.')
         # read in narr data and generate tape5 files and caseList
         caseList, self.narr_coor = mod_proc.make_tape5s(self)
         
-        print 'Running modtran.'
+        logging.info('Running modtran.')
         # change access to prevent errors
         modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
         os.chmod(modtran_bash_path, 0755)
            
-        subprocess.check_call('./bin/modtran.bash %s %s' % (-int(self.verbose), os.path.join(self.scene_dir, 'points')), shell=True)
+        subprocess.check_call('./bin/modtran.bash %s %s' % (int(self.verbose), os.path.join(self.scene_dir, 'points')), shell=True)
         
         # Load Emissivity / Reflectivity
         spec_r = numpy.array(0)
@@ -306,7 +292,7 @@ class CalibrationController(object):
                 spec_r_wvlens = numpy.append(spec_r_wvlens, float(data[0]))
                 spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
         
-        print 'Parsing tape6 files.'
+        logging.info('Parsing tape6 files.')
         upwell_rad = []
         downwell_rad = []
         wavelengths = []
@@ -335,7 +321,7 @@ class CalibrationController(object):
         
         for band, rsr_file in rsr_files:
             
-            print 'Modeled Radiance Processing: Band %s' % (band)
+            logging.info('Modeled Radiance Processing: Band %s' % (band))
 
             RSR, RSR_wavelengths = mod_proc.read_RSR(rsr_file)
             
@@ -370,7 +356,7 @@ class CalibrationController(object):
     def download_img_data(self):
         """ download landsat images and parse metadata. """
         
-        print '.download_img_data: Dealing with Landsat Data'
+        logging.info('.download_img_data: Dealing with Landsat Data')
     
         # download landsat image data and assign returns
         downloaded_LID = landsat_data.download(self)
@@ -390,7 +376,7 @@ class CalibrationController(object):
         im_rad = []
         
         for band, img_file in img_files:
-           print 'Image Radiance Processing: Band %s' % (band)
+           logging.info('Image Radiance Processing: Band %s' % (band))
            
            # find Region Of Interest (PixelOI return)
            self.poi = img_proc.find_roi(img_file, self.buoy_location[0], self.buoy_location[1], self.metadata['UTM_ZONE'])
@@ -435,7 +421,7 @@ class CalibrationController(object):
             if ret_vals != -1:
                 datasets, buoy_coors, depths = ret_vals
             else: 
-                print '.start_download: _save_buoy_data failed'
+                logging.warning('.start_download: _save_buoy_data failed')
    
         for dataset in datasets:
             if year != '2015':
@@ -460,15 +446,15 @@ class CalibrationController(object):
                 self.buoy_airtemp = atemp
                 self.buoy_dewpnt = dewp
                   
-                print 'Used buoy dataset %s.'% dataset
+                logging.info('Used buoy dataset %s.'% dataset)
                 break
                 
             except buoy_data.BuoyDataError:
-                print 'Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (dataset)
+                logging.warning('Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (dataset))
                 continue
             except ValueError:
-                print 'Dataset %s didn\'t work (ValueError). Trying a new one' % (dataset)
+                logging.warning('Dataset %s didn\'t work (ValueError). Trying a new one' % (dataset))
                 continue
             except IOError:
-                print 'Dataset %s didn\'t work (IOError). Trying a new one' % (dataset)
+                logging.warning('Dataset %s didn\'t work (IOError). Trying a new one' % (dataset))
                 continue

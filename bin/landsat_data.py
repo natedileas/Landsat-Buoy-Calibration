@@ -3,7 +3,7 @@ import sys
 import subprocess
 import datetime
 import time
-
+import logging
 
 def download(cc):
     """ download landsat data and parse metadata. """
@@ -20,7 +20,7 @@ def download(cc):
         passwd = passwd.replace('\n', '')
         usgs = {'account': account, 'passwd': passwd}
     except IOError:
-        print 'ERROR: usgs password file problem'
+        logging.error('usgs password file problem (IOError)')
         sys.exit(-1)
         
     prefix = 'LC8'
@@ -55,18 +55,18 @@ def download(cc):
         
         # already downloaded and unzipped
         if os.path.exists(unzipdfile) and os.path.exists(metafile):
-            print 'main: Product %s already downloaded and unzipped ' % scene_id
+            logging.info('Product %s already downloaded and unzipped ' % scene_id)
             break
             
         # already downloaded
         elif os.path.isfile(tgzfile):
-            print 'main: product %s already downloaded ' % scene_id
+            logging.info('product %s already downloaded ' % scene_id)
             unzipimage(tgzfile, cc.scene_dir)
             break
             
         # not downloaded
         else:
-            print 'main: product %s not already downloaded ' % scene_id
+            logging.info('product %s not already downloaded ' % scene_id)
             
             # connect
             connect_cmd = "wget -q --cookies=on --save-cookies cookies.txt --keep-session-cookies --post-data 'username=nid4986&password=Fivyx689' https://ers.cr.usgs.gov/login/ >/dev/null"
@@ -83,7 +83,7 @@ def download(cc):
             break
 
     if cc.scene_id != scene_id:
-        print 'WARNING .start_download: scene_id and landsat_id do not match'
+        logging.warning('scene_id and landsat_id do not match')
 
     return scene_id
 
@@ -95,10 +95,10 @@ def unzipimage(tgz_file, out_dir):
             subprocess.check_call('tar zxvf %s -C %s >/dev/null' % (tgz_file, out_dir), shell=True)
             os.remove(tgz_file)
         except KeyboardInterrupt:
-            print 'unzipimage: OSError'
+            logging.error('KeyboardInterrupt')
             sys.exit(-1)
     else: 
-        print 'File %s does not exist.' % tgz_file
+        logging.error('File %s does not exist.' % tgz_file)
         sys.exit(-1)
         
     return 0
@@ -121,10 +121,10 @@ def read_metadata(cc):
                 except ValueError:
                     data.append(info[1])
                 except IndexError:
-                    print "Index Error in metadata parsing, normal thing"
+                    logging.warning('Index Error in metadata parsing, normal thing')
                     
     except IOError:
-        print 'Metadata not in expected file path.'
+        logging.error('Metadata not in expected file path: %s.' % filename)
         sys.exit(-1)
     
     metadata = dict(zip(desc, data))   # create dictionary

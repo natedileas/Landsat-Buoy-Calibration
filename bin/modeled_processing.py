@@ -4,6 +4,7 @@ import math
 import numpy
 import subprocess
 import sys
+import logging
 import narr_data
 
 ### POST MODTRAN FUNCTIONS ###
@@ -49,8 +50,7 @@ def read_tape6(case):
     check = numpy.subtract(radiance_dn, radiance_dn_check)
     
     if numpy.sum(numpy.absolute(check)) >= .05:
-       print 'Error in modtran module. Total Radiance minus upwelled radianc \
-       e is not (approximately) equal to downwelled radiance*transmission'
+       logging.error('Error in modtran module. Total Radiance minus upwelled radiance is not (approximately) equal to downwelled radiance*transmission')
        sys.exit(-1)
 
     wavelength = numpy.asarray(wavelength)
@@ -177,9 +177,9 @@ def make_tape5s(cc):
     """ Reads narr data and generates tape5 files for modtran runs. """
 
     if os.path.exists(os.path.join(cc.scene_dir, 'narr/HGT_1/1000.txt')):
-        print 'NARR Data Successful Download'
+        logging.info('NARR Data Successful Download')
     else:
-        print 'NARR data not downloaded, no wgrib?'
+        logging.error('NARR data not downloaded, no wgrib?')
         sys.exit(-1)
         
     # choose narr points

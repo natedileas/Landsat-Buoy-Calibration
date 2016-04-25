@@ -3,7 +3,7 @@ radiance as measured by a NBDC buoy. Based on work by Frank Padula and Monica Co
 
 Developed on Fedora x64. 
 
-Use:
+Proper Use:
 Command Line: controller.py, in this directory.
 
 You can also provide a single ID via the command line like so:

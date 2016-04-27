@@ -298,8 +298,6 @@ def generate_tape5s(cc, num_points, NARRindices, lat, lon, interp_atmo, stan_atm
         plot_list[point_idx] = (tempGeoHeight, tempPress, tempTemp, dewpoint_k)
         case_list[point_idx] = currentPoint
         
-        numpy.savetxt(os.path.join(cc.scene_dir,'atmo_interp_%s.txt'%(point_idx)), plot_list[point_idx])
-        
         # assign julian day
         jay = datetime.datetime.strftime(cc.date, '%j')
         
@@ -313,6 +311,7 @@ def generate_tape5s(cc, num_points, NARRindices, lat, lon, interp_atmo, stan_atm
         
     # write caseList to file
     case_list_file = os.path.join(cc.scene_dir,'points/caseList')
+    
 
     with open(case_list_file, 'w') as f:
         for case in case_list:

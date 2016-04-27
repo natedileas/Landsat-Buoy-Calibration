@@ -4,6 +4,7 @@ import image_processing as img_proc
 import utm
 import math
 import os
+import sys
 
 def choose_points(coordinate_file, metadata, buoy_coors):
     """ Read in coordinates.txt, choose points within scene corners. """
@@ -15,29 +16,19 @@ def choose_points(coordinate_file, metadata, buoy_coors):
             line.replace('\n', '')
             coordinates.append(line.split())
 
-    # pull out i,j,lat, lon and reform to 277x349 grids
+    # pull out lat, lon and reform to 277x349 grids
     coordinates = numpy.asarray(coordinates)
-    i_coor = numpy.empty((len(coordinates)))
-    j_coor = numpy.empty((len(coordinates)))
     
-    i_coor = [c[0] for c in coordinates]
-    i_coor = numpy.reshape(i_coor,(277,349)).astype(float)
-
-    j_coor = [c[1] for c in coordinates]
-    j_coor = numpy.reshape(j_coor,(277,349)).astype(float)
-     
     narrLat = [c[2] for c in coordinates]
     lat = numpy.reshape(narrLat,(277,349)).astype(float)
+    lat[numpy.where(lat > 84)] = 84
 
-    narrLon = [c[3] for c in coordinates]
-    east = numpy.where(narrLon > 180.0)
-    
-    for x in range(len(east[0])):
-        narrLon[east[0][x]] = 360.0 - float(narrLon[east[0][x]])
-    west = numpy.where(narrLon < 180.0)
-    for x in range(len(west[0])):
-        narrLon[west[0][x]] = (-1)*float(narrLon[west[0][x]])
+    narrLon = numpy.asarray([c[3] for c in coordinates]).astype(float)
     lon = numpy.reshape(narrLon,(277,349)).astype(float)
+    east = numpy.where(lon >= 180)
+    west = numpy.where(lon < 180)
+    lon[east] = 360 - lon[east]
+    lon[west] = (-1) * lon[west]
 
     if metadata['CORNER_UL_LAT_PRODUCT'] > 0:
         landsatHemi = 6
@@ -52,34 +43,19 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     inLandsat = numpy.asarray([[None,None],[None,None]])
     x_iter = numpy.arange(277)
     
-    for k in x_iter:
-        try:
-        
-            for l in xrange(len(lat[1])-1):
-                if lon[k,l] > 180:
-                    lon[k,l] = 360 - lon[k,l]
-                else: 
-                    lon[k,l] = (-1)*lon[k,l]
-                if lat[k,l] > 84:
-                    lat[k,l] = 84
-                    
-                curr_utm_point = utm.from_latlon(lat[k,l], lon[k,l])
-                
-                if curr_utm_point[2] <= float(metadata['UTM_ZONE']) + 1 and curr_utm_point[2] >= float(metadata['UTM_ZONE']) - 1:
-                    curr_utm_point = img_proc.convert_utm_zones(lat[k,l], lon[k,l], curr_utm_point[2], metadata['UTM_ZONE'])
-                
-                    if curr_utm_point[0] < UL_X:
-                        if curr_utm_point[0] > LR_X:
-                           if curr_utm_point[1] > UL_Y:
-                               if curr_utm_point[1] < LR_Y:
-                                   inLandsat = numpy.append(inLandsat, [[k,l]], axis=0)
-                
-        except IndexError as i:
-            print 'IndexError', i
+    for k in numpy.arange(277):
+        for l in numpy.arange(349):
+            X, Y, zone_num, zone_let = utm.from_latlon(lat[k,l], lon[k,l])
+            
+            if zone_num <= metadata['UTM_ZONE'] + 1 and zone_num >= metadata['UTM_ZONE'] - 1:
+                X, Y = img_proc.convert_utm_zones(lat[k,l], lon[k,l], zone_num, metadata['UTM_ZONE'])
+            
+            if X < UL_X and X > LR_X:
+               if Y > UL_Y and Y < LR_Y:
+                   inLandsat = numpy.append(inLandsat, [[k,l]], axis=0)
             
     inLandsat = numpy.delete(inLandsat, 0, 0)
     inLandsat = numpy.delete(inLandsat, 0, 0)
-    
     num_points = numpy.shape(inLandsat)[0]
     
     if num_points == 0:
@@ -88,14 +64,10 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     
     latvalues = []
     lonvalues = []
-    ivalues = []
-    jvalues = []
-    
+
     for i in range(num_points):
         latvalues.append(lat[inLandsat[i,0],inLandsat[i,1]])
         lonvalues.append(lon[inLandsat[i,0],inLandsat[i,1]])
-        ivalues.append(i_coor[inLandsat[i,0],inLandsat[i,1]])
-        jvalues.append(j_coor[inLandsat[i,0],inLandsat[i,1]])
     
     pixelSize = metadata['GRID_CELL_SIZE_THERMAL']
 
@@ -110,8 +82,7 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     eastvector = numpy.asarray(eastvector)
     northvector = numpy.asarray(northvector)
 
-    buoy_x = utm.from_latlon(buoy_coors[0], buoy_coors[1])[0]
-    buoy_y = utm.from_latlon(buoy_coors[0], buoy_coors[1])[1]
+    buoy_x, buoy_y, buoy_zone_num, buoy_zone_let = utm.from_latlon(*buoy_coors)
 
     distances = []
     dist_idx = []
@@ -133,14 +104,14 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     for m in range(4):
         idx.append(narr_dict[closest[m]])
     
-    NARRindices = []
+    chosen_points = []
     for n in idx:
-        NARRindices.append(list(inLandsat[n]))
+        chosen_points.append(list(inLandsat[n]))
     
-    NARRindices = numpy.asarray(NARRindices)
+    chosen_points = numpy.asarray(chosen_points)
     num_points = 4    # do not remove, important
     
-    return NARRindices, num_points, lat, lon
+    return chosen_points, num_points, lat, lon
     
     
 def read(narr_indices, lat, scene_dir):
@@ -291,3 +262,4 @@ def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
     # self.stanRelHum = stan_atmo[:,3]
     
     return stan_atmo[:,0], stan_atmo[:,1], stan_atmo[:,2], stan_atmo[:,3]
+

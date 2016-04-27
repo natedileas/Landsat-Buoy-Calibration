@@ -195,43 +195,24 @@ def make_tape5s(cc):
     #ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures = data
     
     # interplolate in time and load standard atmo
-    interp_atmo = narr_data.interpolate_time(cc.metadata, *data)
+    interp_time = narr_data.interpolate_time(cc.metadata, *data)
     stan_atmo = narr_data.read_stan_atmo()
-    
+    geoheight, press, temp, relhum = interpolate_space(cc, narr_indices, lat, lon, interp_time, stan_atmo, data[6])
     # actually generate tape5 files
-    case_list = generate_tape5s(cc, num_points, narr_indices, lat, lon, interp_atmo, stan_atmo, data[6])
+
+    case_list = generate_tape5s(cc, geoheight, press, temp, relhum)
 
     return case_list, narr_coor
     
     
-def generate_tape5s(cc, num_points, NARRindices, lat, lon, interp_atmo, stan_atmo, pressures):
-    """do the messy work of generating the tape5 files and caselist. """
-    
+def interpolate_space(cc, num_points, narr_indices, lat, lon, interp_atmo, stan_atmo, pressures):
     # unpack
     height, rhum, temp = interp_atmo
     stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
     
-    modtran_directory = os.path.join(cc.filepath_base, 'data/shared/modtran')
-    # initialize arrays
-    case_list = [''] * num_points
-    plot_list = [0] * num_points
-    
     for point_idx in range(num_points):
-        latString = '%2.3f' % (lat[NARRindices[point_idx,0], NARRindices[point_idx,1]])
         
-        if lon[NARRindices[point_idx,0], NARRindices[point_idx,1]] < 0:
-            lonString = '%2.2f' % lon[NARRindices[point_idx,0], NARRindices[point_idx,1]]
-        else:
-            lonString = '%2.3f' % (360.0 - lon[NARRindices[point_idx,0], NARRindices[point_idx,1]])
-
-        currentPoint = os.path.join(cc.scene_dir, 'points/%s_%s' % (latString, lonString))
-        
-        try:
-            os.makedirs(currentPoint)
-        except OSError:
-            pass
-        
-        if height[0,point_idx] < 0: gdalt = 0.000 
+        if height[0,point_idx] < 0: gdalt = 0.000
         else:  gdalt = height[0,point_idx]
         
         # write to middle file
@@ -241,7 +222,7 @@ def generate_tape5s(cc, num_points, NARRindices, lat, lon, interp_atmo, stan_atm
         rh = rhum[point_idx]
         
         delete = numpy.where(hgt < gdalt)
-        
+        print delete
         indexBelow = 0
         indexAbove = 1
 
@@ -280,34 +261,48 @@ def generate_tape5s(cc, num_points, NARRindices, lat, lon, interp_atmo, stan_atm
             tempPress = numpy.append(numpy.append(tempPress, newPressure2), stan_press[interpolateTo:-1])
             tempTemp = numpy.append(numpy.append(tempTemp, newTemperature2), stan_temp[interpolateTo:-1])
             tempRelHum = numpy.append(numpy.append(tempRelHum, newRelativeHumidity2), stan_rhum[interpolateTo:-1])
-                
-        filename = os.path.join(modtran_directory, 'tempLayers.txt')
         
         dewpoint_k = tempTemp - ((100 - tempRelHum) / 5)   #kelvin
         #source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
 
-        with open(filename, 'w') as f:
-            for k in range(numpy.shape(tempGeoHeight)[0]):
-                line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%15s\n' % \
-                (tempGeoHeight[k], tempPress[k], tempTemp[k], tempRelHum[k] \
-                ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
-                
-                line = line.replace('e', 'E')
-                f.write(line)
-        
-        plot_list[point_idx] = (tempGeoHeight, tempPress, tempTemp, dewpoint_k)
-        case_list[point_idx] = currentPoint
-        
-        # assign julian day
-        jay = datetime.datetime.strftime(cc.date, '%j')
-        
-        nml = str(numpy.shape(tempGeoHeight)[0])
+        return tempGeoHeight, tempPress, tempTemp, tempRelHum
 
-        gdalt = '%1.3f' % float(gdalt)
+def generate_tape5s(cc, GeoHeight, Press, Temp, RelHum):
+    """do the messy work of generating the tape5 files and caselist. """
+
+	latString = '%2.3f' % (cc.buoy_location[0])
+    
+    if cc.buoy_location[1] < 0:
+        lonString = '%2.2f' % cc.buoy_location[1]
+    else:
+        lonString = '%2.3f' % (360.0 - cc.buoy_location[1])
+
+    point_dir = os.path.join(cc.scene_dir, 'points/%s_%s' % (latString, lonString))
         
-        # write header and footer parts of tape5 and concatenate
-        command = './bin/write_tape5.bash %s %s %s %s %s %s %s %s' % (modtran_directory, currentPoint, latString, lonString, jay, nml, gdalt, '%3.3f' % cc.skin_temp)
-        subprocess.check_call(command, shell=True)
+    try:
+        os.makedirs(currentPoint)
+    except OSError:
+        pass
+
+    modtran_directory = os.path.join(cc.filepath_base, 'data/shared/modtran')
+    filename = os.path.join(modtran_directory, 'tempLayers.txt')
+
+    with open(filename, 'w') as f:
+        for k in range(numpy.shape(tempGeoHeight)[0]):
+            line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%15s\n' % \
+            (GeoHeight[k], Press[k], Temp[k], RelHum[k] ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
+            
+            line = line.replace('e', 'E')
+            f.write(line)
+    
+    jay = datetime.datetime.strftime(cc.date, '%j')
+    nml = str(numpy.shape(GeoHeight)[0])
+    gdalt = '%1.3f' % float(GeoHeight[0])
+    
+    # write header and footer parts of tape5 and concatenate
+    command = './bin/write_tape5.bash %s %s %s %s %s %s %s %s' % \
+    (modtran_directory, point_dir, latString, lonString, jay, nml, gdalt, '%3.3f' % cc.skin_temp)
+    subprocess.check_call(command, shell=True)
         
     # write caseList to file
     case_list_file = os.path.join(cc.scene_dir,'points/caseList')

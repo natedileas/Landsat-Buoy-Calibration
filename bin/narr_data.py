@@ -158,6 +158,14 @@ def convert_sh_rh(specHum, T_k, pressure):
     rh = 26.3 * p * q * (1 / numpy.exp(a))
     
     return rh
+    
+def dewpoint_temp(temp, relhum):
+    """ get dewpoint temperature """
+    # temp  - temperature in kelvin
+    # relhum -  relative humidity, 0-100
+    # source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
+    
+    return temp - ((100 - relhum) / 5)   # kelvin
         
 def convert_geopotential_geometric(geopotential, lat):
     """Convert array of geopotential heightsto geometric heights.

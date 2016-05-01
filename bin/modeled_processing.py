@@ -205,17 +205,15 @@ def make_tape5s(cc):
     return case_list, narr_coor
     
     
-def interpolate_space(cc, num_points, narr_indices, lat, lon, interp_atmo, stan_atmo, pressures):
+def interpolate_space(cc, narr_indices, lat, lon, interp_atmo, stan_atmo, pressures):
     # unpack
     height, rhum, temp = interp_atmo
     stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
     
-    for point_idx in range(num_points):
+    for point_idx in range(4):
         
-        if height[0,point_idx] < 0: gdalt = 0.000
-        else:  gdalt = height[0,point_idx]
+        gdalt = height[0,point_idx]
         
-        # write to middle file
         p = pressures[0]
         t = temp[point_idx]
         hgt = height[point_idx]
@@ -260,17 +258,13 @@ def interpolate_space(cc, num_points, narr_indices, lat, lon, interp_atmo, stan_
             tempGeoHeight = numpy.append(numpy.append(tempGeoHeight, newHeight), stan_height[interpolateTo:-1])
             tempPress = numpy.append(numpy.append(tempPress, newPressure2), stan_press[interpolateTo:-1])
             tempTemp = numpy.append(numpy.append(tempTemp, newTemperature2), stan_temp[interpolateTo:-1])
-            tempRelHum = numpy.append(numpy.append(tempRelHum, newRelativeHumidity2), stan_rhum[interpolateTo:-1])
-        
-        dewpoint_k = tempTemp - ((100 - tempRelHum) / 5)   #kelvin
-        #source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
+            tempRelHum = numpy.append(numpy.append(tempRelHum, newRelativeHumidity2), stan_rhum[interpolateTo:-1])  
 
         return tempGeoHeight, tempPress, tempTemp, tempRelHum
 
 def generate_tape5s(cc, GeoHeight, Press, Temp, RelHum):
     """do the messy work of generating the tape5 files and caselist. """
-
-	latString = '%2.3f' % (cc.buoy_location[0])
+    latString = '%2.3f' % (cc.buoy_location[0])
     
     if cc.buoy_location[1] < 0:
         lonString = '%2.2f' % cc.buoy_location[1]
@@ -280,7 +274,7 @@ def generate_tape5s(cc, GeoHeight, Press, Temp, RelHum):
     point_dir = os.path.join(cc.scene_dir, 'points/%s_%s' % (latString, lonString))
         
     try:
-        os.makedirs(currentPoint)
+        os.makedirs(point_dir)
     except OSError:
         pass
 
@@ -288,7 +282,7 @@ def generate_tape5s(cc, GeoHeight, Press, Temp, RelHum):
     filename = os.path.join(modtran_directory, 'tempLayers.txt')
 
     with open(filename, 'w') as f:
-        for k in range(numpy.shape(tempGeoHeight)[0]):
+        for k in range(numpy.shape(GeoHeight)[0]):
             line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%15s\n' % \
             (GeoHeight[k], Press[k], Temp[k], RelHum[k] ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
             
@@ -303,13 +297,5 @@ def generate_tape5s(cc, GeoHeight, Press, Temp, RelHum):
     command = './bin/write_tape5.bash %s %s %s %s %s %s %s %s' % \
     (modtran_directory, point_dir, latString, lonString, jay, nml, gdalt, '%3.3f' % cc.skin_temp)
     subprocess.check_call(command, shell=True)
-        
-    # write caseList to file
-    case_list_file = os.path.join(cc.scene_dir,'points/caseList')
-    
 
-    with open(case_list_file, 'w') as f:
-        for case in case_list:
-            f.write(case + '\n')
-
-    return case_list
+    return point_dir

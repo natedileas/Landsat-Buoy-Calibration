@@ -6,9 +6,8 @@ import math
 import os
 import sys
 
-def choose_points(coordinate_file, metadata, buoy_coors):
-    """ Read in coordinates.txt, choose points within scene corners. """
-    # read narr coordinates from file
+def get_coordinates(coordinate_file):
+    """ read narr coordinates from file """
     coordinates = []
 
     with open(coordinate_file, 'r') as f:
@@ -16,9 +15,15 @@ def choose_points(coordinate_file, metadata, buoy_coors):
             line.replace('\n', '')
             coordinates.append(line.split())
 
-    # pull out lat, lon and reform to 277x349 grids
-    coordinates = numpy.asarray(coordinates)
+    return numpy.asarray(coordinates)
+
+def choose_points(coordinate_file, metadata, buoy_coors):
+    """ Read in coordinates.txt, choose points within scene corners. """
     
+    # read narr coordinates from file
+    coordinates = get_coordinates(coordinate_file)
+    
+    # pull out lat, lon and reform to 277x349 grids
     narrLat = [c[2] for c in coordinates]
     lat = numpy.reshape(narrLat,(277,349)).astype(float)
     lat[numpy.where(lat > 84)] = 84
@@ -30,6 +35,7 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     lon[east] = 360 - lon[east]
     lon[west] = (-1) * lon[west]
 
+    # define corners
     if metadata['CORNER_UL_LAT_PRODUCT'] > 0:
         landsatHemi = 6
     else: 
@@ -40,6 +46,7 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     LR_X = metadata['CORNER_LR_LAT_PRODUCT'] - 0.5
     LR_Y = metadata['CORNER_LR_LON_PRODUCT'] + 0.5
     
+    # pull out points that lie within the corners
     inLandsat = numpy.asarray([[None,None],[None,None]])
     x_iter = numpy.arange(277)
     
@@ -112,6 +119,21 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     num_points = 4    # do not remove, important
     
     return chosen_points, num_points, lat, lon
+
+def line_test(p1, p2, p3):
+    """ check whether the three points lie on a line. """
+    _p1 = p1[:]
+    _p2 = p2[:]
+    _p3 = p3[:]
+
+    _p1.append(1)
+    _p2.append(1)
+    _p3.append(1)
+
+    a = numpy.matrix([_p1, _p2, _p3])
+    a = a.transpose()
+
+    return numpy.linalg.det(a)
     
     
 def read(narr_indices, lat, scene_dir):

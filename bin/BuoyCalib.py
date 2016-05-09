@@ -208,7 +208,7 @@ class CalibrationController(object):
         modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
         os.chmod(modtran_bash_path, 0755)
            
-        subprocess.check_call('./bin/modtran.bash %s %s' % (int(self.verbose), point_dir), shell=True)
+        subprocess.check_call('./bin/modtran.bash %s %s' % (self.filepath_base, point_dir), shell=True)
         
         # Load Emissivity / Reflectivity
         spec_r = numpy.array(0)

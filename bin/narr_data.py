@@ -2,6 +2,7 @@ import numpy
 import linecache
 import image_processing as img_proc
 import utm
+import itertools
 import math
 import os
 import sys
@@ -76,7 +77,6 @@ def choose_points(inLandsat, lat, lon, buoy_coors, num_points=4):
     latvalues = []
     lonvalues = []
     
-    print inLandsat
     for i in range(len(inLandsat)):
         latvalues.append(lat[inLandsat[i,0],inLandsat[i,1]])
         lonvalues.append(lon[inLandsat[i,0],inLandsat[i,1]])
@@ -105,14 +105,15 @@ def choose_points(inLandsat, lat, lon, buoy_coors, num_points=4):
         except IndexError as e:
             print e
 
-    narr_dict = dict(zip(distances, inLandsat[dist_idx]))
+    narr_dict = zip(distances, latvalues, lonvalues, inLandsat)
     sorted_points = numpy.asarray(sorted(narr_dict))
-    indexs = range(0,4)
 
-    while is_square_test(sorted_points[indexs]) is not True:
-        indexs = range(1,5)
-    
-    return chosen_points
+    for chosen_points in itertools.combinations(sorted_points, 4):
+        chosen_points = numpy.asarray(chosen_points)
+        if is_square_test(chosen_points[:,1:3]) is True:
+            break
+
+    return chosen_points[:,3], chosen_points[:, 1:3]
 
 def is_square_test(points):
     p1, p2, p3, p4 = points
@@ -272,7 +273,7 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
 
 def interp_space(cc, atmo_profiles, narr_coor):
     """ interpolate in space between the 4 profiles. """
-    return atmo_profiles[0]
+    return atmo_profiles[1]
     
 def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
     # read in file containing standard mid lat summer atmosphere information 
@@ -297,4 +298,3 @@ def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
     # self.stanRelHum = stan_atmo[:,3]
     
     return stan_atmo[:,0], stan_atmo[:,1], stan_atmo[:,2], stan_atmo[:,3]
-

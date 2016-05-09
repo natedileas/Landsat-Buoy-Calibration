@@ -185,11 +185,7 @@ def make_tape5s(cc):
     # choose narr points
     filename = os.path.join(cc.filepath_base, './data/shared/narr/coordinates.txt')
     narr_indices, lat, lon = narr_data.get_points(filename, cc.metadata)
-    narr_indices = narr_data.choose_points(narr_indices, lat, lon, cc.buoy_location)
-
-    narr_coor = []
-    for i in range(4):
-        narr_coor.append([lat[narr_indices[i,0], narr_indices[i,1]],lon[narr_indices[i,0], narr_indices[i,1]]])
+    narr_indices, narr_coor = narr_data.choose_points(narr_indices, lat, lon, cc.buoy_location)
 
     # read in NARR data
     data = narr_data.read(narr_indices, lat, cc.scene_dir)
@@ -197,10 +193,10 @@ def make_tape5s(cc):
     
     interp_time = narr_data.interpolate_time(cc.metadata, *data)   # interplolate in time
     stan_atmo = narr_data.read_stan_atmo()   # load standard atmo
-    atmo_profiles = generate_profiles(cc, interp_time, stan_atmo, data[6])
+    atmo_profiles = generate_profiles(interp_time, stan_atmo, data[6])
     
     interp_profile = narr_data.interp_space(cc, atmo_profiles, narr_coor)
-    point_dir = generate_tape5s(cc, interp_profile)
+    point_dir = generate_tape5(cc, interp_profile)
 
     return point_dir, narr_coor
     
@@ -221,7 +217,6 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
         rh = rhum[point_idx]
         
         delete = numpy.where(hgt < gdalt)
-        print delete
         indexBelow = 0
         indexAbove = 1
 

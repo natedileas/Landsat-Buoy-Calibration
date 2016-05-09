@@ -17,7 +17,7 @@ def get_coordinates(coordinate_file):
 
     return numpy.asarray(coordinates)
 
-def choose_points(coordinate_file, metadata, buoy_coors):
+def get_points(coordinate_file, metadata):
     """ Read in coordinates.txt, choose points within scene corners. """
     
     # read narr coordinates from file
@@ -69,19 +69,22 @@ def choose_points(coordinate_file, metadata, buoy_coors):
         print 'No NARR points in landsat scene. Fatal.'
         sys.exit(-1)
     
+    return inLandsat, lat, lon
+    
+
+def choose_points(inLandsat, lat, lon, buoy_coors, num_points=4):
     latvalues = []
     lonvalues = []
-
-    for i in range(num_points):
+    
+    print inLandsat
+    for i in range(len(inLandsat)):
         latvalues.append(lat[inLandsat[i,0],inLandsat[i,1]])
         lonvalues.append(lon[inLandsat[i,0],inLandsat[i,1]])
-    
-    pixelSize = metadata['GRID_CELL_SIZE_THERMAL']
 
     eastvector = []
     northvector = []
     
-    for i in range(num_points): 
+    for i in range(len(inLandsat)): 
         narr_utm_ret = utm.from_latlon(latvalues[i],lonvalues[i])
         eastvector.append(narr_utm_ret[0])
         northvector.append(narr_utm_ret[1])
@@ -94,47 +97,45 @@ def choose_points(coordinate_file, metadata, buoy_coors):
     distances = []
     dist_idx = []
 
-    for g in range(num_points):
+    for g in range(len(inLandsat)):
         try:
             dist = distance_in_utm(eastvector[g],northvector[g],buoy_x,buoy_y)
-            if dist > 0:
-                distances.append(dist) 
-                dist_idx.append(g)
+            distances.append(dist) 
+            dist_idx.append(g)
         except IndexError as e:
             print e
 
-    narr_dict = dict(zip(distances, dist_idx))
-    idx = []
+    narr_dict = dict(zip(distances, inLandsat[dist_idx]))
+    sorted_points = numpy.asarray(sorted(narr_dict))
+    indexs = range(0,4)
 
-    closest = sorted(narr_dict)
+    while is_square_test(sorted_points[indexs]) is not True:
+        indexs = range(1,5)
     
-    for m in range(4):
-        idx.append(narr_dict[closest[m]])
-    
-    chosen_points = []
-    for n in idx:
-        chosen_points.append(list(inLandsat[n]))
-    
-    chosen_points = numpy.asarray(chosen_points)
-    num_points = 4    # do not remove, important
-    
-    return chosen_points, num_points, lat, lon
+    return chosen_points
 
+def is_square_test(points):
+    p1, p2, p3, p4 = points
+
+    test = int(line_test(p1, p2, p3))
+    test += int(line_test(p4, p1, p2))
+    test += int(line_test(p3, p4, p1))
+    test += int(line_test(p2, p3, p4))
+
+    return (test == 0)
+    
 def line_test(p1, p2, p3):
     """ check whether the three points lie on a line. """
-    _p1 = p1[:]
-    _p2 = p2[:]
-    _p3 = p3[:]
-
-    _p1.append(1)
-    _p2.append(1)
-    _p3.append(1)
+    # http://math.stackexchange.com/questions/441182/how-to-check-if-three-coordinates-form-a-line
+    # edge condition found with test_line_test.py
+    _p1 = numpy.append(p1, 1)
+    _p2 = numpy.append(p2, 1)
+    _p3 = numpy.append(p3, 1)
 
     a = numpy.matrix([_p1, _p2, _p3])
     a = a.transpose()
 
-    return numpy.linalg.det(a)
-    
+    return (abs(numpy.linalg.det(a)) < 0.001)
     
 def read(narr_indices, lat, scene_dir):
     p = numpy.asarray([1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 125, 100])
@@ -268,6 +269,10 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
     temp = t1 + (time-hour1) * ((t2 - t1)/(hour2 - hour1))
 
     return height, rhum, temp
+
+def interp_space(cc, atmo_profiles, narr_coor):
+    """ interpolate in space between the 4 profiles. """
+    return atmo_profiles[0]
     
 def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
     # read in file containing standard mid lat summer atmosphere information 

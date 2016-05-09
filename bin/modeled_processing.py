@@ -184,31 +184,32 @@ def make_tape5s(cc):
         
     # choose narr points
     filename = os.path.join(cc.filepath_base, './data/shared/narr/coordinates.txt')
-    narr_indices, num_points, lat, lon = narr_data.choose_points(filename, cc.metadata, cc.buoy_location)
-            
+    narr_indices, lat, lon = narr_data.get_points(filename, cc.metadata)
+    narr_indices = narr_data.choose_points(narr_indices, lat, lon, cc.buoy_location)
+
     narr_coor = []
     for i in range(4):
         narr_coor.append([lat[narr_indices[i,0], narr_indices[i,1]],lon[narr_indices[i,0], narr_indices[i,1]]])
-        
-    # read in NARR data and unpack
+
+    # read in NARR data
     data = narr_data.read(narr_indices, lat, cc.scene_dir)
-    #ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures = data
+    #ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures = data   # unpack
     
-    # interplolate in time and load standard atmo
-    interp_time = narr_data.interpolate_time(cc.metadata, *data)
-    stan_atmo = narr_data.read_stan_atmo()
-    geoheight, press, temp, relhum = interpolate_space(cc, narr_indices, lat, lon, interp_time, stan_atmo, data[6])
-    # actually generate tape5 files
+    interp_time = narr_data.interpolate_time(cc.metadata, *data)   # interplolate in time
+    stan_atmo = narr_data.read_stan_atmo()   # load standard atmo
+    atmo_profiles = generate_profiles(cc, interp_time, stan_atmo, data[6])
+    
+    interp_profile = narr_data.interp_space(cc, atmo_profiles, narr_coor)
+    point_dir = generate_tape5s(cc, interp_profile)
 
-    case_list = generate_tape5s(cc, geoheight, press, temp, relhum)
-
-    return case_list, narr_coor
+    return point_dir, narr_coor
     
-    
-def interpolate_space(cc, narr_indices, lat, lon, interp_atmo, stan_atmo, pressures):
+def generate_profiles(interp_atmo, stan_atmo, pressures):
     # unpack
     height, rhum, temp = interp_atmo
     stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
+
+    profiles = []
     
     for point_idx in range(4):
         
@@ -260,10 +261,14 @@ def interpolate_space(cc, narr_indices, lat, lon, interp_atmo, stan_atmo, pressu
             tempTemp = numpy.append(numpy.append(tempTemp, newTemperature2), stan_temp[interpolateTo:-1])
             tempRelHum = numpy.append(numpy.append(tempRelHum, newRelativeHumidity2), stan_rhum[interpolateTo:-1])  
 
-        return tempGeoHeight, tempPress, tempTemp, tempRelHum
+        profiles.append([tempGeoHeight, tempPress, tempTemp, tempRelHum])
 
-def generate_tape5s(cc, GeoHeight, Press, Temp, RelHum):
-    """do the messy work of generating the tape5 files and caselist. """
+    return profiles
+
+def generate_tape5(cc, profile):
+    """ write the tape5 file """
+
+    height, press, temp, relhum = profile
     latString = '%2.3f' % (cc.buoy_location[0])
     
     if cc.buoy_location[1] < 0:
@@ -282,16 +287,16 @@ def generate_tape5s(cc, GeoHeight, Press, Temp, RelHum):
     filename = os.path.join(modtran_directory, 'tempLayers.txt')
 
     with open(filename, 'w') as f:
-        for k in range(numpy.shape(GeoHeight)[0]):
+        for k in range(numpy.shape(height)[0]):
             line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%15s\n' % \
-            (GeoHeight[k], Press[k], Temp[k], RelHum[k] ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
+            (height[k], press[k], temp[k], relhum[k] ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
             
             line = line.replace('e', 'E')
             f.write(line)
     
     jay = datetime.datetime.strftime(cc.date, '%j')
-    nml = str(numpy.shape(GeoHeight)[0])
-    gdalt = '%1.3f' % float(GeoHeight[0])
+    nml = str(numpy.shape(height)[0])
+    gdalt = '%1.3f' % float(height[0])
     
     # write header and footer parts of tape5 and concatenate
     command = './bin/write_tape5.bash %s %s %s %s %s %s %s %s' % \

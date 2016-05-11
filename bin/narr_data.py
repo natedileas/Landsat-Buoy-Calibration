@@ -301,10 +301,15 @@ def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
 
     stan_atmo = numpy.asarray(stan_atmo)
     
-    # separate variables in standard atmosphere
-    # self.stanGeoHeight = stan_atmo[:,0]
-    # self.stanPress = stan_atmo[:,1]
-    # self.stanTemp = stan_atmo[:,2]
-    # self.stanRelHum = stan_atmo[:,3]
-    
     return stan_atmo[:,0], stan_atmo[:,1], stan_atmo[:,2], stan_atmo[:,3]
+
+def write_atmo(cc, atmo):
+    filename = os.path.join(cc.scene_dir, 'atmo_interp.txt')
+    
+    atmo = numpy.array(atmo)
+    dewpoint =  dewpoint_temp(atmo[2], atmo[3])
+
+    save_array = numpy.append(atmo, dewpoint)
+    save_array = numpy.transpose(numpy.reshape(save_array, (5, numpy.shape(atmo[2])[0])))
+
+    numpy.savetxt(filename, save_array, fmt='%f\t%f\t%f\t%f\t%f')

@@ -193,6 +193,8 @@ def make_tape5s(cc):
     atmo_profiles = generate_profiles(interp_time, stan_atmo, data[6])
     
     interp_profile = narr_data.interp_space(cc, atmo_profiles, narr_coor)
+    narr_data.write_atmo(cc, interp_profile)   # save out to file
+
     point_dir = generate_tape5(cc, interp_profile)
 
     return point_dir, narr_coor

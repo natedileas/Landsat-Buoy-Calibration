@@ -216,7 +216,7 @@ def find_skin_temp(filename, date, url, depth):
                 break
 
     if data == [[]] or []:
-        return -1
+        raise BuoyDataError('No data in file? %s.'% filename)
 
     # compute 24hr wind speed and temperature
     avg_wspd = 0    # m/s
@@ -235,7 +235,7 @@ def find_skin_temp(filename, date, url, depth):
         except ValueError:
             pass
         except IndexError:
-            return -1
+            raise BuoyDataError('No data in file? %s.'% filename)
 
     # calculate skin temperature
     if avg_wspd >= 4.5:
@@ -251,6 +251,6 @@ def find_skin_temp(filename, date, url, depth):
     skin_temp = avg_wtmp + 273.15 - (a * z) - d
     
     if skin_temp >= 600:
-        raise BuoyDataError('No water temp data for selected date range in the data set %s.'% self.dataset)
+        raise BuoyDataError('No water temp data for selected date range in the data set %s.'% filename)
 
     return skin_temp, pres, atemp, dewp

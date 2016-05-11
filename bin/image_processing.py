@@ -106,12 +106,12 @@ def write_im(cc):
     ry = 23
     
     for x, y in narr_pix:
-        draw.ellipse((x-rx, y-ry, x+rx, y+ry), fill=(255, 0, 0))
+        draw.ellipse((x-rx, y-rx, x+rx, y+rx), fill=(255, 0, 0))
         
     # draw buoy onto image
     x = cc.poi[0]
     y = cc.poi[1]
-    draw.ellipse((x-rx, y-ry, x+rx, y+ry), fill=(0, 255, 0))
+    draw.ellipse((x-rx, y-rx, x+rx, y+rx), fill=(0, 255, 0))
 
     # downsample
     image = image.resize((500, 486), Image.ANTIALIAS)

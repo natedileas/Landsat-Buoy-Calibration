@@ -201,14 +201,14 @@ class CalibrationController(object):
             
         logging.info('Generating tape5 files.')
         # read in narr data and generate tape5 files and caseList
-        caseList, self.narr_coor = mod_proc.make_tape5s(self)
+        point_dir, self.narr_coor = mod_proc.make_tape5s(self)
         
         logging.info('Running modtran.')
         # change access to prevent errors
         modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
         os.chmod(modtran_bash_path, 0755)
            
-        subprocess.check_call('./bin/modtran.bash %s %s' % (int(self.verbose), os.path.join(self.scene_dir, 'points')), shell=True)
+        subprocess.check_call('./bin/modtran.bash %s %s' % (self.filepath_base, point_dir), shell=True)
         
         # Load Emissivity / Reflectivity
         spec_r = numpy.array(0)
@@ -223,27 +223,9 @@ class CalibrationController(object):
                 spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
         
         logging.info('Parsing tape6 files.')
-        upwell_rad = []
-        downwell_rad = []
-        wavelengths = []
-        transmission = []
-        gnd_reflect = []
         
-        for i in range(4):
-            caseList_p = caseList[i]
-            ret_vals = mod_proc.read_tape6(caseList_p)
-            
-            upwell_rad = numpy.append(upwell_rad, ret_vals[0])   # W cm-2 sr-1 um-1
-            downwell_rad = numpy.append(downwell_rad, ret_vals[1])   # W cm-2 sr-1 um-1
-            wavelengths = ret_vals[2]   # microns
-            transmission = numpy.append(transmission, ret_vals[3])   # no units
-            gnd_reflect = numpy.append(gnd_reflect, ret_vals[4])   # W cm-2 sr-1 um-1
-            
-        # interpolate to buoy location
-        upwell_rad = mod_proc.offset_bilinear_interp(upwell_rad, self.narr_coor, self.buoy_location)
-        downwell_rad = mod_proc.offset_bilinear_interp(downwell_rad, self.narr_coor, self.buoy_location)
-        transmission = mod_proc.offset_bilinear_interp(transmission, self.narr_coor, self.buoy_location)
-        gnd_reflect = mod_proc.offset_bilinear_interp(gnd_reflect, self.narr_coor, self.buoy_location)
+        ret_vals = mod_proc.read_tape6(point_dir)
+        upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = ret_vals
 
         rsr_files = [[10, './data/shared/L8_B10.rsp'], \
                      [11, './data/shared/L8_B11.rsp']]
@@ -262,7 +244,7 @@ class CalibrationController(object):
             gnd_ref = numpy.interp(RSR_wavelengths, wavelengths, gnd_reflect)
             spec_ref = numpy.interp(RSR_wavelengths, spec_r_wvlens, spec_r)
             
-            spec_emis= 1 - spec_ref   # calculate emissivity
+            spec_emis = 1 - spec_ref   # calculate emissivity
 
             RSR_wavelengths = numpy.asarray(RSR_wavelengths) / 1e6   # convert to meters
             
@@ -297,7 +279,6 @@ class CalibrationController(object):
         # read in landsat metadata
         self.metadata = landsat_data.read_metadata(self)
 
-    
     def calc_img_radiance(self):
         """ calculate image radiance for band 10 and 11. """
         
@@ -317,7 +298,6 @@ class CalibrationController(object):
         
         self.image_radiance = im_rad
 
-        
     def calculate_buoy_information(self):
         """ pick buoy dataset, download, and calculate skin_temp. """
         

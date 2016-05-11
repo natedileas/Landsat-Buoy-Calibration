@@ -1,5 +1,5 @@
 # .pyc files
-bin/*.pyc
+*.pyc
 # modtran
 data/shared/modtran/tempLayers.txt
 data/shared/modtran/newHead.txt

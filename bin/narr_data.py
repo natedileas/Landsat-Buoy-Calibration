@@ -1,6 +1,7 @@
 import numpy
 import linecache
 import image_processing as img_proc
+import modeled_processing as mod_proc
 import utm
 import itertools
 import math
@@ -266,14 +267,23 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
 
     # interpolate in time
     height = h1 + (time-hour1) * ((h2 - h1)/(hour2 - hour1))
-    rhum= r1 + (time-hour1) * ((r2 - r1)/(hour2 - hour1))
+    rhum = r1 + (time-hour1) * ((r2 - r1)/(hour2 - hour1))
     temp = t1 + (time-hour1) * ((t2 - t1)/(hour2 - hour1))
 
     return height, rhum, temp
 
 def interp_space(cc, atmo_profiles, narr_coor):
     """ interpolate in space between the 4 profiles. """
-    return atmo_profiles[1]
+    atmo_profiles = numpy.array(atmo_profiles)
+    length = numpy.shape(atmo_profiles)[2]
+    atmo_profiles = atmo_profiles[:,:length]
+
+    height = mod_proc.offset_bilinear_interp(atmo_profiles[:, 0], narr_coor, cc.buoy_location)
+    press = mod_proc.offset_bilinear_interp(atmo_profiles[:, 1], narr_coor, cc.buoy_location)
+    temp = mod_proc.offset_bilinear_interp(atmo_profiles[:, 2], narr_coor, cc.buoy_location)
+    relhum = mod_proc.offset_bilinear_interp(atmo_profiles[:, 3], narr_coor, cc.buoy_location)
+
+    return height, press, temp, relhum
     
 def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
     # read in file containing standard mid lat summer atmosphere information 

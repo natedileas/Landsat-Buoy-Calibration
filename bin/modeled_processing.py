@@ -79,23 +79,20 @@ def read_tape6(case):
     
     return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
         
-def offset_bilinear_interp(array, narr_cor, buoy_coors):
+def offset_bilinear_interp(array, narr_coor, buoy_coors):
     """ interpolate to buoy location. """
-    narr_coor = numpy.absolute(narr_cor)   # 1, 2 , 3, 4
-    buoy_coors = numpy.absolute(buoy_coors)
-    array = numpy.reshape(array, (4, numpy.shape(array)[0]/4))
-    
+
     a = -narr_coor[0,0] + narr_coor[2,0]
     b = -narr_coor[0,0] + narr_coor[1,0]
     c = narr_coor[0,0] - narr_coor[1,0] - narr_coor[2,0] + narr_coor[3,0]
     d = buoy_coors[0] - narr_coor[0,0]
+    
     e = -narr_coor[0,1] + narr_coor[2,1]
     f = -narr_coor[0,1] + narr_coor[1,1]
     g = narr_coor[0,1] - narr_coor[1,1] - narr_coor[2,1] + narr_coor[3,1]
     h = buoy_coors[1] - narr_coor[0,1]
     
     i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
-    # i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
     
     alpha = -(b*e - a*f + d*g - c*h + i)/(2*c*e - 2*a*g)    
     beta  = -(b*e - a*f - d*g + c*h + i)/(2*c*f - 2*b*g)
@@ -209,54 +206,34 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
     
     for point_idx in range(4):
         
-        gdalt = height[0,point_idx]
-        
         p = pressures[0]
         t = temp[point_idx]
         hgt = height[point_idx]
         rh = rhum[point_idx]
+
+        gdalt = hgt[0]
         
-        delete = numpy.where(hgt < gdalt)
-        indexBelow = 0
-        indexAbove = 1
-
-        if delete[0] != []:
-            indexBelow = delete[0][0] - 1
-            indexAbove = delete[0][0]
-
-        if abs(gdalt-hgt[indexAbove]) < 0.001:
-            tempGeoHeight = hgt[indexAbove:-1]
-            tempPress = p[indexAbove:-1]
-            tempTemp = t[indexAbove:-1]
-            tempRelHum = rh[indexAbove:-1]
-        else:
-            newPressure = numpy.add(p[indexBelow], (((p[indexAbove]-p[indexBelow])*gdalt-hgt[indexBelow])/(hgt[indexAbove]-hgt[indexBelow])))
-
-            newTemperature = t[indexBelow]+(gdalt-hgt[indexBelow])*((t[indexAbove]-t[indexBelow])/(hgt[indexAbove]-hgt[indexBelow]))          
-            newRelativeHumidity = rh[indexBelow]+(gdalt-hgt[indexBelow])*((rh[indexAbove]-rh[indexBelow])/(hgt[indexAbove]-hgt[indexBelow]))
-              
-            tempGeoHeight = numpy.insert(hgt[indexAbove:-1], 0, gdalt)
-            tempPress = numpy.insert(p[indexAbove:-1], 0, newPressure)
-            
-            tempTemp = numpy.insert(t[indexAbove:-1], 0, newTemperature)
-            tempRelHum = numpy.insert(rh[indexAbove:-1], 0, newRelativeHumidity)
-              
+        # interpolate linearly between stan atmo and narr data
         above = numpy.where(stan_height > hgt[-1])[0]
-        
-        if numpy.shape(above)[0] > 3:
-            interpolateTo = above[0]
-          
-            newHeight = (stan_height[interpolateTo]+tempGeoHeight[-1])/2.0
-            newPressure2 = tempPress[-1] + (newHeight - tempGeoHeight[-1]) * ((stan_press[interpolateTo] - tempPress[-1]) / (stan_height[interpolateTo] - tempGeoHeight[-1]))
-            newTemperature2 = tempTemp[-1] + (newHeight - tempGeoHeight[-1]) * ((stan_temp[interpolateTo] - tempTemp[-1]) / (stan_height[interpolateTo] - tempGeoHeight[-1]))                
-            newRelativeHumidity2 = tempRelHum[-1] + (newHeight - tempGeoHeight[-1]) * ((stan_rhum[interpolateTo] - tempRelHum[-1]) / (stan_height[interpolateTo] - tempGeoHeight[-1]))
-            
-            tempGeoHeight = numpy.append(numpy.append(tempGeoHeight, newHeight), stan_height[interpolateTo:-1])
-            tempPress = numpy.append(numpy.append(tempPress, newPressure2), stan_press[interpolateTo:-1])
-            tempTemp = numpy.append(numpy.append(tempTemp, newTemperature2), stan_temp[interpolateTo:-1])
-            tempRelHum = numpy.append(numpy.append(tempRelHum, newRelativeHumidity2), stan_rhum[interpolateTo:-1])  
+        interpolateTo = above[0]
+      
+        newHeight = (stan_height[interpolateTo] + hgt[-1]) / 2.0
 
-        profiles.append([tempGeoHeight, tempPress, tempTemp, tempRelHum])
+        newPressure2 = p[-1] + (newHeight - hgt[-1]) * \
+        ((stan_press[interpolateTo] - p[-1]) / (stan_height[interpolateTo] - hgt[-1]))
+
+        newTemperature2 = t[-1] + (newHeight - hgt[-1]) * \
+        ((stan_temp[interpolateTo] - t[-1]) / (stan_height[interpolateTo] - hgt[-1]))
+
+        newRelativeHumidity2 = rh[-1] + (newHeight - hgt[-1]) * \
+        ((stan_rhum[interpolateTo] - rh[-1]) / (stan_height[interpolateTo] - hgt[-1]))
+        
+        hgt = numpy.append(numpy.append(hgt, newHeight), stan_height[interpolateTo:-1])
+        p = numpy.append(numpy.append(p, newPressure2), stan_press[interpolateTo:-1])
+        t = numpy.append(numpy.append(t, newTemperature2), stan_temp[interpolateTo:-1])
+        rh = numpy.append(numpy.append(rh, newRelativeHumidity2), stan_rhum[interpolateTo:-1])
+
+        profiles.append([hgt, p, t, rh])
 
     return profiles
 

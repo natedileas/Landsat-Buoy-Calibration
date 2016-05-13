@@ -192,9 +192,11 @@ def make_tape5s(cc):
     stan_atmo = narr_data.read_stan_atmo()   # load standard atmo
     atmo_profiles = generate_profiles(interp_time, stan_atmo, data[6])
     
-    interp_profile = narr_data.interp_space(cc, atmo_profiles, narr_coor)
+    interp_profile = narr_data.interp_space(cc.buoy_location, atmo_profiles, narr_coor)
+    if numpy.any(interp_profile[0]<0):
+        interp_profile = narr_data.interp_space(numpy.absolute(cc.buoy_location), atmo_profiles, numpy.absolute(narr_coor))
     narr_data.write_atmo(cc, interp_profile)   # save out to file
-
+    
     point_dir = generate_tape5(cc, interp_profile)
 
     return point_dir, narr_coor

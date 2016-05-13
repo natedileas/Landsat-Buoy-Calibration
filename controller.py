@@ -12,11 +12,13 @@ def output(cc):
 
 def read_cache(cc):
     """ read in results from the file. """
-
-    out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
-
+    try:
+        out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
+    except AttributeError:
+        return cc
+        
     if not os.path.isfile(out_file):
-        return
+        return cc
 
     with open(out_file, 'rb') as f:
         return pickle.load(f)

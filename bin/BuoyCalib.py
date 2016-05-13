@@ -48,6 +48,9 @@ class CalibrationController(object):
                 
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
         self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
+        
+        if not os.path.exists(self.scene_dir):
+            os.makedirs(self.scene_dir)
 
         self.verbose = verbose
         if verbose is False:

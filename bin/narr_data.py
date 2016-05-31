@@ -276,14 +276,19 @@ def interp_space(buoy_coor, atmo_profiles, narr_coor):
     """ interpolate in space between the 4 profiles. """
     atmo_profiles = numpy.array(atmo_profiles)
     length = numpy.shape(atmo_profiles)[2]
-    atmo_profiles = atmo_profiles[:,:length]
+    atmo_profiles = numpy.array(atmo_profiles[:,:length])
     narr_coor = numpy.asarray(narr_coor, dtype=float).round(8)
 
-    height = mod_proc.offset_bilinear_interp(atmo_profiles[:, 0], narr_coor, buoy_coor)
-    press = mod_proc.offset_bilinear_interp(atmo_profiles[:, 1], narr_coor, buoy_coor)
-    temp = mod_proc.offset_bilinear_interp(atmo_profiles[:, 2], narr_coor, buoy_coor)
-    relhum = mod_proc.offset_bilinear_interp(atmo_profiles[:, 3], narr_coor, buoy_coor)
-    
+    alpha, beta = mod_proc.calc_interp_weights(narr_coor, buoy_coor)
+
+    if abs(alpha) > 100 or abs(beta) > 100:
+        alpha, beta = mod_proc.calc_interp_weights(numpy.absolute(narr_coor), numpy.absolute(buoy_coor))
+        
+    height = mod_proc.use_interp_weights(atmo_profiles[:, 0], alpha, beta)
+    press = mod_proc.use_interp_weights(atmo_profiles[:, 1], alpha, beta)
+    temp = mod_proc.use_interp_weights(atmo_profiles[:, 2], alpha, beta)
+    relhum = mod_proc.use_interp_weights(atmo_profiles[:, 3], alpha, beta)
+
     return height, press, temp, relhum
     
 def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):

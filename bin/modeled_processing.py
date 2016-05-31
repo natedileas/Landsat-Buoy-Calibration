@@ -78,26 +78,30 @@ def read_tape6(case):
     gnd_reflected_radiance = gnd_reflected_radiance[0]
     
     return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
-        
-def offset_bilinear_interp(array, narr_coor, buoy_coors):
-    """ interpolate to buoy location. """
 
-    a = -narr_coor[0,0] + narr_coor[2,0]
-    b = -narr_coor[0,0] + narr_coor[1,0]
-    c = narr_coor[0,0] - narr_coor[1,0] - narr_coor[2,0] + narr_coor[3,0]
-    d = buoy_coors[0] - narr_coor[0,0]
-    
-    e = -narr_coor[0,1] + narr_coor[2,1]
-    f = -narr_coor[0,1] + narr_coor[1,1]
-    g = narr_coor[0,1] - narr_coor[1,1] - narr_coor[2,1] + narr_coor[3,1]
-    h = buoy_coors[1] - narr_coor[0,1]
-    
+def calc_interp_weights(interp_from, interp_to):
+    """ Calculate weights for the offset bilinear interpolation  of 4 points. """
+    a = -interp_from[0,0] + interp_from[2,0]
+    b = -interp_from[0,0] + interp_from[1,0]
+    c = interp_from[0,0] - interp_from[1,0] - interp_from[2,0] + interp_from[3,0]
+    d = interp_to[0] - interp_from[0,0]
+
+    e = -interp_from[0,1] + interp_from[2,1]
+    f = -interp_from[0,1] + interp_from[1,1]
+    g = interp_from[0,1] - interp_from[1,1] - interp_from[2,1] + interp_from[3,1]
+    h = interp_to[1] - interp_from[0,1]
+
     i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
-    
-    alpha = -(b*e - a*f + d*g - c*h + i)/(2*c*e - 2*a*g)    
+
+    alpha = -(b*e - a*f + d*g - c*h + i)/(2*c*e - 2*a*g)
     beta  = -(b*e - a*f - d*g + c*h + i)/(2*c*f - 2*b*g)
-    
-    return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + alpha * ((1 - beta) * array[2] + beta * array[3]))
+
+    return alpha, beta
+
+def use_interp_weights(array, alpha, beta):
+    """ Calculate the offset bilinear interpolation  of 4 points. """
+    return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + \
+            alpha * ((1 - beta) * array[2] + beta * array[3]))
         
 def read_RSR(rsr_file):
     """ read in RSR data and return it to the caller. """
@@ -193,14 +197,12 @@ def make_tape5s(cc):
     atmo_profiles = generate_profiles(interp_time, stan_atmo, data[6])
     
     interp_profile = narr_data.interp_space(cc.buoy_location, atmo_profiles, narr_coor)
-    if numpy.any(interp_profile[0]<0):
-        interp_profile = narr_data.interp_space(numpy.absolute(cc.buoy_location), atmo_profiles, numpy.absolute(narr_coor))
     narr_data.write_atmo(cc, interp_profile)   # save out to file
     
     point_dir = generate_tape5(cc, interp_profile)
 
     return point_dir, narr_coor
-    
+
 def generate_profiles(interp_atmo, stan_atmo, pressures):
     # unpack
     height, rhum, temp = interp_atmo
@@ -264,10 +266,9 @@ def generate_tape5(cc, profile):
 
     with open(filename, 'w') as f:
         for k in range(numpy.shape(height)[0]):
-            line = '%10.3f%10.3e%10.3e%10.3e%10s%10s%15s\n' % \
+            line = '%10.3f%10.2E%10.2E%10.2E%10s%10s%15s\n' % \
             (height[k], press[k], temp[k], relhum[k] ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
             
-            line = line.replace('e', 'E')
             f.write(line)
     
     jay = datetime.datetime.strftime(cc.date, '%j')

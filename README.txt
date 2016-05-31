@@ -18,4 +18,4 @@ If you would like to use your own landsat images, provide the directory by using
 
 to_csv.py is a tool used to compile results quickly and easily.
 
-Developed by Nathan Dil   eas, RIT 2015
+Developed by Nathan Dileas, RIT 2015

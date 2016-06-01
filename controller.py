@@ -49,7 +49,9 @@ if __name__=='__main__':
     parser.add_argument('-r', '--reprocess', help="Add to explicitly reprocess. Otherwise, a previous calculated version will be outputted.", action='store_true', default=False)
     parser.add_argument('-d', '--directory', help="Directory to search for landsat images.", default='./data/scenes/')
     parser.add_argument('-i','--image', help="draw NARR points and Buoy location on landsat image.", action='store_true')
-    parser.add_argument('-o','--output', help="Serialize class, happens by default.", action='store_false', default=True)
+    parser.add_argument('-o','--No_output', help="Serialize class, happens by default.", action='store_false', default=True)
+    parser.add_argument('-m','--merra', help='Use MERRA-2 Data instead of NARR Data.', action='store_true', default=False)
+    parser.add_argument('-n', '--narr', help='Use NARR Atmospheric Data.', action='store_false', default=True)
 
     args = parser.parse_args()
     
@@ -60,8 +62,12 @@ if __name__=='__main__':
     else:
         sat = {7:'LE7', 8:'LC8'}
         LID = '%3s%6s%7s%3s%2s' % (sat[args.satelite], args.WRS2, args.date, args.station, args.version)
-     
-    x = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose)  # initialize
+    
+    atmo_data_src='narr'
+    if args.merra:
+        atmo_data_src='merra'
+ 
+    x = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, atmo_src=atmo_data_src)  # initialize
 
     if not args.reprocess:
         x = read_cache(x)   # try to read in from pickle

@@ -10,10 +10,11 @@ import modeled_processing as mod_proc
 import image_processing as img_proc
 import buoy_data
 import landsat_data
-
+import narr_data
+import merra_data
 
 class CalibrationController(object):
-    ############## ATTRIBUTES ##########################################################
+    ############## ATTRIBUTES #################################################
     # buoy and related attributes
     _buoy_id = None
     buoy_location = None  # [lat, lon]
@@ -40,8 +41,8 @@ class CalibrationController(object):
     # verbosity
     verbose = False
     
-    ############## ENTRY POINT ##########################################################
-    def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False):
+    ############## ENTRY POINT ################################################
+    def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False, atmo_src='narr'):
         """ set up CalibrationController object. """
         
         self.scene_id = LID
@@ -49,6 +50,8 @@ class CalibrationController(object):
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
         self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
         
+        self.atmo_src = atmo_src
+
         if not os.path.exists(self.scene_dir):
             os.makedirs(self.scene_dir)
 
@@ -59,7 +62,7 @@ class CalibrationController(object):
             logging.basicConfig(level=logging.INFO)
 
     
-############## GETTERS AND SETTERS ##########################################################
+############## GETTERS AND SETTERS ############################################
     @property
     def scene_id(self):
         """ scene_id getter. stored internally as different parts. """
@@ -152,7 +155,7 @@ class CalibrationController(object):
         
         self._image_radiance = new_rad
 
-    ############## MEMBER FUNCTIONS ##########################################################
+    ############## MEMBER FUNCTIONS ###########################################
     def __repr__(self):
         return self.__str__()
         
@@ -184,21 +187,14 @@ class CalibrationController(object):
     ### real work functions ###
                     
     def download_mod_data(self):
-        """ download NARR Data. """
-    
-        logging.info('Downloading NARR Data')
-    
-        if os.path.exists(os.path.join(self.scene_dir, 'narr/HGT_1/1000.txt')):
-            return 0
-    
-        # begin download of NARR data
-        os.chmod('./bin/NARR_py.bash', 0755)
-          
-        ret_val = subprocess.call('./bin/NARR_py.bash %s %s %s' % (self.scene_dir, self.scene_id, int(self.verbose)), shell=True)
-        if ret_val == 1:
-            logging.error('missing wgrib error')
-            sys.exit(-1)
-            
+        """ download atmospheric data. """
+        logging.info('Downloading atmospheric data.')
+
+        if self.atmo_src == 'narr':
+            narr_data.download()
+        elif self.atmo_src == 'merra':
+            merra_data.download()
+
     def calc_mod_radiance(self):
         """ calculate modeled radiance for band 10 and 11. """
             

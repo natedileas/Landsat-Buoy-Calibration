@@ -78,30 +78,6 @@ def read_tape6(case):
     gnd_reflected_radiance = gnd_reflected_radiance[0]
     
     return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
-
-def calc_interp_weights(interp_from, interp_to):
-    """ Calculate weights for the offset bilinear interpolation  of 4 points. """
-    a = -interp_from[0,0] + interp_from[2,0]
-    b = -interp_from[0,0] + interp_from[1,0]
-    c = interp_from[0,0] - interp_from[1,0] - interp_from[2,0] + interp_from[3,0]
-    d = interp_to[0] - interp_from[0,0]
-
-    e = -interp_from[0,1] + interp_from[2,1]
-    f = -interp_from[0,1] + interp_from[1,1]
-    g = interp_from[0,1] - interp_from[1,1] - interp_from[2,1] + interp_from[3,1]
-    h = interp_to[1] - interp_from[0,1]
-
-    i = math.sqrt(abs(-4*(c*e - a*g)*(d*f - b*h) + (b*e - a*f + d*g - c*h)**2))
-
-    alpha = -(b*e - a*f + d*g - c*h + i)/(2*c*e - 2*a*g)
-    beta  = -(b*e - a*f - d*g + c*h + i)/(2*c*f - 2*b*g)
-
-    return alpha, beta
-
-def use_interp_weights(array, alpha, beta):
-    """ Calculate the offset bilinear interpolation  of 4 points. """
-    return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + \
-            alpha * ((1 - beta) * array[2] + beta * array[3]))
         
 def read_RSR(rsr_file):
     """ read in RSR data and return it to the caller. """
@@ -175,8 +151,26 @@ def integrate(x, y, method='trap'):
 ### PRE MODTRAN FUNCTIONS ###
 
 def make_tape5s(cc):
-    """ Reads narr data and generates tape5 files for modtran runs. """
+    """ Reads atmospheric data and generates tape5 files for modtran runs. """
 
+    if cc.atmo_src == 'narr':
+        data, data_coor = get_narr_data(cc)
+    elif cc.amto_src == 'merra':
+        data, data_coor = get_merra_data(cc)
+
+    stan_atmo = atmo_data.read_stan_atmo()   # load standard atmo
+    interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
+    atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
+    interp_profile = atmo_data.interp_space(cc.buoy_location, atmo_profiles, data_coor)
+
+    atmo_data.write_atmo(cc, interp_profile)   # save out to file
+    
+    point_dir = generate_tape5(cc, interp_profile)
+
+    return point_dir, data_coor
+
+def get_narr_data(cc):
+    """  """
     if os.path.exists(os.path.join(cc.scene_dir, 'narr/HGT_1/1000.txt')):
         logging.info('NARR Data Successful Download')
     else:
@@ -191,57 +185,17 @@ def make_tape5s(cc):
     # read in NARR data
     data = narr_data.read(narr_indices, lat, cc.scene_dir)
     #ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures = data   # unpack
-    
-    interp_time = narr_data.interpolate_time(cc.metadata, *data)   # interplolate in time
-    stan_atmo = narr_data.read_stan_atmo()   # load standard atmo
-    atmo_profiles = generate_profiles(interp_time, stan_atmo, data[6])
-    
-    interp_profile = narr_data.interp_space(cc.buoy_location, atmo_profiles, narr_coor)
-    narr_data.write_atmo(cc, interp_profile)   # save out to file
-    
-    point_dir = generate_tape5(cc, interp_profile)
 
-    return point_dir, narr_coor
+    return data, narr_coor
 
-def generate_profiles(interp_atmo, stan_atmo, pressures):
-    # unpack
-    height, rhum, temp = interp_atmo
-    stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
+def get_merra_data(cc):
+    """ choose points and retreive merra data from file. """ 
 
-    profiles = []
-    
-    for point_idx in range(4):
-        
-        p = pressures[0]
-        t = temp[point_idx]
-        hgt = height[point_idx]
-        rh = rhum[point_idx]
+    # check if downloaded
+    # choose points
+    # retrieve data
 
-        gdalt = hgt[0]
-        
-        # interpolate linearly between stan atmo and narr data
-        above = numpy.where(stan_height > hgt[-1])[0]
-        interpolateTo = above[0]
-      
-        newHeight = (stan_height[interpolateTo] + hgt[-1]) / 2.0
-
-        newPressure2 = p[-1] + (newHeight - hgt[-1]) * \
-        ((stan_press[interpolateTo] - p[-1]) / (stan_height[interpolateTo] - hgt[-1]))
-
-        newTemperature2 = t[-1] + (newHeight - hgt[-1]) * \
-        ((stan_temp[interpolateTo] - t[-1]) / (stan_height[interpolateTo] - hgt[-1]))
-
-        newRelativeHumidity2 = rh[-1] + (newHeight - hgt[-1]) * \
-        ((stan_rhum[interpolateTo] - rh[-1]) / (stan_height[interpolateTo] - hgt[-1]))
-        
-        hgt = numpy.append(numpy.append(hgt, newHeight), stan_height[interpolateTo:-1])
-        p = numpy.append(numpy.append(p, newPressure2), stan_press[interpolateTo:-1])
-        t = numpy.append(numpy.append(t, newTemperature2), stan_temp[interpolateTo:-1])
-        rh = numpy.append(numpy.append(rh, newRelativeHumidity2), stan_rhum[interpolateTo:-1])
-
-        profiles.append([hgt, p, t, rh])
-
-    return profiles
+    pass
 
 def generate_tape5(cc, profile):
     """ write the tape5 file """

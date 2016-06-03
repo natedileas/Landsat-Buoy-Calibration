@@ -117,5 +117,9 @@ def write_im(cc):
     image = image.resize((500, 486), Image.ANTIALIAS)
     
     # save
-    save_path = os.path.join(cc.scene_dir, cc.scene_id+'_mod.jpg')
+    save_path = os.path.join(cc.scene_dir, cc.scene_id+'_mod')
+    if cc.atmo_src == 'narr':
+        save_path += '_narr.jpg'
+    elif cc.atmo_src == 'merra':
+        save_path += '_merra.jpg'
     image.save(save_path)

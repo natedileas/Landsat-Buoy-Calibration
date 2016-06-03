@@ -6,6 +6,11 @@ def output(cc):
 
     out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
 
+    if cc.atmo_src == 'narr':
+        out_file += '_narr'
+    elif cc.atmo_src == 'merra':
+        out_file += '_merra'
+
     with open(out_file, 'wb') as f:
         pickle.dump(cc, f)
 
@@ -14,6 +19,10 @@ def read_cache(cc):
     """ read in results from the file. """
     try:
         out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
+        if cc.atmo_src == 'narr':
+            out_file += '_narr'
+        elif cc.atmo_src == 'merra':
+            out_file += '_merra'
     except AttributeError:
         return cc
         
@@ -49,7 +58,7 @@ if __name__=='__main__':
     parser.add_argument('-r', '--reprocess', help="Add to explicitly reprocess. Otherwise, a previous calculated version will be outputted.", action='store_true', default=False)
     parser.add_argument('-d', '--directory', help="Directory to search for landsat images.", default='./data/scenes/')
     parser.add_argument('-i','--image', help="draw NARR points and Buoy location on landsat image.", action='store_true')
-    parser.add_argument('-o','--No_output', help="Serialize class, happens by default.", action='store_false', default=True)
+    parser.add_argument('-o','--output', help="Serialize class, happens by default.", action='store_false', default=True)
     parser.add_argument('-m','--merra', help='Use MERRA-2 Data instead of NARR Data.', action='store_true', default=False)
     parser.add_argument('-n', '--narr', help='Use NARR Atmospheric Data.', action='store_false', default=True)
 

@@ -5,7 +5,11 @@ import numpy
 import subprocess
 import sys
 import logging
+import warnings
+
 import narr_data
+import merra_data
+import atmo_data
 
 ### POST MODTRAN FUNCTIONS ###
 
@@ -122,31 +126,6 @@ def radiance(wvlen, temp, units='microns'):
     # UNITS
     # (W / m^2 * sr) * <wavelength unit>
     return rad
-        
-def integrate(x, y, method='trap'):
-    """approximate integration given two arrays.
-    """
-    total = 0
-    
-    if method == 'trap':
-        for i in xrange(len(x)):
-            try:
-                # calculate area of trapezoid and add to total
-                area = .5*(x[i+1]-x[i])*(y[i]+y[i+1])
-                total += area
-            except IndexError:
-                break
-                
-    if method == 'rect':
-        for i in xrange(0, len(x)):
-            try:
-                # calculate area of rectangle and add to total
-                area = (x[i+1]-x[i])*(y[i])
-                total += abs(area)
-            except IndexError:
-                break
-                
-    return total
 
 ### PRE MODTRAN FUNCTIONS ###
 
@@ -155,13 +134,20 @@ def make_tape5s(cc):
 
     if cc.atmo_src == 'narr':
         data, data_coor = get_narr_data(cc)
-    elif cc.amto_src == 'merra':
+    elif cc.atmo_src == 'merra':
         data, data_coor = get_merra_data(cc)
 
     stan_atmo = atmo_data.read_stan_atmo()   # load standard atmo
     interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
     atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
-    interp_profile = atmo_data.interp_space(cc.buoy_location, atmo_profiles, data_coor)
+
+    interp_profile = None
+    with warnings.catch_warnings():
+        warnings.filterwarnings('error')
+        try:
+            interp_profile = atmo_data.offset_interp_space(cc.buoy_location, atmo_profiles, data_coor)
+        except RuntimeWarning:
+            interp_profile = atmo_data.bilinear_interp_space(cc.buoy_location, atmo_profiles, data_coor)
 
     atmo_data.write_atmo(cc, interp_profile)   # save out to file
     
@@ -192,10 +178,16 @@ def get_merra_data(cc):
     """ choose points and retreive merra data from file. """ 
 
     # check if downloaded
-    # choose points
-    # retrieve data
+    data = merra_data.open(cc)
 
-    pass
+    # choose points
+    points_in_scene, points_in_scene_idx = merra_data.get_points(cc.metadata, data)
+    chosen_points_idxs, chosen_points_lat_lon = merra_data.choose_points(points_in_scene, points_in_scene_idx, cc.buoy_location)
+
+    # retrieve data
+    data = merra_data.read(cc, data, chosen_points_idxs)
+    
+    return data, chosen_points_lat_lon
 
 def generate_tape5(cc, profile):
     """ write the tape5 file """

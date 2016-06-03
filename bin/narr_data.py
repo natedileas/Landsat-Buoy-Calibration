@@ -1,12 +1,13 @@
 import numpy
 import linecache
-import image_processing as img_proc
-import modeled_processing as mod_proc
 import utm
 import itertools
-import math
 import os
 import sys
+
+import image_processing as img_proc
+import atmo_data
+import misc_functions as funcs
 
 def download(cc):
     """ download NARR Data. """
@@ -51,11 +52,6 @@ def get_points(coordinate_file, metadata):
     lon[west] = (-1) * lon[west]
 
     # define corners
-    if metadata['CORNER_UL_LAT_PRODUCT'] > 0:
-        landsatHemi = 6
-    else: 
-        landsatHemi = 7
-    
     UL_X = metadata['CORNER_UL_LAT_PRODUCT'] + 0.5
     UL_Y = metadata['CORNER_UL_LON_PRODUCT'] - 0.5
     LR_X = metadata['CORNER_LR_LAT_PRODUCT'] - 0.5
@@ -113,7 +109,7 @@ def choose_points(inLandsat, lat, lon, buoy_coors, num_points=4):
 
     for g in range(len(inLandsat)):
         try:
-            dist = distance_in_utm(eastvector[g],northvector[g],buoy_x,buoy_y)
+            dist = atmo_data.distance_in_utm(eastvector[g],northvector[g],buoy_x,buoy_y)
             distances.append(dist) 
             dist_idx.append(g)
         except IndexError as e:
@@ -124,39 +120,16 @@ def choose_points(inLandsat, lat, lon, buoy_coors, num_points=4):
 
     for chosen_points in itertools.combinations(sorted_points, 4):
         chosen_points = numpy.asarray(chosen_points)
-        if is_square_test(chosen_points[:,1:3]) is True:
+        if funcs.is_square_test(chosen_points[:,1:3]) is True:
             break
 
     return chosen_points[:,3], chosen_points[:, 1:3]
-
-def is_square_test(points):
-    p1, p2, p3, p4 = points
-
-    test = int(line_test(p1, p2, p3))
-    test += int(line_test(p4, p1, p2))
-    test += int(line_test(p3, p4, p1))
-    test += int(line_test(p2, p3, p4))
-
-    return (test == 0)
-    
-def line_test(p1, p2, p3):
-    """ check whether the three points lie on a line. """
-    # http://math.stackexchange.com/questions/441182/how-to-check-if-three-coordinates-form-a-line
-    # edge condition found with test_line_test.py
-    _p1 = numpy.append(p1, 1)
-    _p2 = numpy.append(p2, 1)
-    _p3 = numpy.append(p3, 1)
-
-    a = numpy.matrix([_p1, _p2, _p3])
-    a = a.transpose()
-
-    return (abs(numpy.linalg.det(a)) < 0.001)
     
 def read(narr_indices, lat, scene_dir):
     p = numpy.asarray([1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 125, 100])
     pressures = numpy.reshape([p]*4, (4,29))
     dirs = ['HGT_1', 'HGT_2', 'TMP_1', 'TMP_2', 'SHUM_1', 'SHUM_2']
-    
+    import misc_functions as funcs
     shape = [277,349]
     indices = [numpy.ravel_multi_index(idx, shape) for idx in narr_indices]
     
@@ -171,8 +144,8 @@ def read(narr_indices, lat, scene_dir):
     data = numpy.reshape(data, (6, 4, 29))  # reshape
     hgt_1, hgt_2, tmp_1, tmp_2, shum_1, shum_2 = data   # unpack
     
-    rhum_1 = convert_sh_rh(shum_1, tmp_1, pressures)
-    rhum_2 = convert_sh_rh(shum_2, tmp_2, pressures)
+    rhum_1 = atmo_data.convert_sh_rh(shum_1, tmp_1, pressures)
+    rhum_2 = atmo_data.convert_sh_rh(shum_2, tmp_2, pressures)
     
     ght_1 = numpy.divide(hgt_1, 1000.0)   # convert m to km
     ght_2 = numpy.divide(hgt_2, 1000.0)   # convert m to km

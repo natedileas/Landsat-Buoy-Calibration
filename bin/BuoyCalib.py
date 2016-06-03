@@ -12,6 +12,7 @@ import buoy_data
 import landsat_data
 import narr_data
 import merra_data
+import misc_functions as funcs
 
 class CalibrationController(object):
     ############## ATTRIBUTES #################################################
@@ -191,9 +192,9 @@ class CalibrationController(object):
         logging.info('Downloading atmospheric data.')
 
         if self.atmo_src == 'narr':
-            narr_data.download()
+            narr_data.download(self)
         elif self.atmo_src == 'merra':
-            merra_data.download()
+            merra_data.download(self)
 
     def calc_mod_radiance(self):
         """ calculate modeled radiance for band 10 and 11. """
@@ -258,8 +259,8 @@ class CalibrationController(object):
             Ltoa = (upwell * 1e10) + term1 + term2   # W m-2 sr-1 m-1
             
             # calculate observed radiance
-            numerator = mod_proc.integrate(RSR_wavelengths, Ltoa * RSR)
-            denominator = mod_proc.integrate(RSR_wavelengths, RSR)
+            numerator = funcs.integrate(RSR_wavelengths, Ltoa * RSR)
+            denominator = funcs.integrate(RSR_wavelengths, RSR)
             modeled_rad.append((numerator / denominator) / 1e6)  # W m-2 sr-1 um-1
                 
         self.modeled_radiance = modeled_rad

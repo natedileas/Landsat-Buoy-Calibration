@@ -1,6 +1,6 @@
 import numpy
 import os
-
+import math
 
 def convert_sh_rh(specHum, T_k, pressure):
     # Given array of specific humidities, temperature, and pressure, generate array of relative humidities
@@ -60,7 +60,6 @@ def convert_geopotential_geometric(geopotential, lat):
     
     return numpy.asarray(geometric_height)
         
-        
 def distance_in_utm(e1, n1, e2, n2):
     """Calculate distances between UTM coordinates.
     """
@@ -108,7 +107,7 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
 
     return height, rhum, temp
 
-def interp_space(buoy_coor, atmo_profiles, narr_coor):
+def offset_interp_space(buoy_coor, atmo_profiles, narr_coor):
     """ interpolate in space between the 4 profiles. """
     atmo_profiles = numpy.array(atmo_profiles)
     length = numpy.shape(atmo_profiles)[2]
@@ -150,6 +149,61 @@ def use_interp_weights(array, alpha, beta):
     """ Calculate the offset bilinear interpolation  of 4 points. """
     return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + \
             alpha * ((1 - beta) * array[2] + beta * array[3]))
+
+def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
+    """ interpolate in space between the 4 profiles. """
+    # shape of atmo profiles - 4 x 4 x X
+    #                     points x data type x layers
+    atmo_profiles = numpy.array(atmo_profiles)
+    length = numpy.shape(atmo_profiles)[2]
+    atmo_profiles = numpy.array(atmo_profiles[:,:length])
+    data_coor = list(data_coor)
+    
+    height_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,0,:]) for i in range(4)]
+    height = bilinear_interpolation(buoy_coor[0], buoy_coor[1], height_points)
+
+    press_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,1,:]) for i in range(4)]
+    press = bilinear_interpolation(buoy_coor[0], buoy_coor[1], press_points)
+
+    temp_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,2,:]) for i in range(4)]
+    temp = bilinear_interpolation(buoy_coor[0], buoy_coor[1], temp_points)
+
+    relhum_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,1,:]) for i in range(4)]
+    relhum = bilinear_interpolation(buoy_coor[0], buoy_coor[1], relhum_points)
+
+    return height, press, temp, relhum
+
+def bilinear_interpolation(x, y, points):
+    '''Interpolate (x,y) from values associated with four points.
+
+    The four points are a list of four triplets:  (x, y, value).
+    The four points can be in any order.  They should form a rectangle.
+
+        >>> bilinear_interpolation(12, 5.5,
+        ...                        [(10, 4, 100),
+        ...                         (20, 4, 200),
+        ...                         (10, 6, 150),
+        ...                         (20, 6, 300)])
+        165.0
+
+    '''
+    # See formula at:  http://en.wikipedia.org/wiki/Bilinear_interpolation
+    # credit: http://stackoverflow.com/questions/8661537/how-to-perform-bilinear-interpolation-in-python
+
+    points = sorted(points)               # order points by x, then by y
+    (x1, y1, q11), (_x1, y2, q12), (x2, _y1, q21), (_x2, _y2, q22) = points
+    
+
+    if x1 != _x1 or x2 != _x2 or y1 != _y1 or y2 != _y2:
+        raise ValueError('points do not form a rectangle')
+    if not x1 <= x <= x2 or not y1 <= y <= y2:
+        raise ValueError('(x, y) not within the rectangle')
+
+    return (q11 * (x2 - x) * (y2 - y) +
+            q21 * (x - x1) * (y2 - y) +
+            q12 * (x2 - x) * (y - y1) +
+            q22 * (x - x1) * (y - y1)
+           ) / ((x2 - x1) * (y2 - y1) + 0.0)
     
 def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
     # read in file containing standard mid lat summer atmosphere information 
@@ -185,25 +239,26 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
 
         gdalt = hgt[0]
         
-        # interpolate linearly between stan atmo and narr data
+        # interpolate linearly between stan atmo and input data
         above = numpy.where(stan_height > hgt[-1])[0]
-        interpolateTo = above[0]
-      
-        newHeight = (stan_height[interpolateTo] + hgt[-1]) / 2.0
+        if len(above) > 0:
+            interpolateTo = above[0]
+          
+            newHeight = (stan_height[interpolateTo] + hgt[-1]) / 2.0
 
-        newPressure2 = p[-1] + (newHeight - hgt[-1]) * \
-        ((stan_press[interpolateTo] - p[-1]) / (stan_height[interpolateTo] - hgt[-1]))
+            newPressure2 = p[-1] + (newHeight - hgt[-1]) * \
+            ((stan_press[interpolateTo] - p[-1]) / (stan_height[interpolateTo] - hgt[-1]))
 
-        newTemperature2 = t[-1] + (newHeight - hgt[-1]) * \
-        ((stan_temp[interpolateTo] - t[-1]) / (stan_height[interpolateTo] - hgt[-1]))
+            newTemperature2 = t[-1] + (newHeight - hgt[-1]) * \
+            ((stan_temp[interpolateTo] - t[-1]) / (stan_height[interpolateTo] - hgt[-1]))
 
-        newRelativeHumidity2 = rh[-1] + (newHeight - hgt[-1]) * \
-        ((stan_rhum[interpolateTo] - rh[-1]) / (stan_height[interpolateTo] - hgt[-1]))
-        
-        hgt = numpy.append(numpy.append(hgt, newHeight), stan_height[interpolateTo:-1])
-        p = numpy.append(numpy.append(p, newPressure2), stan_press[interpolateTo:-1])
-        t = numpy.append(numpy.append(t, newTemperature2), stan_temp[interpolateTo:-1])
-        rh = numpy.append(numpy.append(rh, newRelativeHumidity2), stan_rhum[interpolateTo:-1])
+            newRelativeHumidity2 = rh[-1] + (newHeight - hgt[-1]) * \
+            ((stan_rhum[interpolateTo] - rh[-1]) / (stan_height[interpolateTo] - hgt[-1]))
+            
+            hgt = numpy.append(numpy.append(hgt, newHeight), stan_height[interpolateTo:-1])
+            p = numpy.append(numpy.append(p, newPressure2), stan_press[interpolateTo:-1])
+            t = numpy.append(numpy.append(t, newTemperature2), stan_temp[interpolateTo:-1])
+            rh = numpy.append(numpy.append(rh, newRelativeHumidity2), stan_rhum[interpolateTo:-1])
 
         profiles.append([hgt, p, t, rh])
 

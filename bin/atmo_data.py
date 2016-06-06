@@ -171,7 +171,7 @@ def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
     relhum_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,1,:]) for i in range(4)]
     relhum = bilinear_interpolation(buoy_coor[0], buoy_coor[1], relhum_points)
 
-    return height, press, temp, relhum
+    return [height, press, temp, relhum]
 
 def bilinear_interpolation(x, y, points):
     '''Interpolate (x,y) from values associated with four points.

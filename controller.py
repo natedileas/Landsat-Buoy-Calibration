@@ -23,15 +23,17 @@ def read_cache(cc):
             out_file += '_narr'
         elif cc.atmo_src == 'merra':
             out_file += '_merra'
+        
+        if not os.path.isfile(out_file):
+            raise OSError('pickle_file is not in expected location %s' % outfile) 
+
+        with open(out_file, 'rb') as f:
+            x = pickle.load(f)
+            __ = x.scene_dir
+            return x
+
     except AttributeError:
         return cc
-        
-    if not os.path.isfile(out_file):
-        return cc
-
-    with open(out_file, 'rb') as f:
-        return pickle.load(f)
-
 
 if __name__=='__main__':
     import argparse
@@ -79,7 +81,11 @@ if __name__=='__main__':
     x = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, atmo_src=atmo_data_src)  # initialize
 
     if not args.reprocess:
-        x = read_cache(x)   # try to read in from pickle
+        try:
+            x = read_cache(x)   # try to read in from pickle
+            __ = x.__str__()
+        except:
+            x.calc_all()
     else:
         x.calc_all()
 

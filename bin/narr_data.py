@@ -4,6 +4,7 @@ import utm
 import itertools
 import os
 import sys
+import subprocess
 
 import image_processing as img_proc
 import atmo_data

@@ -141,6 +141,8 @@ def make_tape5s(cc):
     interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
     atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
 
+    #print data_coor, cc.buoy_location
+
     interp_profile = None
     with warnings.catch_warnings():
         warnings.filterwarnings('error')
@@ -148,6 +150,9 @@ def make_tape5s(cc):
             interp_profile = atmo_data.offset_interp_space(cc.buoy_location, atmo_profiles, data_coor)
         except RuntimeWarning:
             interp_profile = atmo_data.bilinear_interp_space(cc.buoy_location, atmo_profiles, data_coor)
+
+            if interp_profile[0][0] > 50:
+                interp_profile = list(numpy.asarray(interp_profile)[:, 1:])
 
     atmo_data.write_atmo(cc, interp_profile)   # save out to file
     

@@ -69,15 +69,15 @@ def download(cc):
             logging.info('product %s not already downloaded ' % scene_id)
             
             # connect
-            connect_cmd = "wget -q --cookies=on --save-cookies cookies.txt --keep-session-cookies --post-data 'username=nid4986&password=Fivyx689' https://ers.cr.usgs.gov/login/ >/dev/null"
+            connect_cmd = "wget --cookies=on --save-cookies cookies.txt --keep-session-cookies --post-data 'username=nid4986&password=Fivyx689' https://ers.cr.usgs.gov/login/"
             download_cmd = 'wget --cookies=on --load-cookies cookies.txt --keep-session-cookies --output-document=%s %s' % (tgzfile, url)
             
-            if not os.path.exists(os.path.join(cc.filepath_base, 'cookies.txt')):
-                subprocess.check_call(connect_cmd, shell=True)   
-                os.remove(os.path.join(cc.filepath_base, 'index.html'))
-                time.sleep(1)
+            
+            subprocess.check_call(connect_cmd, shell=True)
+            os.remove(os.path.join(cc.filepath_base, 'index.html'))
                 
             subprocess.check_call(download_cmd, shell=True)
+            os.remove(os.path.join(cc.filepath_base, 'cookies.txt'))
             
             unzipimage(tgzfile, cc.scene_dir)
             break

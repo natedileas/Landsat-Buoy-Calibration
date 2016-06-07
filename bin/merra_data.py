@@ -38,34 +38,26 @@ def open(cc):
 
 
 def get_points(metadata, data):
-    in_image_lat_lon = []
-    in_image_idx = []
-
     lat = data.variables['lat'][:]
     lon = data.variables['lon'][:]
 
-    lat[lat > 84.0] = 84.0
-    lat[lat < -80.0] = -80.0   # trim to utm module's limits
-
     # define corners
-    UL_X = metadata['CORNER_UL_LAT_PRODUCT'] + 0.5
-    UL_Y = metadata['CORNER_UL_LON_PRODUCT'] - 0.5
-    LR_X = metadata['CORNER_LR_LAT_PRODUCT'] - 0.5
-    LR_Y = metadata['CORNER_LR_LON_PRODUCT'] + 0.5
-    
+    UL_lat = metadata['CORNER_UL_LAT_PRODUCT'] + 0.5
+    UL_lon = metadata['CORNER_UL_LON_PRODUCT'] - 0.5
+    LR_lat = metadata['CORNER_LR_LAT_PRODUCT'] - 0.5
+    LR_lon = metadata['CORNER_LR_LON_PRODUCT'] + 0.5
+
     # pull out points that lie within the corners
-    lc8_utm_zone = metadata['UTM_ZONE']
-    for lt in lat:
-        for ln in lon:
-            X, Y, zone_num, zone_let = utm.from_latlon(lt, ln)
-            
-            if zone_num <= lc8_utm_zone + 1 and zone_num >= lc8_utm_zone - 1:
-                X, Y = img_proc.convert_utm_zones(lt, ln, zone_num, lc8_utm_zone)
-            
-            if X < UL_X and X > LR_X:
-               if Y > UL_Y and Y < LR_Y:
-                   in_image_lat_lon.append([lt, ln])
-                   in_image_idx.append([numpy.where(lat==lt)[0][0], numpy.where(lon==ln)[0][0]])
+    lat_in_image = lat[numpy.where((lat<UL_lat) & (lat>LR_lat))]
+    lon_in_image = lon[numpy.where((lon>UL_lon) & (lon<LR_lon))]
+
+    in_image_lat_lon = []
+    in_image_idx = []
+
+    for lt in lat_in_image:
+        for ln in lon_in_image:
+           in_image_lat_lon.append([lt, ln])
+           in_image_idx.append([numpy.where(lat==lt)[0][0], numpy.where(lon==ln)[0][0]])
 
     return in_image_lat_lon, in_image_idx
 
@@ -104,6 +96,7 @@ def choose_points(points_in_image, points_in_image_idx, buoy_coors):
 
     for chosen_points in itertools.combinations(sorted_points, 4):
         chosen_points = numpy.asarray(chosen_points)
+        break
         if funcs.is_square_test(chosen_points[:,1:3]) is True:
             break
 

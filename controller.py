@@ -1,5 +1,6 @@
 import pickle
 import os
+import bin.BuoyCalib as bc
 
 def output(cc):
     """ output results to a file. """
@@ -35,9 +36,11 @@ def read_cache(cc):
     except AttributeError:
         return cc
 
+def initialize_base(lid, buoy, dir='/dirs/home/ugrad'):
+    return bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, atmo_src=atmo_data_src)
+
 if __name__=='__main__':
     import argparse
-    import bin.BuoyCalib as bc
     import bin.image_processing as img_proc
 
     parser = argparse.ArgumentParser(description='Compute and compare the radiance values of \
@@ -90,7 +93,8 @@ if __name__=='__main__':
         x.calc_all()
 
     print x   # show values on screen
-    
+    #print x.narr_coor
+
     if args.output:
         output(x)    # write out values to pickle
 

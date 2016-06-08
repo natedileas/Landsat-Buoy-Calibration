@@ -96,7 +96,7 @@ def choose_points(points_in_image, points_in_image_idx, buoy_coors):
 
     for chosen_points in itertools.combinations(sorted_points, 4):
         chosen_points = numpy.asarray(chosen_points)
-        break
+        
         if funcs.is_square_test(chosen_points[:,1:3]) is True:
             break
 

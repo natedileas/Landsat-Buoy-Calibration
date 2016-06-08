@@ -171,10 +171,10 @@ def get_narr_data(cc):
     # choose narr points
     filename = os.path.join(cc.filepath_base, './data/shared/narr/coordinates.txt')
     narr_indices, lat, lon = narr_data.get_points(filename, cc.metadata)
-    narr_indices, narr_coor = narr_data.choose_points(narr_indices, lat, lon, cc.buoy_location)
+    chosen_idxs, narr_coor = narr_data.choose_points(narr_indices, lat, lon, cc.buoy_location)
 
     # read in NARR data
-    data = narr_data.read(narr_indices, lat, cc.scene_dir)
+    data = narr_data.read(chosen_idxs, cc.scene_dir)
     #ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures = data   # unpack
 
     return data, narr_coor

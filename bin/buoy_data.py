@@ -189,13 +189,16 @@ def get_buoy_data(filename, url):
 
     return 0
 
-def find_skin_temp(filename, date, url, depth):
+def find_skin_temp(filename, metadata, url, depth):
     """ compute skin temperature. """
 
     # parse year, month, day
+    date = metadata['DATE_ACQUIRED']
     year = date[0:4]
     month = date[5:7]
     day = date[8:10]
+
+    hour = float(metadata['SCENE_CENTER_TIME'][0:2])
 
     date = year+' '+month+' '+day+' 00'    # reformat date
     chars = ['\n']    # characters to remove from line
@@ -235,21 +238,25 @@ def find_skin_temp(filename, date, url, depth):
         except ValueError:
             pass
         except IndexError:
-            raise BuoyDataError('No data in file? %s.'% filename)
+            raise BuoyDataError('No data in file? %s. (IndexError)'% filename)
 
     # calculate skin temperature
-    if avg_wspd >= 4.5:
-        d = 0.17   # Kelvin
-    else:
-        d = 0.0    # Kelvin
-
-    a = 0.05 - (0.6 / avg_wspd) + (0.03 * math.log(avg_wspd))
-
     z = depth   # depth in meters
 
-    # CALCULATE SKIN_TEMPERATURE. sry for the caps
-    skin_temp = avg_wtmp + 273.15 - (a * z) - d
-    
+    # part 1
+    a = 0.05 - (0.6 / avg_wspd) + (0.03 * math.log(avg_wspd))
+    avg_skin_temp = avg_wtmp - (a * z) - 0.17
+
+    # part 2
+    b = 0.35 + 10.018 * math.exp(0.4 * avg_wspd)
+    c = 1.32 - (0.64 * math.log(avg_wspd))
+    t = int(hour - (c * z))
+    T_zt = float(data[t][14])    # get temperature data from that specific hour 
+    f_cz = (T_zt - avg_skin_temp) / math.exp(b*z)
+
+    # combine
+    skin_temp = avg_skin_temp + f_cz + 273.15
+
     if skin_temp >= 600:
         raise BuoyDataError('No water temp data for selected date range in the data set %s.'% filename)
 

@@ -87,26 +87,31 @@ def choose_points(inLandsat, lat, lon, buoy_coors):
 
     return chosen_points[:,3], chosen_points[:, 1:3]
     
-def read(narr_indices, scene_dir):
-    p = numpy.asarray([1000, 975, 950, 925, 900, 875, 850, 825, 800, 775, 750, 725, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 125, 100])
-    pressures = numpy.reshape([p]*4, (4,29))
-    dirs = ['HGT_1', 'HGT_2', 'TMP_1', 'TMP_2', 'SHUM_1', 'SHUM_2']
+def read(height, temp, shum, chosen_points):
+    """ pull out necesary data and return it. """
     
-    data = [[] for i in range(6)]
+    latidx = chosen_points[0]
+    lonidx = chosen_points[1]
 
-    for d in dirs:
-        for i in narr_indices:
-            for press in p:
-                filename = os.path.join(scene_dir, 'narr', d, str(press)+'.txt')
-                data[dirs.index(d)].append(float(linecache.getline(filename, int(i+2))))
+    date = datetime.datetime.strptime(cc.metadata['SCENE_CENTER_TIME'].replace('"', '')[0:7], '%H:%M:%S')
+    hour = date.hour
+    rem1 = hour % 3
+    rem2 = 3 - rem1
+    hour1 = 60 * (hour - rem1)
+    hour2 = 60 * (hour + rem2)   # TODO time conversion
     
-    data = numpy.reshape(data, (6, 4, 29))  # reshape
-    hgt_1, hgt_2, tmp_1, tmp_2, shum_1, shum_2 = data   # unpack
+    p = numpy.array(data.variables['lev'][:])
+    pressure = numpy.reshape([p]*4, (4, len(p)))
     
+    tmp_1 = temp.variables['tmp'][t1, :, chosen_points]
+    tmp_2 = temp.variables['tmp'][t2, :, chosen_points]
+    
+    shum_1 = shum.variables['shum'][t1, :, chosen_points]
+    shum_2 = shum.variables['shum'][t2, :, chosen_points]
     rhum_1 = atmo_data.convert_sh_rh(shum_1, tmp_1, pressures)
     rhum_2 = atmo_data.convert_sh_rh(shum_2, tmp_2, pressures)
     
-    ght_1 = numpy.divide(hgt_1, 1000.0)   # convert m to km
-    ght_2 = numpy.divide(hgt_2, 1000.0)   # convert m to km
+    ght_1 = height.variables['hgt'][t1, :, chosen_points] / 1000.0   # convert m to km
+    ght_2 = height.variables['hgt'][t2, :, chosen_points] / 1000.0
     
-    return ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
+    return ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressure

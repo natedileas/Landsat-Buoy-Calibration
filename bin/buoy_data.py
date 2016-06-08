@@ -248,7 +248,7 @@ def find_skin_temp(filename, metadata, url, depth):
     avg_skin_temp = avg_wtmp - (a * z) - 0.17
 
     # part 2
-    b = 0.35 + 10.018 * math.exp(0.4 * avg_wspd)
+    b = 0.35 + (0.018 * math.exp(0.4 * avg_wspd))
     c = 1.32 - (0.64 * math.log(avg_wspd))
     t = int(hour - (c * z))
     T_zt = float(data[t][14])    # get temperature data from that specific hour 

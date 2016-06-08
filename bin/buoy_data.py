@@ -191,6 +191,8 @@ def get_buoy_data(filename, url):
 
 def find_skin_temp(filename, metadata, url, depth):
     """ compute skin temperature. """
+    
+    # source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
 
     # parse year, month, day
     date = metadata['DATE_ACQUIRED']

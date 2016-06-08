@@ -11,42 +11,46 @@ import atmo_data
 import misc_functions as funcs
 
 def download(cc):
-    """ download NARR Data. """
-    if os.path.exists(os.path.join(cc.scene_dir, 'narr/HGT_1/1000.txt')):
-        return 0
-
-    # begin download of NARR data
-    os.chmod('./bin/NARR_py.bash', 0755)
-      
-    ret_val = subprocess.call('./bin/NARR_py.bash %s %s %s' % (cc.scene_dir, cc.scene_id, int(cc.verbose)), shell=True)
-    if ret_val == 1:
-        logging.error('missing wgrib error')
-        sys.exit(-1)
-
-def get_coordinates(coordinate_file):
-    """ read narr coordinates from file """
-    coordinates = []
-
-    with open(coordinate_file, 'r') as f:
-        for line in f:
-            line.replace('\n', '')
-            coordinates.append(line.split())
-
-    return numpy.asarray(coordinates)
-
-def get_points(coordinate_file, metadata):
-    """ Read in coordinates.txt, choose points within scene corners. """
+    """ download NARR Data (netCDF4 format). """
     
-    # read narr coordinates from file
-    coordinates = get_coordinates(coordinate_file)
+    narr_urls = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc', \
+                    'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/hgt.%s.nc',\
+                    'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/shum.%s.nc']
+    
+    date = cc.date.strftime('%Y%m')   # %s should be YYYYMM
+    
+    for url in narr_urls:
+        url = url % date
+        
+        if os.path.isfile(os.path.join(cc.scene_dir, url.split('/')[-1])):   # if file already downloaded
+            return
+            
+        subprocess.check_call('wget %s -P %s' % (url, cc.scene_dir), shell=True)
 
-    # pull out lat, lon, trim to utm module's limits
-    lat = numpy.asarray([c[2] for c in coordinates]).astype(float)
-    lat[numpy.where(lat > 84)] = 84
+def open(cc):
+    """ open NARR file (netCDF4 format). """
 
-    lon = numpy.asarray([c[3] for c in coordinates]).astype(float)
-    lon[numpy.where(lon >= 180)] = 360 - lon[numpy.where(lon >= 180)]
-    lon[numpy.where(lon < 180)] = (-1) * lon[numpy.where(lon < 180)]
+    data = []
+    narr_files = ['air.%s.nc', 'hgt.%s.nc', 'shum.%s.nc']
+
+    date = cc.date.strftime('%Y%m')
+    
+    for data_file in narr_files:
+        data_file = data_file % date
+        
+        if os.path.isfile(os.path.join(cc.scene_dir, data_file)) is not True:   # if file already downloaded
+            logging.error('NARR Data file does not exist at the expected path: %' % data_file)
+            sys.exit(1)
+
+        data.append(Dataset(data_file, "r", format="NETCDF4"))
+        
+    # order of returns is temp, height, specific humidity
+    return data
+
+def get_points(metadata, data):
+    """ choose points within scene corners. """
+    lat = data.variables['lat'][:]
+    lon = data.variables['lon'][:]
 
     # define corners
     UL_lat = metadata['CORNER_UL_LAT_PRODUCT'] + 0.5
@@ -72,7 +76,7 @@ def choose_points(inLandsat, lat, lon, buoy_coors):
         dist = atmo_data.distance_in_utm(east, north, buoy_x, buoy_y)
         distances.append(dist)
 
-    narr_dict = zip(distances, latvalues, lonvalues, inLandsat[0])
+    narr_dict = zip(distances, latvalues, lonvalues, inLandsat)
     sorted_points = sorted(narr_dict)
 
     for chosen_points in itertools.combinations(sorted_points, 4):

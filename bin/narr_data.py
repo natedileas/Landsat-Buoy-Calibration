@@ -5,6 +5,7 @@ import itertools
 import os
 import sys
 import subprocess
+from netCDF4 import Dataset, num2date
 
 import image_processing as img_proc
 import atmo_data
@@ -17,13 +18,13 @@ def download(cc):
                     'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/hgt.%s.nc',\
                     'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/shum.%s.nc']
     
-    date = cc.date.strftime('%Y%m')   # %s should be YYYYMM
+    date = cc.date.strftime('%Y%m')   # YYYYMM
     
     for url in narr_urls:
         url = url % date
         
-        if os.path.isfile(os.path.join(cc.scene_dir, url.split('/')[-1])):   # if file already downloaded
-            return
+        if os.path.isfile(os.path.join(cc.scene_dir, url.split('/')[-1])):
+            continue   # if file already downloaded
             
         subprocess.check_call('wget %s -P %s' % (url, cc.scene_dir), shell=True)
 
@@ -36,10 +37,10 @@ def open(cc):
     date = cc.date.strftime('%Y%m')
     
     for data_file in narr_files:
-        data_file = data_file % date
+        data_file = os.path.join(cc.scene_dir, data_file % date)
         
-        if os.path.isfile(os.path.join(cc.scene_dir, data_file)) is not True:   # if file already downloaded
-            logging.error('NARR Data file does not exist at the expected path: %' % data_file)
+        if os.path.isfile(data_file) is not True:
+            logging.error('NARR Data file is not at the expected path: %' % data_file)
             sys.exit(1)
 
         data.append(Dataset(data_file, "r", format="NETCDF4"))
@@ -66,7 +67,7 @@ def get_points(metadata, data):
 def choose_points(inLandsat, lat, lon, buoy_coors): 
     latvalues = lat[inLandsat]
     lonvalues = lon[inLandsat]
-
+    
     buoy_x, buoy_y, buoy_zone_num, buoy_zone_let = utm.from_latlon(*buoy_coors)
     distances = []
     
@@ -76,7 +77,8 @@ def choose_points(inLandsat, lat, lon, buoy_coors):
         dist = atmo_data.distance_in_utm(east, north, buoy_x, buoy_y)
         distances.append(dist)
 
-    narr_dict = zip(distances, latvalues, lonvalues, inLandsat)
+    inLandsat = zip(inLandsat[0], inLandsat[1])
+    narr_dict = zip(distances, latvalues, lonvalues, numpy.asarray(inLandsat, dtype=object))
     sorted_points = sorted(narr_dict)
 
     for chosen_points in itertools.combinations(sorted_points, 4):
@@ -87,31 +89,30 @@ def choose_points(inLandsat, lat, lon, buoy_coors):
 
     return chosen_points[:,3], chosen_points[:, 1:3]
     
-def read(height, temp, shum, chosen_points):
+def read(cc, temp, height, shum, chosen_points):
     """ pull out necesary data and return it. """
-    
-    latidx = chosen_points[0]
-    lonidx = chosen_points[1]
 
-    date = datetime.datetime.strptime(cc.metadata['SCENE_CENTER_TIME'].replace('"', '')[0:7], '%H:%M:%S')
-    hour = date.hour
-    rem1 = hour % 3
-    rem2 = 3 - rem1
-    hour1 = 60 * (hour - rem1)
-    hour2 = 60 * (hour + rem2)   # TODO time conversion
+    chosen_points = numpy.array(list(chosen_points))
+    latidx = tuple(chosen_points[:, 0])
+    lonidx = tuple(chosen_points[:, 1])
     
-    p = numpy.array(data.variables['lev'][:])
+    times = temp.variables['time']
+    dates = num2date(times[:], times.units)
+    t1, t2 = sorted(abs(dates-cc.scenedatetime).argsort()[:2])
+
+    p = numpy.array(temp.variables['level'][:])
     pressure = numpy.reshape([p]*4, (4, len(p)))
     
-    tmp_1 = temp.variables['tmp'][t1, :, chosen_points]
-    tmp_2 = temp.variables['tmp'][t2, :, chosen_points]
-    
-    shum_1 = shum.variables['shum'][t1, :, chosen_points]
-    shum_2 = shum.variables['shum'][t2, :, chosen_points]
-    rhum_1 = atmo_data.convert_sh_rh(shum_1, tmp_1, pressures)
-    rhum_2 = atmo_data.convert_sh_rh(shum_2, tmp_2, pressures)
-    
-    ght_1 = height.variables['hgt'][t1, :, chosen_points] / 1000.0   # convert m to km
-    ght_2 = height.variables['hgt'][t2, :, chosen_points] / 1000.0
+    # the .T on the end is a transpose
+    tmp_1 = numpy.diagonal(temp.variables['air'][t1, :, latidx, lonidx], axis1=1, axis2=2).T
+    tmp_2 = numpy.diagonal(temp.variables['air'][t2, :, latidx, lonidx], axis1=1, axis2=2).T
+
+    ght_1 = numpy.diagonal(height.variables['hgt'][t1, :, latidx, lonidx], axis1=1, axis2=2).T / 1000.0   # convert m to km
+    ght_2 = numpy.diagonal(height.variables['hgt'][t2, :, latidx, lonidx], axis1=1, axis2=2).T / 1000.0
+
+    shum_1 = numpy.diagonal(shum.variables['shum'][t1, :, latidx, lonidx], axis1=1, axis2=2).T
+    shum_2 = numpy.diagonal(shum.variables['shum'][t2, :, latidx, lonidx], axis1=1, axis2=2).T
+    rhum_1 = atmo_data.convert_sh_rh(shum_1, tmp_1, pressure)
+    rhum_2 = atmo_data.convert_sh_rh(shum_2, tmp_2, pressure)
     
     return ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressure

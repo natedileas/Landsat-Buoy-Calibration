@@ -283,7 +283,6 @@ class CalibrationController(object):
         date = self.metadata['DATE_ACQUIRED']
         time = self.metadata['SCENE_CENTER_TIME'].replace('"', '')[0:7]
         self.scenedatetime = datetime.datetime.strptime(date+' '+time, '%Y-%m-%d %H:%M:%S')
-        print self.scenedatetime
 
     def calc_img_radiance(self):
         """ calculate image radiance for band 10 and 11. """

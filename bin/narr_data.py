@@ -5,6 +5,7 @@ import itertools
 import os
 import sys
 import subprocess
+import logging
 
 import image_processing as img_proc
 import atmo_data

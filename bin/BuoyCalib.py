@@ -31,6 +31,7 @@ class CalibrationController(object):
     # image radiance and related attributes
     _image_radiance = None
     metadata = None    # landsat metadata
+    scenedatetime = None 
     poi = None
     
     # attributes that make up the lansat id
@@ -278,6 +279,11 @@ class CalibrationController(object):
 
         # read in landsat metadata
         self.metadata = landsat_data.read_metadata(self)
+        
+        date = self.metadata['DATE_ACQUIRED']
+        time = self.metadata['SCENE_CENTER_TIME'].replace('"', '')[0:7]
+        self.scenedatetime = datetime.datetime.strptime(date+' '+time, '%Y-%m-%d %H:%M:%S')
+        print self.scenedatetime
 
     def calc_img_radiance(self):
         """ calculate image radiance for band 10 and 11. """

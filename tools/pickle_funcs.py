@@ -25,7 +25,7 @@ def read_cache(cc):
             out_file += '_merra'
         
         if not os.path.isfile(out_file):
-            raise OSError('pickle_file is not in expected location %s' % outfile) 
+            raise OSError('pickle_file is not in expected location %s' % out_file) 
 
         with open(out_file, 'rb') as f:
             x = pickle.load(f)

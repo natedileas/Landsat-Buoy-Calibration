@@ -234,7 +234,7 @@ class CalibrationController(object):
             
             spec_emis = 1 - spec_ref   # calculate emissivity
 
-            RSR_wavelengths = numpy.asarray(RSR_wavelengths) / 1e6   # convert to meters
+            RSR_wavelengths = RSR_wavelengths / 1e6   # convert to meters
             
             # calculate temperature array
             Lt = mod_proc.calc_temperature_array(RSR_wavelengths, self.skin_temp)  # w m-2 sr-1 m-1

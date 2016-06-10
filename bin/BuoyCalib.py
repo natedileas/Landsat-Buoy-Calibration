@@ -205,11 +205,7 @@ class CalibrationController(object):
         point_dir, self.narr_coor = mod_proc.make_tape5s(self)
         
         logging.info('Running modtran.')
-        # change access to prevent errors
-        modtran_bash_path = os.path.join(self.filepath_base, 'bin/modtran.bash')
-        os.chmod(modtran_bash_path, 0755)
-           
-        subprocess.check_call('./bin/modtran.bash %s %s' % (self.filepath_base, point_dir), shell=True)
+        mod_proc.run_modtran(point_dir)
         
         # Load Emissivity / Reflectivity
         spec_r = numpy.array(0)

@@ -12,6 +12,19 @@ import merra_data
 import atmo_data
 
 ### POST MODTRAN FUNCTIONS ###
+
+def run_modtran(directory):
+    exe = '/dirs/pkg/Mod4v3r1/Mod4v3r1.exe'
+    d = os.getcwd()
+    os.chdir(directory)
+    
+    try:
+        os.symlink('/dirs/pkg/Mod4v3r1/DATA', directory)
+        subprocess.check_call(exe, shell=True)
+    except OSError:  # symlink already exits error
+        pass
+    
+    os.chdir(d)
     
 def parse_tape7scn(directory):
     filename = os.path.join(directory, 'tape7.scn')

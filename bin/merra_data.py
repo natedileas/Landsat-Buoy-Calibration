@@ -110,7 +110,7 @@ def read(cc, data, chosen_points):
     latidx = tuple(chosen_points[:, 0])
     lonidx = tuple(chosen_points[:, 1])
 
-    date = datetime.datetime.strptime(cc.metadata['SCENE_CENTER_TIME'].replace('"', '')[0:7], '%H:%M:%S')
+    date = cc.scenedatetime
     hour = date.hour
     rem1 = hour % 3
     rem2 = 3 - rem1
@@ -122,15 +122,16 @@ def read(cc, data, chosen_points):
  
     p = numpy.array(data.variables['lev'][:])
     pressure = numpy.reshape([p]*4, (4, len(p)))
+    
+    # the .T on the end is a transpose
+    temp1 = numpy.diagonal(data.variables['T'][idx1, :, latidx, lonidx], axis1=1, axis2=2).T   # temp
+    temp2 = numpy.diagonal(data.variables['T'][idx2, :, latidx, lonidx], axis1=1, axis2=2).T   
 
-    temp1 = numpy.asarray(data.variables['T'])[idx1, :, latidx, lonidx]   # temp
-    temp2 = numpy.asarray(data.variables['T'])[idx2, :, latidx, lonidx]   
+    rh1 = numpy.diagonal(data.variables['RH'][idx1, :, latidx, lonidx], axis1=1, axis2=2).T   # relative humidity
+    rh2 = numpy.diagonal(data.variables['RH'][idx2, :, latidx, lonidx], axis1=1, axis2=2).T
 
-    rh1 = numpy.asarray(data.variables['RH'])[idx1, :, latidx, lonidx]   # relative humidity
-    rh2 = numpy.asarray(data.variables['RH'])[idx2, :, latidx, lonidx]
-
-    height1 = numpy.asarray(data.variables['H'])[idx1, :, latidx, lonidx]   # height
-    height2 = numpy.asarray(data.variables['H'])[idx2, :, latidx, lonidx]
+    height1 = numpy.diagonal(data.variables['H'][idx1, :, latidx, lonidx], axis1=1, axis2=2).T   # height
+    height2 = numpy.diagonal(data.variables['H'][idx2, :, latidx, lonidx], axis1=1, axis2=2).T
 
     # convert m to km
     return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1, rh2, pressure

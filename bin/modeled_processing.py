@@ -141,8 +141,6 @@ def make_tape5s(cc):
     interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
     atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
 
-    #print data_coor, cc.buoy_location
-
     interp_profile = None
     with warnings.catch_warnings():
         warnings.filterwarnings('error')
@@ -168,13 +166,15 @@ def get_narr_data(cc):
         logging.error('NARR data not downloaded, no wgrib?')
         sys.exit(-1)
         
+    # check if downloaded
+    temp, height, shum = narr_data.open(cc)
+    
     # choose narr points
-    filename = os.path.join(cc.filepath_base, './data/shared/narr/coordinates.txt')
-    narr_indices, lat, lon = narr_data.get_points(filename, cc.metadata)
+    narr_indices, lat, lon = narr_data.get_points(cc.metadata, temp)
     chosen_idxs, narr_coor = narr_data.choose_points(narr_indices, lat, lon, cc.buoy_location)
 
     # read in NARR data
-    data = narr_data.read(chosen_idxs, cc.scene_dir)
+    data = narr_data.read(cc, temp, height, shum, chosen_idxs)
     #ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures = data   # unpack
 
     return data, narr_coor

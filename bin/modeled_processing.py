@@ -36,23 +36,20 @@ def make_tape5s(cc):
             if interp_profile[0][0] > 50:
                 interp_profile = list(numpy.asarray(interp_profile)[:, 1:])
 
+    # TODO better handling of interpolation
     atmo_data.write_atmo(cc, interp_profile)   # save out to file
+    # TODO write out uninterpolated atmosphere
     
     point_dir = generate_tape5(cc, interp_profile)
 
     return point_dir, data_coor
 
 def get_narr_data(cc):
-    """  """
-    if os.path.exists(os.path.join(cc.scene_dir, 'narr/HGT_1/1000.txt')):
-        logging.info('NARR Data Successful Download')
-    else:
-        logging.error('NARR data not downloaded, no wgrib?')
-        sys.exit(-1)
-        
+    """ choose points and retreive narr data from file. """
+
     # check if downloaded
     temp, height, shum = narr_data.open(cc)
-    
+
     # choose narr points
     narr_indices, lat, lon = narr_data.get_points(cc.metadata, temp)
     chosen_idxs, narr_coor = narr_data.choose_points(narr_indices, lat, lon, cc.buoy_location)
@@ -75,23 +72,24 @@ def get_merra_data(cc):
 
     # retrieve data
     data = merra_data.read(cc, data, chosen_points_idxs)
-    
+
     return data, chosen_points_lat_lon
 
 def generate_tape5(cc, profile):
     """ write the tape5 file """
 
     height, press, temp, relhum = profile
-    
+
+    # TODO streamline
     latString = '%2.3f' % (cc.buoy_location[0])
-    
+
     if cc.buoy_location[1] < 0:
         lonString = '%2.2f' % cc.buoy_location[1]
     else:
         lonString = '%2.3f' % (360.0 - cc.buoy_location[1])
 
     point_dir = os.path.join(cc.scene_dir, 'points/%s_%s' % (latString, lonString))
-        
+
     try:
         os.makedirs(point_dir)
     except OSError:
@@ -102,25 +100,25 @@ def generate_tape5(cc, profile):
     tail_file = os.path.join(modtran_directory, 'tail.txt')
     head = ''
     tail = ''
-    
+
     jay = datetime.datetime.strftime(cc.date, '%j')
     nml = str(numpy.shape(height)[0])
     gdalt = '%1.3f' % float(height[0])
-    
+
     with open(head_file,'r') as f:
         head = f.read()
         head = head.replace('nml', nml)
         head = head.replace('gdalt', gdalt)
         head = head.replace('tmp____', '%3.3f' % cc.skin_temp)
-        
+
     with open(tail_file,'r') as f:
         tail = f.read()
         tail = tail.replace('longit',lonString)
         tail = tail.replace('latitu',latString)
         tail = tail.replace('jay',jay)
-        
+
     tape5_file = os.path.join(point_dir, 'tape5')
-    
+
     with open(tape5_file, 'w') as f:
         f.write(head)
         
@@ -140,17 +138,17 @@ def run_modtran(directory):
     exe = '/dirs/pkg/Mod4v3r1/Mod4v3r1.exe'
     d = os.getcwd()
     os.chdir(directory)
-    
+
     try:
         subprocess.check_call('ln -s /dirs/pkg/Mod4v3r1/DATA', shell=True)
         subprocess.check_call(exe, shell=True)
     except subprocess.CalledProcessError:  # symlink already exits error
         pass
-    
+
     os.chdir(d)
-    
+
 ### POST MODTRAN FUNCTIONS ###
-    
+
 def parse_tape7scn(directory):
     filename = os.path.join(directory, 'tape7.scn')
     
@@ -175,6 +173,7 @@ def calc_temperature_array(wavelengths, temperature):
     """ make array of blackbody radiances. """
     Lt= []
 
+    # TODO try yield keyword
     for d_lambda in wavelengths:
         x = radiance(d_lambda, temperature)
         Lt.append(x)

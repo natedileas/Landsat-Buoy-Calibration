@@ -62,7 +62,7 @@ scenes = ["LC80130332013145LGN00",
 def read_cache(cc):
     """ read in results from the file. """
 
-    out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
+    out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle_narr')
 
     if not os.path.isfile(out_file):
         print 'No cached data at %s' % out_file
@@ -109,7 +109,7 @@ def fmt_items(cc, delim=', '):
         
 
 if __name__ == '__main__':
-    filename = 'output.csv'
+    filename = 'output_narr.csv'
     d = '/dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/'
     v = True
     

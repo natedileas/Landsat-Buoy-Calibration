@@ -1,43 +1,5 @@
-import pickle
-import os
 import bin.BuoyCalib as bc
-
-def output(cc):
-    """ output results to a file. """
-
-    out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
-
-    if cc.atmo_src == 'narr':
-        out_file += '_narr'
-    elif cc.atmo_src == 'merra':
-        out_file += '_merra'
-
-    with open(out_file, 'wb') as f:
-        pickle.dump(cc, f)
-
-
-def read_cache(cc):
-    """ read in results from the file. """
-    try:
-        out_file = os.path.join(cc.scene_dir, cc.scene_id+'_pickle')
-        if cc.atmo_src == 'narr':
-            out_file += '_narr'
-        elif cc.atmo_src == 'merra':
-            out_file += '_merra'
-        
-        if not os.path.isfile(out_file):
-            raise OSError('pickle_file is not in expected location %s' % outfile) 
-
-        with open(out_file, 'rb') as f:
-            x = pickle.load(f)
-            __ = x.scene_dir
-            return x
-
-    except AttributeError:
-        return cc
-
-def initialize_base(lid, buoy, dir='/dirs/home/ugrad'):
-    return bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, atmo_src=atmo_data_src)
+import tools.pickle_funcs as pickle
 
 if __name__=='__main__':
     import argparse
@@ -81,24 +43,24 @@ if __name__=='__main__':
     if args.merra:
         atmo_data_src='merra'
  
-    x = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, atmo_src=atmo_data_src)  # initialize
+    cc = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, atmo_src=atmo_data_src)  # initialize
 
     if not args.reprocess:
         try:
-            x = read_cache(x)   # try to read in from pickle
-            __ = x.__str__()
+            x = pickle.read_cache(cc)   # try to read in from pickle
+            __ = cc.__str__()
         except:
-            x.calc_all()
+            cc.calc_all()
     else:
-        x.calc_all()
+        cc.calc_all()
 
-    print x   # show values on screen
-    #print x.narr_coor
+    print cc   # show values on screen
+    #print cc.narr_coor
 
     if args.output:
-        output(x)    # write out values to pickle
+        pickle.output(cc)    # write out values to pickle
 
     if args.image:
-        img_proc.write_im(x)
-        print 'Image with NARR points and buoy written to %s' % (x.scene_dir + '/' + x.scene_id + '_mod.jpg')
+        img_proc.write_im(cc)
+        print 'Image with NARR points and buoy written to %s' % (cc.scene_dir + '/' + cc.scene_id + '_mod.jpg')
 

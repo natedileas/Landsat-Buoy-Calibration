@@ -132,6 +132,6 @@ def read(cc, data, chosen_points):
 
     height1 = numpy.diagonal(data.variables['H'][idx1, :, latidx, lonidx], axis1=1, axis2=2).T   # height
     height2 = numpy.diagonal(data.variables['H'][idx2, :, latidx, lonidx], axis1=1, axis2=2).T
-
+    
     # convert m to km
-    return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1, rh2, pressure
+    return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1 * 100, rh2 * 100, pressure

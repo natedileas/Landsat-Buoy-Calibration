@@ -168,7 +168,7 @@ def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
     temp_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,2,:]) for i in range(4)]
     temp = bilinear_interpolation(buoy_coor[0], buoy_coor[1], temp_points)
 
-    relhum_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,1,:]) for i in range(4)]
+    relhum_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,3,:]) for i in range(4)]
     relhum = bilinear_interpolation(buoy_coor[0], buoy_coor[1], relhum_points)
 
     return [height, press, temp, relhum]
@@ -265,7 +265,12 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
     return profiles
 
 def write_atmo(cc, atmo):
-    filename = os.path.join(cc.scene_dir, 'atmo_interp.txt')
+    filename = os.path.join(cc.scene_dir, 'atmo_interp')
+    
+    if cc.atmo_src == 'narr':
+        filename += '_narr.txt'
+    elif cc.atmo_src == 'merra':
+        filename += '_merra.txt'
     
     atmo = numpy.array(atmo)
     dewpoint =  dewpoint_temp(atmo[2], atmo[3])

@@ -58,9 +58,9 @@ if __name__=='__main__':
     #print cc.narr_coor
 
     if args.output:
-        pickle.output(cc)    # write out values to pickle
+        pickle.output_cache(cc)    # write out values to pickle
 
     if args.image:
         img_proc.write_im(cc)
-        print 'Image with NARR points and buoy written to %s' % (cc.scene_dir + '/' + cc.scene_id + '_mod.jpg')
+        print 'Image with NARR points and buoy written to %s' % (cc.scene_dir + '/' + cc.scene_id + '_mod.png')
 

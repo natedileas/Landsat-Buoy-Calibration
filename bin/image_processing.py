@@ -100,10 +100,9 @@ def write_im(cc):
 
     # draw circle on top of image to signify narr points
     image = Image.open(img)
-    image = image.point(lambda i:i*(1./256)).convert('RGB')
+    image = image.point(lambda i:i*(1./256.0)).convert('RGBA')
     draw = ImageDraw.Draw(image)
-    rx = 50
-    ry = 23
+    rx = 100
     
     for x, y in narr_pix:
         draw.ellipse((x-rx, y-rx, x+rx, y+rx), fill=(255, 0, 0))
@@ -116,10 +115,22 @@ def write_im(cc):
     # downsample
     image = image.resize((500, 486), Image.ANTIALIAS)
     
+    data = image.getdata()
+    #print data.shape
+    #print data.size
+    newData = []
+    
+    for item in data:
+        if item[0] == item[1] == item[2] == 0:
+            newData.append((255, 255, 255, 0))
+        else:
+            newData.append(item)
+    
+    image.putdata(newData)
     # save
     save_path = os.path.join(cc.scene_dir, cc.scene_id+'_mod')
     if cc.atmo_src == 'narr':
-        save_path += '_narr.jpg'
+        save_path += '_narr.png'
     elif cc.atmo_src == 'merra':
-        save_path += '_merra.jpg'
+        save_path += '_merra.png'
     image.save(save_path)

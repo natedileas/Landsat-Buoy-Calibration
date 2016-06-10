@@ -11,86 +11,6 @@ import narr_data
 import merra_data
 import atmo_data
 
-### POST MODTRAN FUNCTIONS ###
-
-def run_modtran(directory):
-    exe = '/dirs/pkg/Mod4v3r1/Mod4v3r1.exe'
-    d = os.getcwd()
-    os.chdir(directory)
-    
-    try:
-        subprocess.check_call('ln -s /dirs/pkg/Mod4v3r1/DATA', shell=True)
-        subprocess.check_call(exe, shell=True)
-    except subprocess.CalledProcessError:  # symlink already exits error
-        pass
-    
-    os.chdir(d)
-    
-def parse_tape7scn(directory):
-    filename = os.path.join(directory, 'tape7.scn')
-    
-    data = numpy.genfromtxt(filename,  skip_header=11, skip_footer=1, \
-    usecols=(0,1,2,6,8), unpack=True)   
-    
-    wvlen, trans, pth_thm, gnd_ref, total = data
-    
-    downwell_rad = gnd_ref / trans   # calculate downwelled radiance
-    upwell_rad = pth_thm   # calc upwelled radiance
-    
-    # sanity check
-    check = downwell_rad - ((total - upwell_rad) / trans)
-    if numpy.sum(numpy.absolute(check)) >= .05:
-       logging.error('Error in modtran module. Total Radiance minus upwelled \
-       radiance is not (approximately) equal to downwelled radiance*transmission')
-       sys.exit(-1)
-
-    return upwell_rad, downwell_rad, wvlen, trans, gnd_ref
-    
-    
-def read_RSR(rsr_file):
-    """ read in RSR data and return it to the caller. """
-    wavelength_RSR = []
-    RSR = []
-    trans_RSR = []
-    data = []
-    
-    with open(rsr_file, 'r') as f:
-        for line in f:    
-            data = line.split()
-            data = filter(None, data)
-            wavelength_RSR.append(float(data[0]))
-            RSR.append(float(data[1]))
-    
-    return RSR, wavelength_RSR
-    
-def calc_temperature_array(wavelengths, temperature):
-    """ make array of blackbody radiances. """
-    Lt= []
-
-    for d_lambda in wavelengths:
-        x = radiance(d_lambda, temperature)
-        Lt.append(x)
-        
-    return Lt
-        
-def radiance(wvlen, temp, units='microns'):
-    """calculate blackbody radiance given wavelength (in meters) and temperature. """
-    
-    # define constants
-    c = 3e8   # speed of light, m s-1
-    h = 6.626e-34	# J*s = kg m2 s-1
-    k = 1.38064852e-23 # m2 kg s-2 K-1, boltzmann
-    
-    c1 = 2 * (c * c) * h   # units = kg m4 s-3
-    c2 = (h * c) / k    # (h * c) / k, units = m K    
-        
-    # calculate radiance
-    rad = c1 / (((wvlen**5)) * (math.e**((c2 / (temp * wvlen))) - 1))
-    
-    # UNITS
-    # (W / m^2 * sr) * <wavelength unit>
-    return rad
-
 ### PRE MODTRAN FUNCTIONS ###
 
 def make_tape5s(cc):
@@ -213,3 +133,85 @@ def generate_tape5(cc, profile):
         f.write(tail)
 
     return point_dir
+
+### MODTRAN FUNCTION ###
+
+def run_modtran(directory):
+    exe = '/dirs/pkg/Mod4v3r1/Mod4v3r1.exe'
+    d = os.getcwd()
+    os.chdir(directory)
+    
+    try:
+        subprocess.check_call('ln -s /dirs/pkg/Mod4v3r1/DATA', shell=True)
+        subprocess.check_call(exe, shell=True)
+    except subprocess.CalledProcessError:  # symlink already exits error
+        pass
+    
+    os.chdir(d)
+    
+### POST MODTRAN FUNCTIONS ###
+    
+def parse_tape7scn(directory):
+    filename = os.path.join(directory, 'tape7.scn')
+    
+    data = numpy.genfromtxt(filename,  skip_header=11, skip_footer=1, \
+    usecols=(0,1,2,6,8), unpack=True)   
+    
+    wvlen, trans, pth_thm, gnd_ref, total = data
+    
+    downwell_rad = gnd_ref / trans   # calculate downwelled radiance
+    upwell_rad = pth_thm   # calc upwelled radiance
+    
+    # sanity check
+    check = downwell_rad - ((total - upwell_rad) / trans)
+    if numpy.sum(numpy.absolute(check)) >= .05:
+       logging.error('Error in modtran module. Total Radiance minus upwelled \
+       radiance is not (approximately) equal to downwelled radiance*transmission')
+       sys.exit(-1)
+
+    return upwell_rad, downwell_rad, wvlen, trans, gnd_ref
+    
+    
+def read_RSR(rsr_file):
+    """ read in RSR data and return it to the caller. """
+    wavelength_RSR = []
+    RSR = []
+    trans_RSR = []
+    data = []
+    
+    with open(rsr_file, 'r') as f:
+        for line in f:    
+            data = line.split()
+            data = filter(None, data)
+            wavelength_RSR.append(float(data[0]))
+            RSR.append(float(data[1]))
+    
+    return RSR, wavelength_RSR
+    
+def calc_temperature_array(wavelengths, temperature):
+    """ make array of blackbody radiances. """
+    Lt= []
+
+    for d_lambda in wavelengths:
+        x = radiance(d_lambda, temperature)
+        Lt.append(x)
+        
+    return Lt
+        
+def radiance(wvlen, temp, units='microns'):
+    """calculate blackbody radiance given wavelength (in meters) and temperature. """
+    
+    # define constants
+    c = 3e8   # speed of light, m s-1
+    h = 6.626e-34	# J*s = kg m2 s-1
+    k = 1.38064852e-23 # m2 kg s-2 K-1, boltzmann
+    
+    c1 = 2 * (c * c) * h   # units = kg m4 s-3
+    c2 = (h * c) / k    # (h * c) / k, units = m K    
+        
+    # calculate radiance
+    rad = c1 / (((wvlen**5)) * (math.e**((c2 / (temp * wvlen))) - 1))
+    
+    # UNITS
+    # (W / m^2 * sr) * <wavelength unit>
+    return rad

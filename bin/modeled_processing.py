@@ -19,7 +19,7 @@ def run_modtran(directory):
     os.chdir(directory)
     
     try:
-        os.symlink('/dirs/pkg/Mod4v3r1/DATA', directory)
+        subprocess.check_call('ln -s /dirs/pkg/Mod4v3r1/DATA', shell=True)
         subprocess.check_call(exe, shell=True)
     except OSError:  # symlink already exits error
         pass
@@ -162,6 +162,7 @@ def generate_tape5(cc, profile):
     """ write the tape5 file """
 
     height, press, temp, relhum = profile
+    
     latString = '%2.3f' % (cc.buoy_location[0])
     
     if cc.buoy_location[1] < 0:
@@ -177,22 +178,38 @@ def generate_tape5(cc, profile):
         pass
 
     modtran_directory = os.path.join(cc.filepath_base, 'data/shared/modtran')
-    filename = os.path.join(modtran_directory, 'tempLayers.txt')
-
-    with open(filename, 'w') as f:
-        for k in range(numpy.shape(height)[0]):
-            line = '%10.3f%10.2E%10.2E%10.2E%10s%10s%15s\n' % \
-            (height[k], press[k], temp[k], relhum[k] ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
-            
-            f.write(line)
+    head_file = os.path.join(modtran_directory, 'head.txt')
+    tail_file = os.path.join(modtran_directory, 'tail.txt')
+    head = ''
+    tail = ''
     
     jay = datetime.datetime.strftime(cc.date, '%j')
     nml = str(numpy.shape(height)[0])
     gdalt = '%1.3f' % float(height[0])
     
-    # write header and footer parts of tape5 and concatenate
-    command = './bin/write_tape5.bash %s %s %s %s %s %s %s %s' % \
-    (modtran_directory, point_dir, latString, lonString, jay, nml, gdalt, '%3.3f' % cc.skin_temp)
-    subprocess.check_call(command, shell=True)
+    with open(head_file,'r') as f:
+        head = f.read()
+        head = head.replace('nml', nml)
+        head = head.replace('gdalt', gdalt)
+        head = head.replace('tmp____', '%3.3f' % cc.skin_temp)
+        
+    with open(tail_file,'r') as f:
+        tail = f.read()
+        tail = tail.replace('longit',lonString)
+        tail = tail.replace('latitu',latString)
+        tail = tail.replace('jay',jay)
+        
+    tape5_file = os.path.join(point_dir, 'tape5')
+    
+    with open(tape5_file, 'w') as f:
+        f.write(head)
+        
+        for k in range(numpy.shape(height)[0]):
+            line = '%10.3f%10.2E%10.2E%10.2E%10s%10s%15s\n' % \
+            (height[k], press[k], temp[k], relhum[k] ,'0.000E+00','0.000E+00', 'AAH2222222222 2')
+            
+            f.write(line)
+            
+        f.write(tail)
 
     return point_dir

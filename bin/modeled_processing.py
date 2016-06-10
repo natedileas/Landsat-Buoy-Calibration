@@ -171,23 +171,6 @@ def parse_tape7scn(directory):
 
     return upwell_rad, downwell_rad, wvlen, trans, gnd_ref
     
-    
-def read_RSR(rsr_file):
-    """ read in RSR data and return it to the caller. """
-    wavelength_RSR = []
-    RSR = []
-    trans_RSR = []
-    data = []
-    
-    with open(rsr_file, 'r') as f:
-        for line in f:    
-            data = line.split()
-            data = filter(None, data)
-            wavelength_RSR.append(float(data[0]))
-            RSR.append(float(data[1]))
-    
-    return RSR, wavelength_RSR
-    
 def calc_temperature_array(wavelengths, temperature):
     """ make array of blackbody radiances. """
     Lt= []

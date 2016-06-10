@@ -208,16 +208,8 @@ class CalibrationController(object):
         mod_proc.run_modtran(point_dir)
         
         # Load Emissivity / Reflectivity
-        spec_r = numpy.array(0)
-        spec_r_wvlens = numpy.array(0)
         water_file = './data/shared/water.txt'
-        
-        with open(water_file, 'r') as f:
-            water_file = f.readlines()
-            for line in water_file[3:]:
-                data = line.split()
-                spec_r_wvlens = numpy.append(spec_r_wvlens, float(data[0]))
-                spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
+        spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
         
         logging.info('Parsing tape files.')
         ret_vals = mod_proc.parse_tape7scn(point_dir)
@@ -231,7 +223,7 @@ class CalibrationController(object):
             
             logging.info('Modeled Radiance Processing: Band %s' % (band))
 
-            RSR, RSR_wavelengths = mod_proc.read_RSR(rsr_file)
+            RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
             
             # resample to rsr wavelength range
             upwell = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)

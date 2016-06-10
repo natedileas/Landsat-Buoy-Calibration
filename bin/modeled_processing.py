@@ -21,7 +21,7 @@ def run_modtran(directory):
     try:
         subprocess.check_call('ln -s /dirs/pkg/Mod4v3r1/DATA', shell=True)
         subprocess.check_call(exe, shell=True)
-    except OSError:  # symlink already exits error
+    except subprocess.CalledProcessError:  # symlink already exits error
         pass
     
     os.chdir(d)

@@ -17,5 +17,3 @@ pushd $tape5_dir >/dev/null 2>/dev/null
 ln -s /dirs/pkg/Mod4v3r1/DATA  >/dev/null 2>/dev/null
 /dirs/pkg/Mod4v3r1/Mod4v3r1.exe >/dev/null 2>/dev/null
 popd >/dev/null 2>/dev/null
-ln -fs $home/$directory/elim2.sed "${tape5_dir}"  >/dev/null 2>/dev/null
-./bin/tape6parser.bash $tape5_dir >/dev/null 2>/dev/null

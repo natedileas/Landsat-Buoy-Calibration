@@ -223,9 +223,8 @@ class CalibrationController(object):
                 spec_r_wvlens = numpy.append(spec_r_wvlens, float(data[0]))
                 spec_r = numpy.append(spec_r, float(data[1].replace('\n', '')))
         
-        logging.info('Parsing tape6 files.')
-        
-        ret_vals = mod_proc.read_tape6(point_dir)
+        logging.info('Parsing tape files.')
+        ret_vals = mod_proc.parse_tape7scn(point_dir)
         upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = ret_vals
 
         rsr_files = [[10, './data/shared/L8_B10.rsp'], \

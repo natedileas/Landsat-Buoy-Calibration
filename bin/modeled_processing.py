@@ -12,77 +12,28 @@ import merra_data
 import atmo_data
 
 ### POST MODTRAN FUNCTIONS ###
-
-def read_tape6(case):
-    """ parse tape6 files and return values. """
-
-    wavelengths = numpy.zeros(0)
-    radiance_up = numpy.zeros(0)
-    radiance_dn = numpy.zeros(0)
-    transission = numpy.zeros(0)
     
-    filename = os.path.join(case, 'parsed')
+def parse_tape7scn(directory):
+    filename = os.path.join(directory, 'tape7.scn')
     
-    wavelength = []
-    upwelled_radiance = []
-    gnd_reflected_radiance = []
-    transmission_parsed = []
-    total = []
-
-    # read data from file     
-    with open(filename, 'r') as f:
-        for line in f:
-            w, ur, grr, tot, t = line.split(' ')
-            wavelength.append(float(w))
-            upwelled_radiance.append(float(ur))
-            gnd_reflected_radiance.append(float(grr))
-            total.append(float(tot))
-            transmission_parsed.append(float(t))
+    data = numpy.genfromtxt(filename,  skip_header=11, skip_footer=1, \
+    usecols=(0,1,2,6,8), unpack=True)   
     
-    # calculate upwelled radiance and transmission
-    transission = numpy.asarray(transmission_parsed)
-    radiance_up = numpy.asarray(upwelled_radiance)
-        
-    # calculate downwelled radiance
-    transission[numpy.where(transission==0.0000)[0]] = 0.00001
-    gnd_reflected_radiance = numpy.asarray(gnd_reflected_radiance)
-    radiance_dn = numpy.divide(gnd_reflected_radiance, transission)
+    wvlen, trans, pth_thm, gnd_ref, total = data
+    
+    downwell_rad = gnd_ref / trans   # calculate downwelled radiance
+    upwell_rad = pth_thm   # calc upwelled radiance
     
     # sanity check
-    total = numpy.asarray(total)
-    radiance_dn_check = numpy.divide(numpy.subtract(total, radiance_up), transission)
-    check = numpy.subtract(radiance_dn, radiance_dn_check)
-    
+    check = downwell_rad - ((total - upwell_rad) / trans)
     if numpy.sum(numpy.absolute(check)) >= .05:
-       logging.error('Error in modtran module. Total Radiance minus upwelled radiance is not (approximately) equal to downwelled radiance*transmission')
+       logging.error('Error in modtran module. Total Radiance minus upwelled \
+       radiance is not (approximately) equal to downwelled radiance*transmission')
        sys.exit(-1)
 
-    wavelength = numpy.asarray(wavelength)
+    return upwell_rad, downwell_rad, wvlen, trans, gnd_ref
     
-    # flip wavelength, radiance, and transmission arrays...
-    # Tape6parser returns them backwards
-    wavelength = numpy.tile(wavelength,(1,1))
-    wavelength = numpy.fliplr(wavelength)
-    wavelength = wavelength[0]
     
-    radiance_up = numpy.tile(radiance_up,(1,1))
-    radiance_up = numpy.fliplr(radiance_up)
-    radiance_up = radiance_up[0]
-    
-    radiance_dn = numpy.tile(radiance_dn,(1,1))
-    radiance_dn = numpy.fliplr(radiance_dn)
-    radiance_dn = radiance_dn[0]
-    
-    transission = numpy.tile(transission,(1,1))
-    transission = numpy.fliplr(transission)
-    transission = transission[0]
-    
-    gnd_reflected_radiance = numpy.tile(gnd_reflected_radiance,(1,1))
-    gnd_reflected_radiance = numpy.fliplr(gnd_reflected_radiance)
-    gnd_reflected_radiance = gnd_reflected_radiance[0]
-    
-    return radiance_up, radiance_dn, wavelength, transission, gnd_reflected_radiance
-        
 def read_RSR(rsr_file):
     """ read in RSR data and return it to the caller. """
     wavelength_RSR = []

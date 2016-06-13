@@ -7,23 +7,21 @@ import ogr
 import osr
 
 def find_roi(img_file, lat, lon, zone):
-    """ find the region of interest in pixel coordinates. """
-    # open image
-    ds = gdal.Open(img_file)
-    #get data transform
-    gt = ds.GetGeoTransform()
+    """ find pixel which corresponds to lat and lon in image. """
+    # img_file: full path to georeferenced image file
+    # lat, lon: float, location to find
+    # zone: utm zone in which the image is projected
     
-    #change lat_lon to same projection
-    ret_val = utm.from_latlon(lat, lon)
+    ds = gdal.Open(img_file)   # open image
+    gt = ds.GetGeoTransform()   # get data transform
     
-    l_x = ret_val[0]
-    l_y = ret_val[1]
-        
-    if zone != ret_val[2]:
-        l_x, l_y = convert_utm_zones(l_x, l_y, ret_val[2], zone)
+    # change lat_lon to same projection
+    l_x, l_y, l_zone, l_zone_let = utm.from_latlon(lat, lon)
+    
+    if zone != l_zone:
+        l_x, l_y = convert_utm_zones(l_x, l_y, l_zone, zone)
 
-    #calculate pixel locations- 
-    #source:http://www.gdal.org/gdal_datamodel.html
+    # calculate pixel locations- source: http://www.gdal.org/gdal_datamodel.html
     x = int((l_x - gt[0]) / gt[1])
     y = int((l_y - gt[3]) / gt[5])
     

@@ -53,7 +53,7 @@ def convert_utm_zones(x, y, zone_from, zone_to):
     return point.GetX(), point.GetY()
      
 def calc_dc_avg(filename, poi):
-    """ calculate the digital count average. """
+    """ calculate the digital count average of the region of interest. """
     #open image
     im = Image.open(filename)
     im_loaded = im.load()

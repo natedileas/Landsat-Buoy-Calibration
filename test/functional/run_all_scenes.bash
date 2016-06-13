@@ -122,9 +122,15 @@ LC80410372014072LGN00
 LC80410372014104LGN00  
 LC80410372014136LGN00 )
 
+landsat_7=(
+LE70160382012364EDC00
+LE70160382012348EDC00
+LE70160382012332EDC00
+LE70160382012268EDC00 )
+
 for i in "${all_wo_wgrib[@]}"
 do 
    echo $i
-   python controller.py -scene_id $i -rv -d /dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/
+   python controller.py -scene_id $i -rvi -d /dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/
    echo
 done

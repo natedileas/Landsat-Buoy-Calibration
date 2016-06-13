@@ -1,0 +1,8 @@
+Scenes:
+
+LC80130332013145LGN00
+
+
+python controller.py -d /dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes -riv -scene
+
+

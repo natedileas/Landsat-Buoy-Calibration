@@ -89,7 +89,7 @@ def generate_tape5(cc, profile):
     else:
         lonString = '%2.3f' % (360.0 - cc.buoy_location[1])
 
-    point_dir = os.path.join(cc.scene_dir, 'points/%s_%s' % (latString, lonString))
+    point_dir = os.path.join(cc.scene_dir, 'modtran_%s_%s' % (latString, lonString))
 
     try:
         os.makedirs(point_dir)

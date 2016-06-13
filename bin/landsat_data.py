@@ -7,8 +7,6 @@ import logging
 
 def download(cc):
     """ download landsat data and parse metadata. """
-    
-    #downloaded_LID = DownloadLandsatScene().main(cc)
 
     if not os.path.exists(cc.scene_dir):
         os.makedirs(cc.scene_dir)
@@ -22,18 +20,20 @@ def download(cc):
     except IOError:
         logging.error('usgs password file problem (IOError)')
         sys.exit(-1)
-        
-    prefix = 'LC8'
 
-    # assign prefix,  repert, stations
+    # assign prefix, repert, stations
     if cc.satelite == 'LC8':
         prefix = 'LC8'
         repert = '4923'
         stations = ['LGN']
-    if cc.satelite == 'LE7':
+    elif cc.satelite == 'LE7':
         prefix = 'LE7'
         repert = '3373'
         stations = ['EDC', 'SGS', 'AGS', 'ASN', 'SG1']
+    elif cc.satelite == 'LT5':
+        prefix = 'LT5'
+        repert = '3119'
+        stations = ['GLC','ASA','KIR','MOR','KHC', 'PAC', 'KIS', 'CHM', 'LGS', 'MGR', 'COA', 'MPS']
 
     scene_ids = [cc.scene_id]
     date = datetime.datetime.strftime(cc.date, '%Y%j')
@@ -41,7 +41,7 @@ def download(cc):
     for station in stations:
         for version in ['00', '01', '02', '03', '04']:
             scene_ids.append(prefix + cc.wrs2 + date + station + version)
-    
+
     # remove any ids which are None
     scene_ids = filter(None, scene_ids)
     
@@ -54,7 +54,7 @@ def download(cc):
         unzipdfile = os.path.join(cc.scene_dir, scene_id + '_B10.TIF')
         
         # already downloaded and unzipped
-        if os.path.exists(unzipdfile) and os.path.exists(metafile):
+        if os.path.exists(metafile):
             logging.info('Product %s already downloaded and unzipped ' % scene_id)
             break
             

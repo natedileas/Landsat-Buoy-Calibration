@@ -10,6 +10,7 @@ import warnings
 import narr_data
 import merra_data
 import atmo_data
+import misc_functions as funcs
 
 ### PRE MODTRAN FUNCTIONS ###
 
@@ -142,12 +143,51 @@ def run_modtran(directory):
     try:
         subprocess.check_call('ln -s /dirs/pkg/Mod4v3r1/DATA', shell=True)
         subprocess.check_call(exe, shell=True)
-    except subprocess.CalledProcessError:  # symlink already exits error
+    except subprocess.CalledProcessError:  # symlink already exists error
         pass
 
     os.chdir(d)
 
 ### POST MODTRAN FUNCTIONS ###
+
+def calc_radiance(cc, rsr_file, modtran_data):
+    """ calculate modeled radiance for band 10 and 11. """
+        
+    upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = modtran_data
+
+    RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
+    
+    # Load Emissivity / Reflectivity
+    water_file = os.path.join(cc.filepath_base, 'data/shared/water.txt')
+    spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
+    
+    # resample to rsr wavelength range
+    upwell = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)
+    downwell = numpy.interp(RSR_wavelengths, wavelengths, downwell_rad)
+    tau = numpy.interp(RSR_wavelengths, wavelengths, transmission)
+    gnd_ref = numpy.interp(RSR_wavelengths, wavelengths, gnd_reflect)
+    spec_ref = numpy.interp(RSR_wavelengths, spec_r_wvlens, spec_r)
+    
+    spec_emis = 1 - spec_ref   # calculate emissivity
+
+    RSR_wavelengths = RSR_wavelengths / 1e6   # convert to meters
+    
+    # calculate temperature array
+    Lt = calc_temperature_array(RSR_wavelengths, cc.skin_temp)  # w m-2 sr-1 m-1
+    
+    # calculate top of atmosphere radiance (spectral)
+    ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
+    term1 = Lt * spec_emis * tau # W m-2 sr-1 m-1
+    term2 = spec_ref * gnd_ref * 1e10 # W m-2 sr-1 m-1
+    Ltoa = (upwell * 1e10) + term1 + term2   # W m-2 sr-1 m-1
+    
+    # calculate observed radiance
+    numerator = funcs.integrate(RSR_wavelengths, Ltoa * RSR)
+    denominator = funcs.integrate(RSR_wavelengths, RSR)
+    
+    modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
+    return modeled_rad
+
 
 def parse_tape7scn(directory):
     filename = os.path.join(directory, 'tape7.scn')

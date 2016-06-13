@@ -1,5 +1,6 @@
 import bin.BuoyCalib as bc
 import tools.pickle_funcs as pickle
+import os
 
 if __name__=='__main__':
     import argparse
@@ -61,6 +62,6 @@ if __name__=='__main__':
         pickle.output_cache(cc)    # write out values to pickle
 
     if args.image:
-        img_proc.write_im(cc)
+        img_proc.write_im(cc, os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6_VCID_2']))
         print 'Image with NARR points and buoy written to %s' % (cc.scene_dir + '/' + cc.scene_id + '_mod.png')
 

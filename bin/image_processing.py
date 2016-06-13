@@ -6,6 +6,18 @@ import utm
 import ogr
 import osr
 
+def calc_radiance(cc, img_file, band):
+    """ calculate image radiance for a given image file. """
+
+    # find Region Of Interest (PixelOI return)
+    cc.poi = find_roi(img_file, cc.buoy_location[0], cc.buoy_location[1], cc.metadata['UTM_ZONE'])
+
+    # calculate digital count average and convert to radiance of 3x3 area around poi
+    dc_avg = calc_dc_avg(img_file, cc.poi)
+    radiance = dc_to_rad(cc.satelite, band, cc.metadata, dc_avg)
+
+    return radiance
+
 def find_roi(img_file, lat, lon, zone):
     """ find pixel which corresponds to lat and lon in image. """
     # img_file: full path to georeferenced image file
@@ -71,33 +83,48 @@ def calc_dc_avg(filename, poi):
 
     return dc_avg
 
-def dc_to_rad(band, metadata, DCavg):
+def dc_to_rad(sat, band, metadata, DCavg):
     """ Convert digital count average to radiance. """
     
-    if band == 10:
-        L_add = metadata['RADIANCE_ADD_BAND_10']
-        L_mult = metadata['RADIANCE_MULT_BAND_10']
-    if band == 11:
-        L_add = metadata['RADIANCE_ADD_BAND_11']
-        L_mult = metadata['RADIANCE_MULT_BAND_11']
-
-    #calculate LLambda
-    LLambdaaddmult = DCavg * L_mult + L_add
+    if sat == 'LC8':   # L8
+        if band == 10:
+            L_add = metadata['RADIANCE_ADD_BAND_10']
+            L_mult = metadata['RADIANCE_MULT_BAND_10']
+        elif band == 11:
+            L_add = metadata['RADIANCE_ADD_BAND_11']
+            L_mult = metadata['RADIANCE_MULT_BAND_11']
+        else:
+            logging.error('Band was not 10 or 11 for landsat 8.')
+            sys.exit(1)
+            
+    elif sat == 'LE7':   # L7
+        L_add = metadata['RADIANCE_ADD_BAND_6_VCID_2']
+        L_mult = metadata['RADIANCE_MULT_BAND_6_VCID_2']
         
-    return LLambdaaddmult
+    elif sat == 'LT5':   # L5
+        L_add = metadata['RADIANCE_ADD_BAND_6']
+        L_mult = metadata['RADIANCE_MULT_BAND_6']
+
+    else:
+        logging.error('Sat was not 5, 7, or 8.')
+        sys.exit(1)
+
+    print DCavg, L_mult, L_add
+    radiance = DCavg * L_mult + L_add
+
+    return radiance
 
 
-def write_im(cc):
-    img = os.path.join(cc.scene_dir, cc.scene_id+'_B10.TIF')
+def write_im(cc, img_file):
     zone = cc.metadata['UTM_ZONE']
     narr_pix = []
     
     # get narr point locations
     for lat, lon in cc.narr_coor:
-        narr_pix.append(find_roi(img, lat, lon, zone))
+        narr_pix.append(find_roi(img_file, lat, lon, zone))
 
     # draw circle on top of image to signify narr points
-    image = Image.open(img)
+    image = Image.open(img_file)
     image = image.point(lambda i:i*(1./256.0)).convert('RGBA')
     draw = ImageDraw.Draw(image)
     rx = 100

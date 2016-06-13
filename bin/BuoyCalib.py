@@ -25,11 +25,11 @@ class CalibrationController(object):
     buoy_dewpnt = None
     
     # modeled radiance and related attributes
-    _modeled_radiance = None
+    _modeled_radiance = []
     narr_coor = None
     
     # image radiance and related attributes
-    _image_radiance = None
+    _image_radiance = []
     metadata = None    # landsat metadata
     scenedatetime = None 
     poi = None
@@ -38,6 +38,7 @@ class CalibrationController(object):
     satelite = None
     wrs2 = None
     date = None
+    station = None
     version = None
     
     # verbosity
@@ -69,7 +70,7 @@ class CalibrationController(object):
     def scene_id(self):
         """ scene_id getter. stored internally as different parts. """
         
-        lid = '%s%s%sLGN%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'), self.version)
+        lid = '%s%s%s%s%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'),self.station, self.version)
         return lid
 
 
@@ -77,18 +78,18 @@ class CalibrationController(object):
     def scene_id(self, new_id):
         """ scene_id setter. check for validity before assignment. """
         
-        match = re.match('L[CE][78]\d{13}LGN0[0-5]', new_id)
+        match = re.match('^L(C8|E7|T5)\d{13}(LGN|EDC|SGS|AGS|ASN|SG1)0[0-5]$', new_id)
 
         if match:
-            new_id = match.group()
             self.satelite = new_id[0:3]
             self.wrs2 = new_id[3:9]
             self.date = datetime.datetime.strptime(new_id[9:16], '%Y%j')
+            self.station = new_id[16:19]
             self.version = new_id[-2:]
 
         else:
-            logging.warning('scene_id.setter: %s is the wrong format' % new_id)
-
+            logging.error('scene_id.setter: %s is the wrong format' % new_id)
+            sys.exit(-1)
 
     @property
     def buoy_id(self):
@@ -168,10 +169,10 @@ class CalibrationController(object):
         output_items = ['Scene ID: %s'%self.scene_id]
         
         if self._modeled_radiance:
-            output_items.append('Modeled: Band 10: %2.6f Band 11: %2.6f' % (self._modeled_radiance[0], self._modeled_radiance[1]))
+            output_items.append('Modeled: %s' % (self._modeled_radiance))
         
         if self._image_radiance:
-            output_items.append('Image:   Band 10: %2.6f Band 11: %2.6f' % (self._image_radiance[0], self._image_radiance[1]))
+            output_items.append('Image: %s' % (self._image_radiance))
         
         if self._buoy_id:
             output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %4.4f' %(self.buoy_id, self.buoy_location, self.skin_temp))
@@ -180,11 +181,32 @@ class CalibrationController(object):
     
     ### helper functions ###
     def calc_all(self):
-         self.download_img_data()
-         self.calculate_buoy_information()
-         self.download_mod_data()
-         self.calc_mod_radiance() 
-         self.calc_img_radiance()
+        self.download_img_data()
+        self.calculate_buoy_information()
+        self.download_mod_data()
+        
+        # modeled radiance processing
+        if self.satelite == 'LC8':   # L8
+            rsr_files = [[10, os.path.join(self.filepath_base, 'data/shared/L8_B10.rsp')], \
+                        [11, os.path.join(self.filepath_base, 'data/shared/L8_B11.rsp')]]
+            img_files = [[10, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10'])], \
+                        [11, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]]
+        elif self.satelite == 'LE7':   # L7
+            rsr_files = [[6, os.path.join(self.filepath_base, 'data/shared/L7_B6_2.rsp')]]
+            img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6_VCID_2'])]]
+        elif self.satelite == 'LT5':   # L5
+            rsr_files = [[6, os.path.join(self.filepath_base, 'data/shared/L5_B6.rsp')]]
+            img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6'])]]
+
+        modtran_data = self.run_modtran()
+        
+        for band, rsr_file in rsr_files:
+            logging.info('Modeled Radiance Processing: Band %s' % (band))
+            self._modeled_radiance.append(mod_proc.calc_radiance(self, rsr_file, modtran_data))
+                    
+        for band, img_file in img_files:
+            logging.info('Image Radiance Processing: Band %s' % (band))
+            self._image_radiance.append(img_proc.calc_radiance(self, img_file, band))
 
     ### real work functions ###
                     
@@ -196,10 +218,8 @@ class CalibrationController(object):
             narr_data.download(self)
         elif self.atmo_src == 'merra':
             merra_data.download(self)
-
-    def calc_mod_radiance(self):
-        """ calculate modeled radiance for band 10 and 11. """
             
+    def run_modtran(self):
         logging.info('Generating tape5 files.')
         # read in narr data and generate tape5 files and caseList
         point_dir, self.narr_coor = mod_proc.make_tape5s(self)
@@ -207,52 +227,11 @@ class CalibrationController(object):
         logging.info('Running modtran.')
         mod_proc.run_modtran(point_dir)
         
-        # Load Emissivity / Reflectivity
-        water_file = './data/shared/water.txt'
-        spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
-        
-        logging.info('Parsing tape files.')
-        ret_vals = mod_proc.parse_tape7scn(point_dir)
-        upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = ret_vals
+        logging.info('Parsing modtran output.')
+        upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = mod_proc.parse_tape7scn(point_dir)
+        return upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
 
-        rsr_files = [[10, './data/shared/L8_B10.rsp'], \
-                     [11, './data/shared/L8_B11.rsp']]
-        modeled_rad = []
-        
-        for band, rsr_file in rsr_files:
-            
-            logging.info('Modeled Radiance Processing: Band %s' % (band))
-
-            RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
-            
-            # resample to rsr wavelength range
-            upwell = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)
-            downwell = numpy.interp(RSR_wavelengths, wavelengths, downwell_rad)
-            tau = numpy.interp(RSR_wavelengths, wavelengths, transmission)
-            gnd_ref = numpy.interp(RSR_wavelengths, wavelengths, gnd_reflect)
-            spec_ref = numpy.interp(RSR_wavelengths, spec_r_wvlens, spec_r)
-            
-            spec_emis = 1 - spec_ref   # calculate emissivity
-
-            RSR_wavelengths = RSR_wavelengths / 1e6   # convert to meters
-            
-            # calculate temperature array
-            Lt = mod_proc.calc_temperature_array(RSR_wavelengths, self.skin_temp)  # w m-2 sr-1 m-1
-            
-            # calculate top of atmosphere radiance (Ltoa)
-            # NEW METHOD 
-            ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
-            term1 = Lt * spec_emis * tau # W m-2 sr-1 m-1
-            term2 = spec_ref * gnd_ref * 1e10 # W m-2 sr-1 m-1
-            Ltoa = (upwell * 1e10) + term1 + term2   # W m-2 sr-1 m-1
-            
-            # calculate observed radiance
-            numerator = funcs.integrate(RSR_wavelengths, Ltoa * RSR)
-            denominator = funcs.integrate(RSR_wavelengths, RSR)
-            modeled_rad.append((numerator / denominator) / 1e6)  # W m-2 sr-1 um-1
-                
-        self.modeled_radiance = modeled_rad
-
+    
     def download_img_data(self):
         """ download landsat images and parse metadata. """
         
@@ -270,25 +249,6 @@ class CalibrationController(object):
         date = self.metadata['DATE_ACQUIRED']
         time = self.metadata['SCENE_CENTER_TIME'].replace('"', '')[0:7]
         self.scenedatetime = datetime.datetime.strptime(date+' '+time, '%Y-%m-%d %H:%M:%S')
-
-    def calc_img_radiance(self):
-        """ calculate image radiance for band 10 and 11. """
-        
-        img_files = [[10, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10'])], \
-                     [11, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]]
-        im_rad = []
-        
-        for band, img_file in img_files:
-           logging.info('Image Radiance Processing: Band %s' % (band))
-           
-           # find Region Of Interest (PixelOI return)
-           self.poi = img_proc.find_roi(img_file, self.buoy_location[0], self.buoy_location[1], self.metadata['UTM_ZONE'])
-            
-           # calculate digital count average and convert to radiance of 3x3 area around poi
-           dc_avg = img_proc.calc_dc_avg(img_file, self.poi)
-           im_rad.append(img_proc.dc_to_rad(band, self.metadata, dc_avg))
-        
-        self.image_radiance = im_rad
 
     def calculate_buoy_information(self):
         """ pick buoy dataset, download, and calculate skin_temp. """

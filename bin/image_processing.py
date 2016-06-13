@@ -109,7 +109,6 @@ def dc_to_rad(sat, band, metadata, DCavg):
         logging.error('Sat was not 5, 7, or 8.')
         sys.exit(1)
 
-    print DCavg, L_mult, L_add
     radiance = DCavg * L_mult + L_add
 
     return radiance
@@ -125,7 +124,8 @@ def write_im(cc, img_file):
 
     # draw circle on top of image to signify narr points
     image = Image.open(img_file)
-    image = image.point(lambda i:i*(1./256.0)).convert('RGBA')
+    #image = image.point(lambda i:i*(1./256.0)).convert('RGBA')
+    image = image.convert('RGBA')
     draw = ImageDraw.Draw(image)
     rx = 100
     

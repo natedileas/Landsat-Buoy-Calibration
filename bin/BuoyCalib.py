@@ -12,7 +12,6 @@ import buoy_data
 import landsat_data
 import narr_data
 import merra_data
-import misc_functions as funcs
 
 class CalibrationController(object):
     ############## ATTRIBUTES #################################################
@@ -25,11 +24,11 @@ class CalibrationController(object):
     buoy_dewpnt = None
     
     # modeled radiance and related attributes
-    _modeled_radiance = []
+    modeled_radiance = []
     narr_coor = None
     
     # image radiance and related attributes
-    _image_radiance = []
+    image_radiance = []
     metadata = None    # landsat metadata
     scenedatetime = None 
     poi = None
@@ -44,7 +43,7 @@ class CalibrationController(object):
     # verbosity
     verbose = False
     
-    ############## ENTRY POINT ################################################
+    ### ENTRY POINT ###
     def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False, atmo_src='narr'):
         """ set up CalibrationController object. """
         
@@ -60,17 +59,19 @@ class CalibrationController(object):
 
         self.verbose = verbose
         if verbose is False:
-            logging.basicConfig(filename=os.path.join(self.scene_dir, 'log.txt'), level=logging.INFO, filemode='w')
+            logging.basicConfig(filename=os.path.join(self.scene_dir, 'log.txt'), \
+            level=logging.INFO, filemode='w')
         else:
             logging.basicConfig(level=logging.INFO)
 
     
-############## GETTERS AND SETTERS ############################################
+    ### GETTERS AND SETTERS ###
     @property
     def scene_id(self):
         """ scene_id getter. stored internally as different parts. """
         
-        lid = '%s%s%s%s%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'),self.station, self.version)
+        lid = '%s%s%s%s%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'), \
+        self.station, self.version)
         return lid
 
 
@@ -97,82 +98,33 @@ class CalibrationController(object):
         
         return self._buoy_id
 
-
     @buoy_id.setter
     def buoy_id(self, new_id):
         """ buoy_id setter. check for validity before assignment. """
         
-        match = re.match('\d{5}', new_id)
+        match = re.match('^\d{5}$', new_id)
 
         if match:   # if it matches the pattern
             self._buoy_id = match.group()
         else:
             self._buoy_id = new_id
-            logging.warning('.buoy_id: @buoy_id.setter: the given buoy id is the wrong format')
-     
-            
-    @property
-    def modeled_radiance(self):
-        """ modeled_radiance getter. calulates it if not already calculated. """
-        
-        if not self._modeled_radiance:
-            # do everything necesary to calculate mod_radiance
-            
-            if not self.metadata:
-                self.download_img_data()
-            if not self.buoy_location:
-                self.calculate_buoy_information()
-                
-            # download
-            self.download_mod_data()
-                
-            # process
-            self.calc_mod_radiance()
-            
-        return self._modeled_radiance
-    
-    
-    @modeled_radiance.setter
-    def modeled_radiance(self, new_rad):
-        """ modeled_radiance setter. """
-        
-        self._modeled_radiance = new_rad
-        
-        
-    @property
-    def image_radiance(self):
-        """ image_radiance getter. calulates it if not already calculated. """
-        
-        if not self._image_radiance:
-            if not self.metadata:
-                self.download_img_data()
-            if not self.buoy_location:
-                self.calculate_buoy_information()
-            self.calc_img_radiance()
-        return self._image_radiance
-        
-        
-    @image_radiance.setter
-    def image_radiance(self, new_rad):
-        """ image_radiance setter. """
-        
-        self._image_radiance = new_rad
+            logging.warning('.buoy_id: @buoy_id.setter: %s is the wrong format' % new_id)
 
-    ############## MEMBER FUNCTIONS ###########################################
+
+    #### MEMBER FUNCTIONS ###
     def __repr__(self):
         return self.__str__()
-        
         
     def __str__(self):
         """ print calculated values. """
             
         output_items = ['Scene ID: %s'%self.scene_id]
         
-        if self._modeled_radiance:
-            output_items.append('Modeled: %s' % (self._modeled_radiance))
+        if self.modeled_radiance:
+            output_items.append('Modeled: %s' % (self.modeled_radiance))
         
-        if self._image_radiance:
-            output_items.append('Image: %s' % (self._image_radiance))
+        if self.image_radiance:
+            output_items.append('Image: %s' % (self.image_radiance))
         
         if self._buoy_id:
             output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %4.4f' %(self.buoy_id, self.buoy_location, self.skin_temp))
@@ -202,14 +154,14 @@ class CalibrationController(object):
         
         for band, rsr_file in rsr_files:
             logging.info('Modeled Radiance Processing: Band %s' % (band))
-            self._modeled_radiance.append(mod_proc.calc_radiance(self, rsr_file, modtran_data))
+            self.modeled_radiance.append(mod_proc.calc_radiance(self, rsr_file, modtran_data))
                     
         for band, img_file in img_files:
             logging.info('Image Radiance Processing: Band %s' % (band))
-            self._image_radiance.append(img_proc.calc_radiance(self, img_file, band))
+            self.image_radiance.append(img_proc.calc_radiance(self, img_file, band))
 
     ### real work functions ###
-                    
+  
     def download_mod_data(self):
         """ download atmospheric data. """
         logging.info('Downloading atmospheric data.')

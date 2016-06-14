@@ -40,11 +40,8 @@ class CalibrationController(object):
     station = None
     version = None
     
-    # verbosity
-    verbose = False
-    
     ### ENTRY POINT ###
-    def __init__(self, LID, BID, DIR='/dirs/home/ugrad/nid4986/landsat_data/', atmo_src='narr', verbose=False):
+    def __init__(self, LID, BID=None, DIR='/dirs/home/ugrad/nid4986/landsat_data/', atmo_src='narr', verbose=False):
         """ set up CalibrationController object. """
         
         self.scene_id = LID
@@ -52,16 +49,14 @@ class CalibrationController(object):
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
         self.data_base = os.path.realpath(DIR)
         self.scene_dir = os.path.realpath(os.path.join(DIR, 'landsat_scenes', LID))
-        print self.scene_dir, self.data_base, self.filepath_base
         
         self.atmo_src = atmo_src
 
         if not os.path.exists(self.scene_dir):
             os.makedirs(self.scene_dir)
 
-        self.verbose = verbose
         if verbose is False:
-            logging.basicConfig(filename=os.path.join(self.scene_dir, 'log.txt'), \
+            logging.basicConfig(filename=os.path.join(self.scene_dir, 'output','log.txt'), \
             level=logging.INFO, filemode='w')
         else:
             logging.basicConfig(level=logging.INFO)

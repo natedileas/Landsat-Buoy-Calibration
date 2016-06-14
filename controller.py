@@ -44,7 +44,7 @@ if __name__=='__main__':
     if args.merra:
         atmo_data_src='merra'
  
-    cc = bc.CalibrationController(LID, args.buoy_id, args.directory, verbose=args.verbose, atmo_src=atmo_data_src)  # initialize
+    cc = bc.CalibrationController(LID, args.buoy_id, verbose=args.verbose, atmo_src=atmo_data_src)  # initialize
 
     if not args.reprocess:
         try:

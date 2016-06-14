@@ -20,14 +20,15 @@ def download(cc):
                     'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/shum.%s.nc']
     
     date = cc.date.strftime('%Y%m')   # YYYYMM
+    save_dir = os.path.join(cc.data_base, 'narr')
     
     for url in narr_urls:
         url = url % date
         
-        if os.path.isfile(os.path.join(cc.scene_dir, url.split('/')[-1])):
+        if os.path.isfile(os.path.join(save_dir, url.split('/')[-1])):
             continue   # if file already downloaded
             
-        subprocess.check_call('wget %s -P %s' % (url, cc.scene_dir), shell=True)
+        subprocess.check_call('wget %s -P %s' % (url, save_dir), shell=True)
 
 def open(cc):
     """ open NARR file (netCDF4 format). """
@@ -36,9 +37,10 @@ def open(cc):
     narr_files = ['air.%s.nc', 'hgt.%s.nc', 'shum.%s.nc']
 
     date = cc.date.strftime('%Y%m')
+    save_dir = os.path.join(cc.data_base, 'narr')
     
     for data_file in narr_files:
-        data_file = os.path.join(cc.scene_dir, data_file % date)
+        data_file = os.path.join(save_dir, data_file % date)
         
         if os.path.isfile(data_file) is not True:
             logging.error('NARR Data file is not at the expected path: %' % data_file)

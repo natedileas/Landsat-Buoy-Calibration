@@ -22,7 +22,10 @@ def make_tape5s(cc):
     elif cc.atmo_src == 'merra':
         data, data_coor = get_merra_data(cc)
 
-    stan_atmo = atmo_data.read_stan_atmo()   # load standard atmo
+    # load standard atmosphere for mid-lat summer
+    filename = os.path.join(cc.data_base, 'misc', 'stanAtm.txt')
+    stan_atmo = numpy.loadtxt(filename, unpack=True)
+    
     interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
     atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
 
@@ -96,7 +99,7 @@ def generate_tape5(cc, profile):
     except OSError:
         pass
 
-    modtran_directory = os.path.join(cc.filepath_base, 'data/shared/modtran')
+    modtran_directory = os.path.join(cc.data_base, 'misc')
     head_file = os.path.join(modtran_directory, 'head.txt')
     tail_file = os.path.join(modtran_directory, 'tail.txt')
     head = ''
@@ -158,7 +161,7 @@ def calc_radiance(cc, rsr_file, modtran_data):
     RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
     
     # Load Emissivity / Reflectivity
-    water_file = os.path.join(cc.filepath_base, 'data/shared/water.txt')
+    water_file = os.path.join(cc.data_base, 'misc', 'water.txt')
     spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
     
     # resample to rsr wavelength range

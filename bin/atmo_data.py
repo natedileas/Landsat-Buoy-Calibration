@@ -204,24 +204,6 @@ def bilinear_interpolation(x, y, points):
             q12 * (x2 - x) * (y - y1) +
             q22 * (x - x1) * (y - y1)
            ) / ((x2 - x1) * (y2 - y1) + 0.0)
-    
-def read_stan_atmo(filename='./data/shared/modtran/stanAtm.txt'):
-    # read in file containing standard mid lat summer atmosphere information 
-    # to be used for upper layers of atmo profile
-    stan_atmo = []
-    chars = ['\n']
-
-    with open(filename, 'r') as f:
-        for line in f:
-            data = line.translate(None, ''.join(chars))
-            data = data.split()
-            data = filter(None, data)
-            data = [float(j) for j in data]
-            stan_atmo.append(data)
-
-    stan_atmo = numpy.asarray(stan_atmo)
-    
-    return stan_atmo[:,0], stan_atmo[:,1], stan_atmo[:,2], stan_atmo[:,3]
 
 def generate_profiles(interp_atmo, stan_atmo, pressures):
     # unpack
@@ -265,7 +247,11 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
     return profiles
 
 def write_atmo(cc, atmo):
-    filename = os.path.join(cc.scene_dir, 'atmo_interp')
+    dir_ = os.path.join(cc.scene_dir,'atmo')
+    if not os.path.exists(dir_):
+        os.makedirs(dir_)
+    
+    filename = os.path.join(dir_,'atmo_interp')
     
     if cc.atmo_src == 'narr':
         filename += '_narr.txt'

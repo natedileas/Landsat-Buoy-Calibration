@@ -44,13 +44,15 @@ class CalibrationController(object):
     verbose = False
     
     ### ENTRY POINT ###
-    def __init__(self, LID, BID, DIR='./data/scenes/', verbose=False, atmo_src='narr'):
+    def __init__(self, LID, BID, DIR='/dirs/home/ugrad/nid4986/landsat_data/', atmo_src='narr', verbose=False):
         """ set up CalibrationController object. """
         
         self.scene_id = LID
                 
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
-        self.scene_dir = os.path.realpath(os.path.join(DIR, LID))
+        self.data_base = os.path.realpath(DIR)
+        self.scene_dir = os.path.realpath(os.path.join(DIR, 'landsat_scenes', LID))
+        print self.scene_dir, self.data_base, self.filepath_base
         
         self.atmo_src = atmo_src
 
@@ -79,7 +81,7 @@ class CalibrationController(object):
     def scene_id(self, new_id):
         """ scene_id setter. check for validity before assignment. """
         
-        match = re.match('^L(C8|E7|T5)\d{13}(LGN|EDC|SGS|AGS|ASN|SG1)0[0-5]$', new_id)
+        match = re.match('^L(C8|E7|T5)\d{13}(LGN|EDC|SGS|AGS|ASN|SG1|GLC|ASA|KIR|MOR|KHC|PAC|KIS|CHM|LGS|MGR|COA|MPS)0[0-5]$', new_id)
 
         if match:
             self.satelite = new_id[0:3]
@@ -212,7 +214,7 @@ class CalibrationController(object):
         corners[1] = self.metadata['CORNER_LL_LAT_PRODUCT'], \
             self.metadata['CORNER_LL_LON_PRODUCT']
 
-        save_dir = os.path.join(self.filepath_base, 'data/shared/buoy')
+        save_dir = os.path.join(self.data_base, 'noaa')
         dataset = None
         
         buoy_data.get_stationtable(save_dir)   # download staion_table.txt

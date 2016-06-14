@@ -10,17 +10,7 @@ def download(cc):
 
     if not os.path.exists(cc.scene_dir):
         os.makedirs(cc.scene_dir)
-
-    # read password file
-    try:
-        with open(os.path.join(cc.filepath_base, 'data/shared/usgs_login.txt'), 'r') as f:
-            account, passwd = f.readline().split(' ')
-        passwd = passwd.replace('\n', '')
-        usgs = {'account': account, 'passwd': passwd}
-    except IOError:
-        logging.error('usgs password file problem (IOError)')
-        sys.exit(-1)
-
+    
     # assign prefix, repert, stations
     if cc.satelite == 'LC8':
         prefix = 'LC8'
@@ -37,7 +27,7 @@ def download(cc):
 
     scene_ids = [cc.scene_id]
     date = datetime.datetime.strftime(cc.date, '%Y%j')
-    
+
     for station in stations:
         for version in ['00', '01', '02', '03', '04']:
             scene_ids.append(prefix + cc.wrs2 + date + station + version)
@@ -46,12 +36,11 @@ def download(cc):
     scene_ids = filter(None, scene_ids)
     
     # iterate through ids
-    tgz_out_dir = os.path.realpath(os.path.join(cc.scene_dir, '..'))
+    tgz_out_dir = os.path.realpath(os.path.join(cc.data_base, 'landsat_scenes'))
     for scene_id in scene_ids:
         url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
         tgzfile = os.path.join(tgz_out_dir, scene_id + '.tgz')
         metafile = os.path.join(cc.scene_dir, scene_id + '_MTL.txt')
-        unzipdfile = os.path.join(cc.scene_dir, scene_id + '_B10.TIF')
         
         # already downloaded and unzipped
         if os.path.exists(metafile):
@@ -67,18 +56,17 @@ def download(cc):
         # not downloaded
         else:
             logging.info('product %s not already downloaded ' % scene_id)
-            
+
             # connect
-            connect_cmd = "wget --cookies=on --save-cookies cookies.txt --keep-session-cookies --post-data 'username=nid4986&password=Fivyx689' https://ers.cr.usgs.gov/login/"
+            connect_cmd = "wget --cookies=on --save-cookies cookies.txt --keep-session-cookies --post-data 'username=nid4986&password=Chester89' https://ers.cr.usgs.gov/login/"
             download_cmd = 'wget --cookies=on --load-cookies cookies.txt --keep-session-cookies --output-document=%s %s' % (tgzfile, url)
-            
-            
+
             subprocess.check_call(connect_cmd, shell=True)
             os.remove(os.path.join(cc.filepath_base, 'index.html'))
-                
+
             subprocess.check_call(download_cmd, shell=True)
             os.remove(os.path.join(cc.filepath_base, 'cookies.txt'))
-            
+
             unzipimage(tgzfile, cc.scene_dir)
             break
 

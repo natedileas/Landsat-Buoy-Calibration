@@ -14,36 +14,34 @@ import narr_data
 import merra_data
 
 class CalibrationController(object):
-    ############## ATTRIBUTES #################################################
-    # buoy and related attributes
-    _buoy_id = None
-    buoy_location = None  # [lat, lon]
-    skin_temp = None   # calculated from buoy dataset
-    buoy_press = None
-    buoy_airtemp = None
-    buoy_dewpnt = None
-    
-    # modeled radiance and related attributes
-    modeled_radiance = []
-    narr_coor = None
-    
-    # image radiance and related attributes
-    image_radiance = []
-    metadata = None    # landsat metadata
-    scenedatetime = None 
-    poi = None
-    
-    # attributes that make up the lansat id
-    satelite = None
-    wrs2 = None
-    date = None
-    station = None
-    version = None
-    
-    ### ENTRY POINT ###
     def __init__(self, LID, BID=None, DIR='/dirs/home/ugrad/nid4986/landsat_data/', atmo_src='narr', verbose=False):
         """ set up CalibrationController object. """
         
+        # buoy and related attributes
+        self._buoy_id = None
+        self.buoy_location = None  # [lat, lon]
+        self.skin_temp = None   # calculated from buoy dataset
+        self.buoy_press = None
+        self.buoy_airtemp = None
+        self.buoy_dewpnt = None
+        
+        # modeled radiance and related attributes
+        self.modeled_radiance = []
+        self.narr_coor = None
+        
+        # image radiance and related attributes
+        self.image_radiance = []
+        self.metadata = None    # landsat metadata
+        self.scenedatetime = None 
+        self.poi = None
+        
+        # attributes that make up the lansat id
+        self.satelite = None
+        self.wrs2 = None
+        self.date = None
+        self.station = None
+        self.version = None
+
         self.scene_id = LID
                 
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
@@ -54,6 +52,9 @@ class CalibrationController(object):
 
         if not os.path.exists(self.scene_dir):
             os.makedirs(self.scene_dir)
+
+        if not os.path.exists(os.path.join(self.scene_dir, 'output')):
+            os.makedirs(os.path.join(self.scene_dir, 'output'))
 
         if verbose is False:
             logging.basicConfig(filename=os.path.join(self.scene_dir, 'output','log.txt'), \
@@ -107,7 +108,6 @@ class CalibrationController(object):
             self._buoy_id = new_id
             logging.warning('.buoy_id: @buoy_id.setter: %s is the wrong format' % new_id)
 
-
     #### MEMBER FUNCTIONS ###
     def __repr__(self):
         return self.__str__()
@@ -117,14 +117,10 @@ class CalibrationController(object):
             
         output_items = ['Scene ID: %s'%self.scene_id]
         
-        if self.modeled_radiance:
-            output_items.append('Modeled: %s' % (self.modeled_radiance))
+        output_items.append('Modeled: %s' % (self.modeled_radiance))
+        output_items.append('Image: %s' % (self.image_radiance))
         
-        if self.image_radiance:
-            output_items.append('Image: %s' % (self.image_radiance))
-        
-        if self._buoy_id:
-            output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %4.4f' %(self.buoy_id, self.buoy_location, self.skin_temp))
+        output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %s' %(self.buoy_id, self.buoy_location, self.skin_temp))
             
         return '\n'.join(output_items)
     

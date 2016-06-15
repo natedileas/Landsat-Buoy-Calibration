@@ -124,10 +124,15 @@ def write_im(cc, img_file):
 
     # draw circle on top of image to signify narr points
     image = Image.open(img_file)
-    #image = image.point(lambda i:i*(1./256.0)).convert('RGBA')
-    image = image.convert('RGBA')
+    
+    # convert to proper format
+    if image.mode == 'L':
+        image = image.convert('RGBA')
+    elif 'I;16' in image.mode:
+        image = image.point(lambda i:i*(1./256.0)).convert('RGBA')
+    
     draw = ImageDraw.Draw(image)
-    rx = 100
+    rx = 80
     
     for x, y in narr_pix:
         draw.ellipse((x-rx, y-rx, x+rx, y+rx), fill=(255, 0, 0))
@@ -138,11 +143,11 @@ def write_im(cc, img_file):
     draw.ellipse((x-rx, y-rx, x+rx, y+rx), fill=(0, 255, 0))
 
     # downsample
-    image = image.resize((500, 486), Image.ANTIALIAS)
+    new_size = (int(image.size[0] / 15), int(image.size[1] / 15))
+    image = image.resize(new_size, Image.ANTIALIAS)
     
+    # put alpha mask in
     data = image.getdata()
-    #print data.shape
-    #print data.size
     newData = []
     
     for item in data:
@@ -152,8 +157,9 @@ def write_im(cc, img_file):
             newData.append(item)
     
     image.putdata(newData)
+
     # save
-    save_path = os.path.join(cc.scene_dir, 'output',cc.scene_id+'_mod')
+    save_path = os.path.join(cc.scene_dir, 'output', cc.scene_id+'_mod')
     if cc.atmo_src == 'narr':
         save_path += '_narr.png'
     elif cc.atmo_src == 'merra':

@@ -68,9 +68,7 @@ LC80150402013239LGN00
 ids_7=(
 LC80160392013134LGN03 ) # total randiance not equal blah blah blah, merra
  
-ids_8=(LC80140332014299LGN00
-LC80160302013166LGN04 
-LC80160302014153LGN00
+ids_8=(LC80140332014299LGN00 
 LC80170302014272LGN00) # modeled radiance is a nan (merra)
 
 L8_wo_wgrib=(LC80130332013145LGN00 
@@ -140,6 +138,6 @@ LT50410372011048PAC01
 for i in "${landsat_5[@]}"
 do 
    echo $i
-   python controller.py -scene_id $i -rvi -d /dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/
+   python controller.py $i -rim
    echo
 done

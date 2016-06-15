@@ -21,7 +21,7 @@ if __name__=='__main__':
     parser.add_argument('-v', '--verbose', help="Verbose: Specify to see command line output.", action='store_true', default=False)
     parser.add_argument('-r', '--reprocess', help="Add to explicitly reprocess.", action='store_true', default=False)
     #parser.add_argument('-n', '--narr', help='Use NARR Atmospheric Data.', action='store_false', default=True)
-    #parser.add_argument('-d', '--directory', help="Directory to search for landsat images.", default='./data/scenes/')
+    #parser.add_argument('-d', '--directory', help="Directory to search for landsat images.", default='')
     #parser.add_argument('-c', '--cloud' , help="Maximum desired cloud coverage in percent", type=int, default=100)
 
     args = parser.parse_args()

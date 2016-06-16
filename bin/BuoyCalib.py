@@ -132,15 +132,15 @@ class CalibrationController(object):
         
         # modeled radiance processing
         if self.satelite == 'LC8':   # L8
-            rsr_files = [[10, os.path.join(self.filepath_base, 'data/shared/L8_B10.rsp')], \
-                        [11, os.path.join(self.filepath_base, 'data/shared/L8_B11.rsp')]]
+            rsr_files = [[10, os.path.join(self.data_base, 'misc', 'L8_B10.rsp')], \
+                        [11, os.path.join(self.data_base, 'misc', 'L8_B11.rsp')]]
             img_files = [[10, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10'])], \
                         [11, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]]
         elif self.satelite == 'LE7':   # L7
-            rsr_files = [[6, os.path.join(self.filepath_base, 'data/shared/L7_B6_2.rsp')]]
+            rsr_files = [[6, os.path.join(self.data_base, 'misc', 'L7_B6_2.rsp')]]
             img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6_VCID_2'])]]
         elif self.satelite == 'LT5':   # L5
-            rsr_files = [[6, os.path.join(self.filepath_base, 'data/shared/L5_B6.rsp')]]
+            rsr_files = [[6, os.path.join(self.data_base, 'misc', 'L5_B6.rsp')]]
             img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6'])]]
 
         modtran_data = self.run_modtran()

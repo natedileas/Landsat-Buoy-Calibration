@@ -14,6 +14,9 @@ import narr_data
 import merra_data
 
 class CalibrationController(object):
+    """
+
+    """
     def __init__(self, LID, BID=None, DIR='/dirs/home/ugrad/nid4986/landsat_data/', atmo_src='narr', verbose=False):
         """ set up CalibrationController object. """
         
@@ -66,7 +69,17 @@ class CalibrationController(object):
     ### GETTERS AND SETTERS ###
     @property
     def scene_id(self):
-        """ scene_id getter. stored internally as different parts. """
+        """ 
+        stored internally as different parts.
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
         
         lid = '%s%s%s%s%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'), \
         self.station, self.version)
@@ -75,7 +88,17 @@ class CalibrationController(object):
 
     @scene_id.setter
     def scene_id(self, new_id):
-        """ scene_id setter. check for validity before assignment. """
+        """
+        Check for validity before assignment.
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
         
         match = re.match('^L(C8|E7|T5)\d{13}(LGN|EDC|SGS|AGS|ASN|SG1|GLC|ASA|KIR|MOR|KHC|PAC|KIS|CHM|LGS|MGR|COA|MPS)0[0-5]$', new_id)
 
@@ -98,7 +121,17 @@ class CalibrationController(object):
 
     @buoy_id.setter
     def buoy_id(self, new_id):
-        """ buoy_id setter. check for validity before assignment. """
+        """ 
+        Check for validity before assignment.
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
         
         match = re.match('^\d{5}$', new_id)
 
@@ -113,7 +146,17 @@ class CalibrationController(object):
         return self.__str__()
         
     def __str__(self):
-        """ print calculated values. """
+        """ 
+        print calculated values.
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
             
         output_items = ['Scene ID: %s'%self.scene_id]
         
@@ -126,6 +169,17 @@ class CalibrationController(object):
     
     ### helper functions ###
     def calc_all(self):
+        """
+
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
         self.download_img_data()
         self.calculate_buoy_information()
         self.download_mod_data()
@@ -156,7 +210,17 @@ class CalibrationController(object):
     ### real work functions ###
   
     def download_mod_data(self):
-        """ download atmospheric data. """
+        """
+        Download atmospheric data.
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
         logging.info('Downloading atmospheric data.')
 
         if self.atmo_src == 'narr':
@@ -165,6 +229,17 @@ class CalibrationController(object):
             merra_data.download(self)
             
     def run_modtran(self):
+        """
+
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
         logging.info('Generating tape5 files.')
         # read in narr data and generate tape5 files and caseList
         point_dir, self.narr_coor = mod_proc.make_tape5s(self)
@@ -178,7 +253,17 @@ class CalibrationController(object):
 
     
     def download_img_data(self):
-        """ download landsat images and parse metadata. """
+        """
+        Download landsat images and parse metadata.
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
         
         logging.info('.download_img_data: Dealing with Landsat Data')
     
@@ -196,7 +281,17 @@ class CalibrationController(object):
         self.scenedatetime = datetime.datetime.strptime(date+' '+time, '%Y-%m-%d %H:%M:%S')
 
     def calculate_buoy_information(self):
-        """ pick buoy dataset, download, and calculate skin_temp. """
+        """
+        Pick buoy dataset, download, and calculate skin_temp.
+
+        Args:
+
+        Returns:
+
+        Raises:
+
+        Notes:
+        """
         
         corners = numpy.asarray([[0, 0]]*2, dtype=numpy.float32)
         corners[0] = self.metadata['CORNER_UR_LAT_PRODUCT'], \

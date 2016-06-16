@@ -1,10 +1,23 @@
-import numpy
 import os
 import math
 
+import numpy
+
 def convert_sh_rh(specHum, T_k, pressure):
-    # Given array of specific humidities, temperature, and pressure, generate array of relative humidities
-    # source: http://earthscience.stackexchange.com/questions/2360/how-do-i-convert-specific-humidity-to-relative-humidity
+    """ 
+    Converts specific humidity to relative humidity. 
+
+    Args:
+        specHum: specific humidity
+        T_k: temperature, in kelvin
+        pressure: pressure, in mB
+
+    Returns:
+        rh: relative humidity, (1d numpy array)
+
+    Notes:
+        http://earthscience.stackexchange.com/questions/2360/how-do-i-convert-specific-humidity-to-relative-humidity
+    """
     
     T_k = numpy.asarray(T_k, dtype=numpy.float64)  #numpy.float64
     
@@ -21,21 +34,39 @@ def convert_sh_rh(specHum, T_k, pressure):
     return rh
     
 def dewpoint_temp(temp, relhum):
-    """ get dewpoint temperature """
-    # temp  - temperature in kelvin
-    # relhum -  relative humidity, 0-100
-    # source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
+    """
+    Calculates dewpoint temperature. 
+
+    Args:
+        temp: temperature, in celcius (1d numpy array)
+        relhum: relative humidity, in percent (0-100), (1d numpy array)
+
+    Returns:
+        dewpoint temperature, in celcius (1d numpy array)
+
+    Notes:
+        source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
+    """
     
     return temp - ((100 - relhum) / 5)   # kelvin
         
 def convert_geopotential_geometric(geopotential, lat):
-    """Convert array of geopotential heightsto geometric heights.
     """
-    # source: http://www.ofcm.gov/fmh3/pdf/12-app-d.pdf
-    # http://gis.stackexchange.com/questions/20200/how-do-you-compute-the-earths-radius-at-a-given-geodetic-latitude
+    Convert array of geopotential heights to geometric heights.
+
+    Args:
+        geopotential: Geopotential Height, i.e. height measured without acconting for latititude
+        lat: latitude
+
+    Returns:
+        geometric height: height measured from sea level, accounting for latititude
+
+    Notes:
+        source: http://www.ofcm.gov/fmh3/pdf/12-app-d.pdf
+        http://gis.stackexchange.com/questions/20200/how-do-you-compute-the-earths-radius-at-a-given-geodetic-latitude
+    """
     
-    # convert latitiude to radians
-    radlat = (lat * math.pi) / 180.0
+    radlat = (lat * math.pi) / 180.0   # convert latitiude to radians
     
     # gravity at latitude
     grav_lat = 9.80616 * (1 - 0.002637 * numpy.cos(2 * radlat) + 0.0000059 * numpy.power(numpy.cos(2 * radlat), 2))
@@ -61,7 +92,17 @@ def convert_geopotential_geometric(geopotential, lat):
     return numpy.asarray(geometric_height)
         
 def distance_in_utm(e1, n1, e2, n2):
-    """Calculate distances between UTM coordinates.
+    """
+    Calculate distance between 2 sets of UTM coordinates.
+    
+    Args:
+        e1: east value for point 1
+        n1: north value for point 1
+        e2: east value for point 2
+        n2: north value for point 2
+
+    Returns:
+        d: distance (in UTM space) between point 1 and 2
     """
     
     s = 0.9996    # scale factor 
@@ -108,7 +149,18 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
     return height, rhum, temp
 
 def offset_interp_space(buoy_coor, atmo_profiles, narr_coor):
-    """ interpolate in space between the 4 profiles. """
+    """ 
+    Interpolate in space between the 4 profiles. 
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+
+    """
     atmo_profiles = numpy.array(atmo_profiles)
     length = numpy.shape(atmo_profiles)[2]
     atmo_profiles = numpy.array(atmo_profiles[:,:length])
@@ -127,7 +179,18 @@ def offset_interp_space(buoy_coor, atmo_profiles, narr_coor):
     return height, press, temp, relhum
 
 def calc_interp_weights(interp_from, interp_to):
-    """ Calculate weights for the offset bilinear interpolation  of 4 points. """
+    """
+    Calculate weights for the offset bilinear interpolation  of 4 points. 
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+    
+    """
     a = -interp_from[0,0] + interp_from[2,0]
     b = -interp_from[0,0] + interp_from[1,0]
     c = interp_from[0,0] - interp_from[1,0] - interp_from[2,0] + interp_from[3,0]
@@ -151,7 +214,18 @@ def use_interp_weights(array, alpha, beta):
             alpha * ((1 - beta) * array[2] + beta * array[3]))
 
 def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
-    """ interpolate in space between the 4 profiles. """
+    """ 
+    Interpolate in space between the 4 profiles. 
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+    
+    """
     # shape of atmo profiles - 4 x 4 x X
     #                     points x data type x layers
     atmo_profiles = numpy.array(atmo_profiles)
@@ -174,21 +248,20 @@ def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
     return [height, press, temp, relhum]
 
 def bilinear_interpolation(x, y, points):
-    '''Interpolate (x,y) from values associated with four points.
+    """Interpolate (x,y) from values associated with four points.
 
     The four points are a list of four triplets:  (x, y, value).
     The four points can be in any order.  They should form a rectangle.
 
-        >>> bilinear_interpolation(12, 5.5,
-        ...                        [(10, 4, 100),
-        ...                         (20, 4, 200),
-        ...                         (10, 6, 150),
-        ...                         (20, 6, 300)])
-        165.0
+    Args:
 
-    '''
-    # See formula at:  http://en.wikipedia.org/wiki/Bilinear_interpolation
-    # credit: http://stackoverflow.com/questions/8661537/how-to-perform-bilinear-interpolation-in-python
+    Returns:
+
+    Raises:
+
+    Notes:
+        See formula at:  http://en.wikipedia.org/wiki/Bilinear_interpolation
+    """
 
     points = sorted(points)               # order points by x, then by y
     (x1, y1, q11), (_x1, y2, q12), (x2, _y1, q21), (_x2, _y2, q22) = points
@@ -206,7 +279,18 @@ def bilinear_interpolation(x, y, points):
            ) / ((x2 - x1) * (y2 - y1) + 0.0)
 
 def generate_profiles(interp_atmo, stan_atmo, pressures):
-    # unpack
+    """
+
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+
+    """
     height, rhum, temp = interp_atmo
     stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
 
@@ -247,6 +331,18 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
     return profiles
 
 def write_atmo(cc, atmo):
+    """
+    Writes the interpolated atmosphere data to a file. 
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+
+    """
     dir_ = os.path.join(cc.scene_dir,'atmo')
     if not os.path.exists(dir_):
         os.makedirs(dir_)

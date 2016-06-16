@@ -12,7 +12,18 @@ class BuoyDataError(Exception):
     pass
             
 def get_stationtable(save_dir):
-    """ download and unzip station_table.txt. """
+    """ 
+    Downloads and unzips station_table.txt. 
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+    """
+
     # define names
     filename = os.path.join(save_dir, 'station_table.txt')
     url = "http://www.ndbc.noaa.gov/data/stations/station_table.txt"
@@ -44,7 +55,17 @@ def get_stationtable(save_dir):
         
 
 def find_datasets(save_dir, corners):
-    """ get list of possible datasets. """
+    """
+    Get list of possible datasets. 
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+    """
     # define names
     filename = os.path.join(save_dir, 'station_table.txt')
 
@@ -115,7 +136,17 @@ def find_datasets(save_dir, corners):
     return datasets, coordinates, depths
         
 def search_stationtable(save_dir, sid):
-    """ last-ditch attempt at getting buoy data. """
+    """
+    Last-ditch attempt at getting buoy data. 
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+    """
     filename = os.path.join(save_dir, 'station_table.txt')
     
     sid = str(sid)
@@ -162,7 +193,17 @@ def search_stationtable(save_dir, sid):
 
 
 def get_buoy_data(filename, url):
-    """ download/ unzip appripriate buoy data from url. """
+    """
+    Download/ unzip appripriate buoy data from url.
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+    """
 
     try:
         # open url
@@ -190,9 +231,18 @@ def get_buoy_data(filename, url):
     return 0
 
 def find_skin_temp(filename, metadata, url, depth):
-    """ compute skin temperature. """
-    
-    # source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
+    """
+    Compute skin temperature.
+
+    Args:
+
+    Returns:
+
+    Raises:
+
+    Notes:
+        source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
+    """
 
     # parse year, month, day
     date = metadata['DATE_ACQUIRED']

@@ -4,10 +4,13 @@ import subprocess
 import datetime
 import time
 import logging
+import urllib2, urllib
+import tarfile
 
 def download(cc):
     """ download landsat data and parse metadata. """
 
+    usgs = {'username':'nid4986','password':'Carlson89'}
     if not os.path.exists(cc.scene_dir):
         os.makedirs(cc.scene_dir)
     
@@ -39,7 +42,7 @@ def download(cc):
     tgz_out_dir = os.path.realpath(os.path.join(cc.data_base, 'landsat_scenes'))
     for scene_id in scene_ids:
         url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
-        tgzfile = os.path.join(tgz_out_dir, scene_id + '.tgz')
+        tarfile = os.path.join(tgz_out_dir, scene_id + '.tgz')
         metafile = os.path.join(cc.scene_dir, scene_id + '_MTL.txt')
         
         # already downloaded and unzipped
@@ -48,26 +51,24 @@ def download(cc):
             break
             
         # already downloaded
-        elif os.path.isfile(tgzfile):
+        elif os.path.isfile(tarfile):
             logging.info('product %s already downloaded ' % scene_id)
-            unzipimage(tgzfile, cc.scene_dir)
+            unzipimage(tarfile, cc.scene_dir)
+            os.remove(tarfile)
             break
             
         # not downloaded
         else:
             logging.info('product %s not already downloaded ' % scene_id)
 
-            # connect
-            connect_cmd = "wget --cookies=on --save-cookies cookies.txt --keep-session-cookies --post-data 'username=nid4986&password=Chester89' https://ers.cr.usgs.gov/login/"
-            download_cmd = 'wget --cookies=on --load-cookies cookies.txt --keep-session-cookies --output-document=%s %s' % (tgzfile, url)
+            connect_earthexplorer_no_proxy(usgs)
 
-            subprocess.check_call(connect_cmd, shell=True)
-            os.remove(os.path.join(cc.filepath_base, 'index.html'))
+            if download_landsat_product(url, tarfile) is False:
+                continue
 
-            subprocess.check_call(download_cmd, shell=True)
-            os.remove(os.path.join(cc.filepath_base, 'cookies.txt'))
+            unzipimage(tarfile, cc.scene_dir)
+            os.remove(tarfile)
 
-            unzipimage(tgzfile, cc.scene_dir)
             break
 
     if cc.scene_id != scene_id:
@@ -75,21 +76,75 @@ def download(cc):
 
     return scene_id
 
-def unzipimage(tgz_file, out_dir):
-    """ Unzip tgz file. """
-    
-    if os.path.exists(tgz_file):
-        try:
-            subprocess.check_call('tar zxvf %s -C %s >/dev/null' % (tgz_file, out_dir), shell=True)
-            os.remove(tgz_file)
-        except KeyboardInterrupt:
-            logging.error('KeyboardInterrupt')
-            sys.exit(-1)
-    else: 
-        logging.error('File %s does not exist.' % tgz_file)
+def connect_earthexplorer_no_proxy(usgs):
+    """ Connect to EarthExplorer. """
+    logging.info("Establishing connection to Earthexplorer...")
+
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
+    urllib2.install_opener(opener)
+    params = urllib.urlencode(usgs)
+
+    f = opener.open("https://ers.cr.usgs.gov/login", params)
+    data = f.read()
+    f.close()
+
+    if data.find('You must sign in as a registered user to download data or place orders for USGS EROS products')>0 :
+        logging.error("Authentification failed")
         sys.exit(-1)
+
+    logging.info('Connected')
+
+def download_landsat_product(url,out_file):
+    """ download the landsat prouct from the url. """
+
+    try:
+        req = urllib2.urlopen(url)
+
+        if (req.info().gettype()=='text/html'):
+            logging.error( "In HTML format, authentication probably failed.")
+            lignes=req.read()
+
+            if lignes.find('Download Not Found')>0 :
+                raise TypeError('Download Not Found')
+            else:
+                raise urllib2.HTTPError
+
+        total_size = int(req.info().getheader('Content-Length').strip())
+
+        if (total_size<50000):
+            logging.error("The file is too small to be a Landsat Product")
+            return False
+
+        CHUNK = 1024 * 1024 *8
+
+        logging.info('Downloading Landsat Product')
+
+        with open(out_file, 'wb') as fp:
+            while True:
+                chunk = req.read(CHUNK)
+                if not chunk: break
+                fp.write(chunk)
+
+    except urllib2.HTTPError, e:
+        if e.code == 500:
+            logging.error('File doesn\'t exist')
+        else:
+            logging.error("HTTP Error:", e.code , url)
+        return False
+    except urllib2.URLError, e:
+        logging.error("URL Error:",e.reason , url)
+        return False
+
+    logging.info('Finished Download')
+    return True
+
+def unzipimage(in_file, out_dir):
+    """ Unzip tar file. """
         
-    return 0
+    with tarfile.open(in_file, 'r') as f:
+        #files = f.getmembers()  # TODO choose which files to extract from info
+        f.extractall(out_dir)
+
 
 def read_metadata(cc):
     filename = os.path.join(cc.scene_dir, cc.scene_id + '_MTL.txt')
@@ -109,7 +164,8 @@ def read_metadata(cc):
                 except ValueError:
                     data.append(info[1])
                 except IndexError:
-                    logging.warning('Index Error in metadata parsing, normal thing')
+                    #normal thing, caused by non-delimeted lines
+                    pass
                     
     except IOError:
         logging.error('Metadata not in expected file path: %s.' % filename)

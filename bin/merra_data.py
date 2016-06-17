@@ -1,19 +1,28 @@
-import subprocess
 import datetime
-import sys
 import logging
 import itertools
 import os
-import utm
-import numpy
+import subprocess
+import sys
 
 from netCDF4 import Dataset
+import numpy
+import utm
+
 import image_processing as img_proc
 import atmo_data
 import misc_functions as funcs
 
 def download(cc):
-    """ download MERRA data. """
+    """
+    Download MERRA data via ftp.
+
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        None
+    """
 
     urlbase = 'ftp://goldsmr5.sci.gsfc.nasa.gov/data/s4pa/MERRA2/M2I3NPASM.5.12.4/%s/%s/MERRA2_400.inst3_3d_asm_Np.%s.nc4'
     # year with century, zero padded month, then full date
@@ -27,7 +36,15 @@ def download(cc):
     subprocess.check_call('wget %s -P %s' % (url, save_dir), shell=True)
 
 def open(cc):
-    """ open MERRA file (netCDF4 format). """
+    """
+    Open MERRA data file (in netCDF4 format).
+
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        rootgrp: data reference to variables stored in MERRA data file.
+    """
 
     merra_file = os.path.join(cc.data_base, 'merra', 'MERRA2_400.inst3_3d_asm_Np.%s.nc4' % cc.date.strftime('%Y%m%d'))
 
@@ -40,6 +57,18 @@ def open(cc):
 
 
 def get_points(metadata, data):
+    """
+    Get points which lie inside the landsat image.
+
+    Args:
+        metadata: landsat metadata, for edges
+        data: netcdf4 object with merra data
+
+    Returns:
+        in_image_lat_lon, in_image_idx: points which lie inside, in lat and lon
+        as well as indices into the netcdf4 variables.
+    """
+    
     lat = data.variables['lat'][:]
     lon = data.variables['lon'][:]
 
@@ -64,7 +93,17 @@ def get_points(metadata, data):
     return in_image_lat_lon, in_image_idx
 
 def choose_points(points_in_image, points_in_image_idx, buoy_coors):
-    
+    """
+    Choose the four points which will be used.
+
+    Args:
+        points_in_image, points_in_image_idx: points which lie inside, in lat and lon
+        as well as indices into the netcdf4 variables.
+        buoy_coors: lat, lon where the buoy is
+
+    Returns:
+        chosen indices, and chosen lats and lons
+    """
     points_in_image = numpy.asarray(points_in_image)
     latvalues = points_in_image[:, 0]
     lonvalues = points_in_image[:, 1]
@@ -105,8 +144,18 @@ def choose_points(points_in_image, points_in_image_idx, buoy_coors):
     return chosen_points[:,3], chosen_points[:, 1:3]
 
 def read(cc, data, chosen_points):
-    """ pull out necesary data and return it. """
+    """
+    Pull out chosen data and do some basic processing.
 
+    Args:
+        cc: CalibrationController object
+        data: netcdf4 object to MERRA data
+        chosen_points: indices into netcdf4 object
+
+    Returns:
+        data: shape=(7, 4, 42), units=[km, K, %, torr]
+            ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
+    """
     chosen_points = numpy.array(list(chosen_points))
 
     latidx = tuple(chosen_points[:, 0])
@@ -135,5 +184,4 @@ def read(cc, data, chosen_points):
     height1 = numpy.diagonal(data.variables['H'][idx1, :, latidx, lonidx], axis1=1, axis2=2).T   # height
     height2 = numpy.diagonal(data.variables['H'][idx2, :, latidx, lonidx], axis1=1, axis2=2).T
     
-    # convert m to km
     return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1 * 100, rh2 * 100, pressure

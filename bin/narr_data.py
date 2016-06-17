@@ -1,19 +1,27 @@
-import numpy
-import linecache
-import utm
 import itertools
 import os
 import sys
 import subprocess
 import logging
+
 from netCDF4 import Dataset, num2date
+import numpy
+import utm
 
 import image_processing as img_proc
 import atmo_data
 import misc_functions as funcs
 
 def download(cc):
-    """ download NARR Data (netCDF4 format). """
+    """
+    Download NARR Data (netCDF4 format) via ftp.
+
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        None
+    """
     
     narr_urls = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc', \
                     'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/hgt.%s.nc',\
@@ -31,7 +39,16 @@ def download(cc):
         subprocess.check_call('wget %s -P %s' % (url, save_dir), shell=True)
 
 def open(cc):
-    """ open NARR file (netCDF4 format). """
+    """
+    Open NARR files (netCDF4 format).
+
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        data: list of references to variables stored in NARR data files.
+            [temp, height, specific_humidity]
+    """
 
     data = []
     narr_files = ['air.%s.nc', 'hgt.%s.nc', 'shum.%s.nc']
@@ -48,11 +65,21 @@ def open(cc):
 
         data.append(Dataset(data_file, "r", format="NETCDF4"))
         
-    # order of returns is temp, height, specific humidity
     return data
 
 def get_points(metadata, data):
-    """ choose points within scene corners. """
+    """ 
+    Get points which lie inside the landsat image.
+
+    Args:
+        metadata: landsat metadata, for edges
+        data: netcdf4 object with NARR data
+
+    Returns:
+        indexs, lat, lon: indexs and corresponding lat and lon for the points 
+        which lie inside the landsat image
+    """
+
     lat = data.variables['lat'][:]
     lon = data.variables['lon'][:]
 
@@ -62,12 +89,24 @@ def get_points(metadata, data):
     LR_lat = metadata['CORNER_LR_LAT_PRODUCT'] - 0.5
     LR_lon = metadata['CORNER_LR_LON_PRODUCT'] + 0.5
 
-    # pull out points that lie within the corners
+    # pull out points that lie within the corners (only works for NW quadrant)
     indexs = numpy.where((lat<UL_lat) & (lat>LR_lat) & (lon>UL_lon) & (lon<LR_lon))
 
     return indexs, lat, lon
 
 def choose_points(inLandsat, lat, lon, buoy_coors): 
+    """
+    Choose the four points which will be used.
+
+    Args:
+        inLandsat, lat, lon: points which lie inside, in lat and lon
+            as well as indices into the netcdf4 variables.
+        buoy_coors: lat, lon where the buoy is
+
+    Returns:
+        chosen indices, and chosen lats and lons
+    """
+
     latvalues = lat[inLandsat]
     lonvalues = lon[inLandsat]
     
@@ -93,7 +132,18 @@ def choose_points(inLandsat, lat, lon, buoy_coors):
     return chosen_points[:,3], chosen_points[:, 1:3]
     
 def read(cc, temp, height, shum, chosen_points):
-    """ pull out necesary data and return it. """
+    """
+    Pull out chosen data and do some basic processing.
+
+    Args:
+        cc: CalibrationController object
+        temp, height, shum: netcdf4 objects
+        chosen_points: idices to 4 chosen points
+
+    Returns:
+        data: shape=(7, 4, 29), units=[km, K, %, torr]
+            ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
+    """
 
     chosen_points = numpy.array(list(chosen_points))
     latidx = tuple(chosen_points[:, 0])

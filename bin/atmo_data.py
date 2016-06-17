@@ -1,5 +1,5 @@
-import os
 import math
+import os
 
 import numpy
 
@@ -119,6 +119,22 @@ def distance_in_utm(e1, n1, e2, n2):
     return d
 
 def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
+    """ 
+    Interpolate in time. 7 profiles -> 4 profiles.
+
+    Args:
+        metadata:
+        h1, h2: height
+        t1, t2: temperature
+        r1, r2: realtive humidity
+        p: pressure
+
+    Returns:
+        height, rhum, temp: all the parts of the profile
+    
+    Notes:
+        Credit: Monica Cook.
+    """
     # determine three hour-increment before and after scene center scan time
     time = metadata['SCENE_CENTER_TIME'].replace('"', '')
     hour = int(time[0:2])
@@ -150,16 +166,15 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
 
 def offset_interp_space(buoy_coor, atmo_profiles, narr_coor):
     """ 
-    Interpolate in space between the 4 profiles. 
+    Interpolate in space between the 4 profiles with an offset algorithm. 
 
     Args:
+        buoy_coor: coordinates to interpolate to
+        atmo_profiles: data to interpolate
+        narr_coor: coordinates to interpolate from
 
     Returns:
-
-    Raises:
-
-    Notes:
-
+        the interpolated profile
     """
     atmo_profiles = numpy.array(atmo_profiles)
     length = numpy.shape(atmo_profiles)[2]
@@ -183,13 +198,15 @@ def calc_interp_weights(interp_from, interp_to):
     Calculate weights for the offset bilinear interpolation  of 4 points. 
 
     Args:
+        interp_from: coordinates to interpolate from
+        interp_to: coordinates to interpolate to
 
     Returns:
-
-    Raises:
+        alpha, beta: weights to use with use_interp_weights()
 
     Notes:
-    
+        this function is intended to be paired with use_interp_weights().
+        Source: 
     """
     a = -interp_from[0,0] + interp_from[2,0]
     b = -interp_from[0,0] + interp_from[1,0]
@@ -218,13 +235,12 @@ def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
     Interpolate in space between the 4 profiles. 
 
     Args:
+        buoy_coor: coordinates to interpolate to
+        atmo_profiles: data to interpolate
+        data_coor: coordinates to interpolate from
 
     Returns:
-
-    Raises:
-
-    Notes:
-    
+        the interpolated profile   
     """
     # shape of atmo profiles - 4 x 4 x X
     #                     points x data type x layers
@@ -250,14 +266,16 @@ def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
 def bilinear_interpolation(x, y, points):
     """Interpolate (x,y) from values associated with four points.
 
-    The four points are a list of four triplets:  (x, y, value).
-    The four points can be in any order.  They should form a rectangle.
-
     Args:
+        x, y: point to interpolate to
+        points: The four points are a list of four triplets:  (x, y, value).
+        The four points can be in any order.  They should form a rectangle.
 
     Returns:
+        Interpolated stuff.
 
     Raises:
+        ValueError: if points are not the right type/values to use this function
 
     Notes:
         See formula at:  http://en.wikipedia.org/wiki/Bilinear_interpolation
@@ -280,16 +298,15 @@ def bilinear_interpolation(x, y, points):
 
 def generate_profiles(interp_atmo, stan_atmo, pressures):
     """
-
+    Add standard atmosphere to top of NARR or MERRA atmo data.
 
     Args:
+        interp_atmo: NARR or MERRA data
+        stan_atmo: summer mid-lat MODTRAN standard atmosphere
+        pressures: pressure levels
 
     Returns:
-
-    Raises:
-
-    Notes:
-
+        [hgt, p, t, rh] * 4: one list for each point
     """
     height, rhum, temp = interp_atmo
     stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
@@ -335,13 +352,8 @@ def write_atmo(cc, atmo):
     Writes the interpolated atmosphere data to a file. 
 
     Args:
-
-    Returns:
-
-    Raises:
-
-    Notes:
-
+        cc: CalibrationController object (for save paths)
+        atmo: atmospheric profile data to save
     """
     dir_ = os.path.join(cc.scene_dir,'atmo')
     if not os.path.exists(dir_):

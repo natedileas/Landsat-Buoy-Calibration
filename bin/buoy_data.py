@@ -1,27 +1,30 @@
-import numpy
+import logging
+import math
+import os
+import re
 import subprocess
 import urllib2
-import os
+
+import numpy
 import utm
-import re
-import sys
-import shutil
-import math
 
 class BuoyDataError(Exception):
-    pass
-            
+    """ Exception for lack of buoy data in the expected file. """
+    def __init__(self, msg):
+        self.msg=msg
+
+    def __str__(self):
+        return repr(self.msg)
+
 def get_stationtable(save_dir):
     """ 
     Downloads and unzips station_table.txt. 
 
     Args:
+        save_dir: directory in which to save the file
 
     Returns:
-
-    Raises:
-
-    Notes:
+        True or False: depending on whether or not it has been downloaded 
     """
 
     # define names
@@ -34,44 +37,44 @@ def get_stationtable(save_dir):
             f = urllib2.urlopen(url)
 
             data = f.read()
-            
+
             # write data to file
             with open(filename, "wb") as local_file:
                 local_file.write(data)
-                
+
             return 0
-            
+
         except urllib2.HTTPError, e:
             print "HTTP Error:", e.code, url
-            return -1
+            return False
         except urllib2.URLError, e:
             print "URL Error:", e.reason, url
-            return -1
+            return False
         except OSError, e:
             print 'OSError: ', e.reason
-            return -1
-    else:
-        return 0
-        
+            return False
+
+    return True
 
 def find_datasets(save_dir, corners):
     """
     Get list of possible datasets. 
 
     Args:
+        save_dir: directory in which to save the file
+        corners: corners of the landsat image
 
     Returns:
-
-    Raises:
+        datasets, coordinates, depths: lists of buoy ids, their coordinates, and their depths
 
     Notes:
+        The staion_table.txt file is hugely inconsistent and not computer-friendly.
     """
-    # define names
+
     filename = os.path.join(save_dir, 'station_table.txt')
 
     # read in and zip coordinates and buoy SIDs
     # use reg expressions to find matching strings in lines
-    # search for lat/lon
     lat_lon_search = re.compile('\d\d\.\d\d\d [NS] \d?\d\d\.\d\d\d [WE]')
     # search for SID (station ID)
     sid_search = re.compile('\A\w*')
@@ -127,11 +130,10 @@ def find_datasets(save_dir, corners):
         # check for latitude
         if buoy_lat > corners[1, 0] and buoy_lat < corners[0, 0]:
             # check for longitude
-            if buoy_lon > corners[1, 1]:
-                if buoy_lon < corners[0, 1]:
-                    datasets.append(buoy_stations[i][0])
-                    coordinates.append(buoy_stations[i][1])
-                    depths.append(buoy_stations[i][2])
+            if buoy_lon > corners[1, 1] and buoy_lon < corners[0, 1]:
+                datasets.append(buoy_stations[i][0])
+                coordinates.append(buoy_stations[i][1])
+                depths.append(buoy_stations[i][2])
 
     return datasets, coordinates, depths
         
@@ -197,12 +199,12 @@ def get_buoy_data(filename, url):
     Download/ unzip appripriate buoy data from url.
 
     Args:
+        filename: path/file to save buoy data file
+        url: url to download data from
 
     Returns:
+        True or False: depending on whether or not it has been downloaded 
 
-    Raises:
-
-    Notes:
     """
 
     try:
@@ -214,31 +216,38 @@ def get_buoy_data(filename, url):
         with open(filename, "wb") as local_file:
             local_file.write(f.read())
 
-        # unzip if it is still zipped
+        # unzip if it is still zipped 
+        # TODO replace with python unzip method
         if '.gz' in filename:
             subprocess.check_call('gzip -d -f '+filename, shell=True)
             # subprocess.Popen('rm '+filename, shell=True)
 
     except urllib2.HTTPError, e:
-        return -1
+        return False
     except urllib2.URLError, e:
-        print "URL Error:", e.reason, url
-        sys.exit()
+        logging.error("URL Error:", e.reason, url)
+        return False
     except OSError, e:
-        print 'OSError: ', e.reason
-        sys.exit()
+        logging.error('OSError: ', e.reason, filename)
+        return False
 
-    return 0
+    return True
 
 def find_skin_temp(filename, metadata, url, depth):
     """
-    Compute skin temperature.
+    Convert bulk temp -> skin temperature.
 
     Args:
+        filename: filename to get data from
+        metadata: landsat meta data
+        url: deprecated, remove
+        depth: depth of thermometer on buoy
 
     Returns:
+        skin_temp, pres, atemp, dewp: all parameters of the buoy
 
     Raises:
+        BuoyDataError: if no data, date range wrong, etc.
 
     Notes:
         source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf

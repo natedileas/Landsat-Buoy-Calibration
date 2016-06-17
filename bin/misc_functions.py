@@ -1,7 +1,15 @@
 import numpy
 
 def integrate(x, y, method='trap'):
-    """approximate integration given two arrays.
+    """
+    Approximate integration given two arrays.
+    
+    Args:
+        x, y: points to approximate 1d intergation with.
+        method: trapezoidal or rectangular integration. in most cases, it does not matter.
+
+    Returns:
+        total: "integral" of arrays.
     """
     total = 0
     
@@ -26,7 +34,16 @@ def integrate(x, y, method='trap'):
     return total
 
 def is_square_test(points):
-    """ test if 4 points lie on a grid. """
+    """
+    Test if 4 points lie on a grid.
+
+    Args:
+        points: 
+            format = [[x1, y1], [x2, y2], ...]
+
+    Returns:
+        true or false, based on result
+    """
     p1, p2, p3, p4 = points
 
     test = int(line_test(p1, p2, p3))
@@ -37,7 +54,9 @@ def is_square_test(points):
     return (test == 0)
     
 def line_test(p1, p2, p3):
-    """ check whether the three points lie on a line. """
+    """
+    Check whether the three points lie on a line.
+    """
     # http://math.stackexchange.com/questions/441182/how-to-check-if-three-coordinates-form-a-line
     # threshold found with test_line_test.py
     _p1 = numpy.append(p1, 1)

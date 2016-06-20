@@ -156,7 +156,7 @@ def read(cc, data, chosen_points):
         chosen_points: indices into netcdf4 object
 
     Returns:
-        data: shape=(7, 4, 42), units=[km, K, %, torr]
+        data: shape=(7, 4, 42), units=[km, K, %, hPa]
             ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
     """
     chosen_points = numpy.array(list(chosen_points))
@@ -171,20 +171,23 @@ def read(cc, data, chosen_points):
     hour1 = 60 * (hour - rem1)
     hour2 = 60 * (hour + rem2)
 
-    idx1 = numpy.where(data.variables['time'][:] == hour1)[0][0]
-    idx2 = numpy.where(data.variables['time'][:] == hour2)[0][0]
- 
+    t1 = numpy.where(data.variables['time'][:] == hour1)[0][0]
+    t2 = numpy.where(data.variables['time'][:] == hour2)[0][0]
+    
+    index1 = (t1, slice(None), latidx, lonidx)
+    index2 = (t2, slice(None), latidx, lonidx)
+    
     p = numpy.array(data.variables['lev'][:])
     pressure = numpy.reshape([p]*4, (4, len(p)))
     
     # the .T on the end is a transpose
-    temp1 = numpy.diagonal(data.variables['T'][idx1, :, latidx, lonidx], axis1=1, axis2=2).T   # temp
-    temp2 = numpy.diagonal(data.variables['T'][idx2, :, latidx, lonidx], axis1=1, axis2=2).T   
+    temp1 = numpy.diagonal(data.variables['T'][index1], axis1=1, axis2=2).T
+    temp2 = numpy.diagonal(data.variables['T'][index2], axis1=1, axis2=2).T
 
-    rh1 = numpy.diagonal(data.variables['RH'][idx1, :, latidx, lonidx], axis1=1, axis2=2).T   # relative humidity
-    rh2 = numpy.diagonal(data.variables['RH'][idx2, :, latidx, lonidx], axis1=1, axis2=2).T
+    rh1 = numpy.diagonal(data.variables['RH'][index1], axis1=1, axis2=2).T   # relative humidity
+    rh2 = numpy.diagonal(data.variables['RH'][index2], axis1=1, axis2=2).T
 
-    height1 = numpy.diagonal(data.variables['H'][idx1, :, latidx, lonidx], axis1=1, axis2=2).T   # height
-    height2 = numpy.diagonal(data.variables['H'][idx2, :, latidx, lonidx], axis1=1, axis2=2).T
+    height1 = numpy.diagonal(data.variables['H'][index1], axis1=1, axis2=2).T   # height
+    height2 = numpy.diagonal(data.variables['H'][index2], axis1=1, axis2=2).T
     
     return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1 * 100, rh2 * 100, pressure

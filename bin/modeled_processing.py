@@ -43,11 +43,13 @@ def make_tape5s(cc):
         try:
             interp_profile = atmo_data.offset_interp_space(cc.buoy_location, atmo_profiles, data_coor)
         except RuntimeWarning:
+            #print atmo_profiles
             interp_profile = atmo_data.bilinear_interp_space(cc.buoy_location, atmo_profiles, data_coor)
 
-            if interp_profile[0][0] > 50:
-                interp_profile = list(numpy.asarray(interp_profile)[:, 1:])
+            if numpy.where(interp_profile > 1e6)[0] is not []:
+                interp_profile = numpy.delete(interp_profile, numpy.where(interp_profile>1e6), axis=1)
 
+                
     # TODO better handling of interpolation
     atmo_data.write_atmo(cc, interp_profile)   # save out to file
     # TODO write out uninterpolated atmosphere

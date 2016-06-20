@@ -83,6 +83,7 @@ class CalibrationController(object):
         self.version = None
 
         self.scene_id = LID
+        if BID: self.buoy_id = BID
                 
         self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
         self.data_base = os.path.realpath(DIR)
@@ -280,22 +281,17 @@ class CalibrationController(object):
         month = self.date.strftime('%m')
         urls = []
         
-        if self.buoy_id:
-            urls.append('%s%sh%s.txt.gz'%(url_base[0], self.buoy_id, year))
-            urls.append('%s%s%s%s2015.txt.gz' % (url_base[1], mon_str[int(month)-1], self.buoy_id, str(int(month))))
-
-            ret_vals = buoy_data.search_stationtable(save_dir, self.buoy_id)
-            if ret_vals != -1:
-                datasets, buoy_coors, depths = ret_vals
-            else: 
-                logging.warning('.start_download: _save_buoy_data failed')
-   
         for dataset in datasets:
-            if year != '2015':
+            if self.date.year < 2015:
                 urls.append(url_base[0] + dataset + 'h' + year + '.txt.gz')
             else:
                 urls.append(url_base[1] + mon_str[int(month)-1] + dataset +
                             str(int(month)) + '2015.txt.gz')
+            
+        if self.buoy_id in datasets:
+            idx = datasets.index(self.buoy_id)
+            datasets.insert(0, datasets.pop(idx))
+            urls.insert(0, urls.pop(idx))
         
         for url in urls:
             dataset = os.path.basename(url)

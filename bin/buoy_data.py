@@ -136,63 +136,6 @@ def find_datasets(save_dir, corners):
                 depths.append(buoy_stations[i][2])
 
     return datasets, coordinates, depths
-        
-def search_stationtable(save_dir, sid):
-    """
-    Last-ditch attempt at getting buoy data. 
-
-    Args:
-
-    Returns:
-
-    Raises:
-
-    Notes:
-    """
-    filename = os.path.join(save_dir, 'station_table.txt')
-    
-    sid = str(sid)
-    # read in and zip coordinates and buoy SIDs
-    # use reg expressions to find matching strings in lines
-    # search for lat/lon
-    lat_lon_search = re.compile('\d\d\.\d\d\d [NS] \d?\d\d\.\d\d\d [WE]')
-
-    with open(filename, 'r') as f:
-        f.readline()
-        f.readline()
-
-        for line in f:
-            if sid in line:
-                lat_lon = lat_lon_search.search(line)  # latitude and longitude
-
-                if lat_lon:
-                    lat_lon = lat_lon.group()
-                    lat_lon = lat_lon.split()
-
-                    if lat_lon[3] == 'W':
-                        lat_lon[2] = float(lat_lon[2]) * (-1)
-                    else:
-                        lat_lon[2] = float(lat_lon[2])
-
-                    if lat_lon[1] == 'S':
-                        lat_lon[0] = float(lat_lon[0]) * (-1)
-                    else:
-                        lat_lon[0] = float(lat_lon[0])
-
-                    if 'ARES' in line:
-                        depth = 1.0
-                    elif 'AMPS' in line:   # TODO add more payload options
-                        depth = 0.6
-                    else:
-                        depth = 0.8
-                    
-                    
-                    return sid, [lat_lon[0], lat_lon[2]], depth
-                else:
-                    self.logger.warning('lat_lon search returned none')
-                    return -1
-        return -1
-
 
 def get_buoy_data(filename, url):
     """

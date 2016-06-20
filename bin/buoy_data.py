@@ -189,71 +189,47 @@ def get_buoy_data(filename, url):
 
     return 0
 
-def find_skin_temp(filename, metadata, url, depth):
+def find_skin_temp(cc, filename, depth):
     """ compute skin temperature. """
     
     # source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
 
-    # parse year, month, day
-    date = metadata['DATE_ACQUIRED']
-    year = date[0:4]
-    month = date[5:7]
-    day = date[8:10]
-
-    hour = float(metadata['SCENE_CENTER_TIME'][0:2])
-
-    date = year+' '+month+' '+day+' 00'    # reformat date
-    chars = ['\n']    # characters to remove from line
+    hour = cc.scenedatetime.hour
+    
+    date = cc.date.strftime('%Y %m %d')
     data = []
-    line = ' '
 
-    # open file, get rid of empty spaces and unwanted characters
-    # then append to data
     with open(filename, 'r') as f:
-        while line != '':
-            line = f.readline()
+        for line in f:
             if date in line:
-                for i in range(24):
-                    if i != 0:
-                        line = f.readline()
-                    line = line.translate(None, ''.join(chars))
-                    data.append(filter(None, line.split(' ')))
-                break
+                data.append(line.strip('\n').split())
 
-    if data == [[]] or []:
+    if data is []:
         raise BuoyDataError('No data in file? %s.'% filename)
+        
+    data = numpy.asarray(data, dtype=float)
 
     # compute 24hr wind speed and temperature
-    avg_wspd = 0    # m/s
-    avg_wtmp = 0    # C
-    pres = 0
-    atemp = 0
-    dewp = 0
-
-    for i in range(24):
-        try:
-            avg_wspd += float(data[i][6]) / 24
-            avg_wtmp += float(data[i][14]) / 24
-            pres += float(data[i][12]) / 24
-            atemp += float(data[i][13]) / 24
-            dewp += float(data[i][15]) / 24
-        except ValueError:
-            pass
-        except IndexError:
-            raise BuoyDataError('No data in file? %s. (IndexError)'% filename)
+    avg_wspd = data[:,6].mean()   # [m s-1]
+    avg_wtmp = data[:,14].mean()   # [C]
+    
+    pres = data[:,12].mean()
+    atemp = data[:,13].mean()
+    dewp = data[:,15].mean()
 
     # calculate skin temperature
-    z = depth   # depth in meters
-
     # part 1
     a = 0.05 - (0.6 / avg_wspd) + (0.03 * math.log(avg_wspd))
+    z = depth   # depth in meters
+    
     avg_skin_temp = avg_wtmp - (a * z) - 0.17
 
     # part 2
     b = 0.35 + (0.018 * math.exp(0.4 * avg_wspd))
     c = 1.32 - (0.64 * math.log(avg_wspd))
+    
     t = int(hour - (c * z))
-    T_zt = float(data[t][14])    # get temperature data from that specific hour 
+    T_zt = float(data[t][14])    # temperature data from closest hour
     f_cz = (T_zt - avg_skin_temp) / math.exp(b*z)
 
     # combine

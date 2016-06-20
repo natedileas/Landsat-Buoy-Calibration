@@ -244,7 +244,7 @@ class CalibrationController(object):
             
             try:
                 buoy_data.get_buoy_data(zipped_file, url)   # download and unzip
-                temp, pres, atemp, dewp = buoy_data.find_skin_temp(unzipped_file, self.metadata, url, depths[urls.index(url)])
+                temp, pres, atemp, dewp = buoy_data.find_skin_temp(self, unzipped_file, depths[urls.index(url)])
                 
                 self.buoy_id = datasets[urls.index(url)]
                 self.buoy_location = buoy_coors[urls.index(url)]
@@ -252,7 +252,7 @@ class CalibrationController(object):
                 self.buoy_press = pres
                 self.buoy_airtemp = atemp
                 self.buoy_dewpnt = dewp
-                  
+
                 logging.info('Used buoy dataset %s.'% dataset)
                 break
                 

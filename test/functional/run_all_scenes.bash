@@ -128,7 +128,6 @@ LE70160382012268EDC00 )
 
 landsat_5=(
 LT50410372011240PAC01
-LT50410372011240PAC01
 LT50410372011144PAC01
 LT50410372011096PAC01
 LT50410372011064PAC01
@@ -138,6 +137,6 @@ LT50410372011048PAC01
 for i in "${landsat_5[@]}"
 do 
    echo $i
-   python controller.py $i -rim
+   ./buoy-calib $i -ri
    echo
 done

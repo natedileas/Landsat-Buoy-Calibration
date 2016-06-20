@@ -184,7 +184,7 @@ def run_modtran(directory):
     os.chdir(directory)
 
     try:
-        subprocess.check_call('ln -s /dirs/pkg/Mod4v3r1/DATA', shell=True)
+        subprocess.check_call('ln -sf /dirs/pkg/Mod4v3r1/DATA', shell=True)
         subprocess.check_call(exe, shell=True)
     except subprocess.CalledProcessError:  # symlink already exists error
         pass

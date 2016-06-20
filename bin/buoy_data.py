@@ -263,10 +263,11 @@ def find_skin_temp(cc, filename, depth):
             if date in line:
                 data.append(line.strip('\n').split())
 
-    if data is []:
+    if data == []:
         raise BuoyDataError('No data in file? %s.'% filename)
         
     data = numpy.asarray(data, dtype=float)
+    #print data
 
     # compute 24hr wind speed and temperature
     avg_wspd = data[:,6].mean()   # [m s-1]

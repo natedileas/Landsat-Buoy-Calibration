@@ -38,16 +38,17 @@ OVERVIEW:
             http://www.ndbc.noaa.gov/data/historical/stdmet/
 
 USAGE: 
-    controller.py, in this directory. Use the -h option for more information 
+    ./buoy-calib, in this directory. Use the -h option for more information 
     on flags and options that are available.
 
-    python controller.py [options] <Landsat_ID>
+    ./buoy-calib [options] <Landsat_ID>
 
     Examples:
-        python controller.py -i LC80130332013145LGN00 : Output an image with the location 
+        ./buoy-calib -i LC80130332013145LGN00 : Output an image with the location 
                                                  of the buoy and narr points drawn on it
-        python controller.py -m LE70160382012268EDC00 : Use MERRA data instaed of NARR
-        python controller.py -b 44009 LT50410372011048PAC01 : use a specific NOAA buoy
+        ./buoy-calib -m LE70160382012268EDC00 : Use MERRA data instaed of NARR
+        ./buoy-calib -b 44009 LT50410372011048PAC01 : use a specific NOAA buoy
+        ./buoy-calib -imvr LC80130332013145LGN00 : Output an image, verbose, reprocesss, with MERRA data
 
 
     The Landsat ID can be any valid ID from landsat 5 or 8 with a level 1 product available.
@@ -59,3 +60,4 @@ TOOLS:
     tools/to_csv.py: used to compile results quickly and easily.
     tools/generate_atmo_figure.py : generate a figure using information from a already processed scene.
     test/functional/run_all_scenes.bash: run a batch of scenes. Move it to this directory before use.
+

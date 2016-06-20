@@ -92,6 +92,9 @@ def connect_earthexplorer_no_proxy(usgs):
 
     Returns:
         None
+        
+    Raises:
+        urllib2.HTTPError: if authentication does not occur
     """
     logging.info("Establishing connection to Earthexplorer...")
 
@@ -104,8 +107,8 @@ def connect_earthexplorer_no_proxy(usgs):
     f.close()
 
     if data.find('You must sign in as a registered user to download data or place orders for USGS EROS products')>0 :
-        logging.error("Authentification failed")
-        sys.exit(-1)
+        logging.error('Authentification failed')
+        raise urllib.HTTPError('Authentification failed')
 
     logging.info('Connected')
 
@@ -119,6 +122,9 @@ def download_landsat_product(url,out_file):
 
     Returns:
         True or False, depending on success
+    
+    Raises: 
+        TypeError: if the downlaod is not found
     """
 
     try:
@@ -131,7 +137,7 @@ def download_landsat_product(url,out_file):
             if lignes.find('Download Not Found')>0 :
                 raise TypeError('Download Not Found')
             else:
-                raise urllib2.HTTPError
+                raise urllib2.HTTPError()
 
         total_size = int(req.info().getheader('Content-Length').strip())
 
@@ -194,23 +200,19 @@ def read_metadata(cc):
     data = []
 
     # open file, split, and save to two lists
-    try:
-        with open(filename, 'r') as f:
-            for line in f:
-                try:
-                    info = line.strip(' ').split(' = ')
-                    info[1] = info[1].translate(None, ''.join(chars))
-                    desc.append(info[0])
-                    data.append(float(info[1]))
-                except ValueError:
-                    data.append(info[1])
-                except IndexError:
-                    #normal thing, caused by non-delimeted lines
-                    pass
-                    
-    except IOError:
-        logging.error('Metadata not in expected file path: %s.' % filename)
-        sys.exit(-1)
+
+    with open(filename, 'r') as f:
+        for line in f:
+            try:
+                info = line.strip(' ').split(' = ')
+                info[1] = info[1].translate(None, ''.join(chars))
+                desc.append(info[0])
+                data.append(float(info[1]))
+            except ValueError:
+                data.append(info[1])
+            except IndexError:
+                #normal thing, caused by non-delimeted lines
+                pass
     
     metadata = dict(zip(desc, data))   # create dictionary
 

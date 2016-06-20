@@ -48,6 +48,9 @@ def open(cc):
     Returns:
         data: list of references to variables stored in NARR data files.
             [temp, height, specific_humidity]
+            
+    Raises:
+        IOError: if files do not exist at the expected path
     """
 
     data = []
@@ -61,7 +64,7 @@ def open(cc):
         
         if os.path.isfile(data_file) is not True:
             logging.error('NARR Data file is not at the expected path: %' % data_file)
-            sys.exit(1)
+            raise IOError('NARR Data file is not at the expected path: %' % data_file)
 
         data.append(Dataset(data_file, "r", format="NETCDF4"))
         

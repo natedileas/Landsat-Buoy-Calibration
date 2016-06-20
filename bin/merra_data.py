@@ -44,13 +44,16 @@ def open(cc):
 
     Returns:
         rootgrp: data reference to variables stored in MERRA data file.
+    
+    Raises:
+        IOError: if file does not exist at the expected path
     """
 
     merra_file = os.path.join(cc.data_base, 'merra', 'MERRA2_400.inst3_3d_asm_Np.%s.nc4' % cc.date.strftime('%Y%m%d'))
 
     if os.path.isfile(merra_file) is not True:
         logging.error('MERRA Data file does not exist at the expected path: %' % merra_file)
-        sys.exit(1)
+        raise IOError('MERRA Data file does not exist at the expected path: %' % merra_file)
 
     rootgrp = Dataset(merra_file, "r", format="NETCDF4")
     return rootgrp

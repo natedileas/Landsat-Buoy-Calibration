@@ -141,7 +141,7 @@ def dc_to_rad(sat, band, metadata, dig_count):
             L_mult = metadata['RADIANCE_MULT_BAND_11']
         else:
             logging.error('Band was not 10 or 11 for landsat 8.')
-            sys.exit(1)
+            raise ValueError('Band was not 10 or 11 for landsat 8: %s' % band)
             
     elif sat == 'LE7':   # L7
         L_add = metadata['RADIANCE_ADD_BAND_6_VCID_2']
@@ -152,8 +152,8 @@ def dc_to_rad(sat, band, metadata, dig_count):
         L_mult = metadata['RADIANCE_MULT_BAND_6']
 
     else:
-        logging.error('Sat was not 5, 7, or 8.')   # TODO raise error?
-        sys.exit(1)
+        logging.error('Sat was not 5, 7, or 8.')
+        raise ValueError('Satelite string did not match: %s' % sat)
 
     radiance = dig_count * L_mult + L_add
 

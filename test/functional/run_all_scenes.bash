@@ -1,6 +1,6 @@
 id=$1
 
-L_8_all=(LC80130332013145LGN00 
+L8_all=(LC80130332013145LGN00 
 LC80140332013104LGN01 
 LC80140332013200LGN00 
 LC80140332014299LGN00 
@@ -62,14 +62,18 @@ LC80170302014272LGN00) # missing wgrib
 
 ids_6=(
 LC80160382013166LGN04 
-LC80150402013239LGN00
-)  # interpolation error (array of sample points is empty), narr and merrra
-
-ids_7=(
-LC80160392013134LGN03 ) # total randiance not equal blah blah blah, merra
+)  # interpolation error (array of sample points is empty), narr, merra
+# this is the modtran output
+# ******* ERROR >>>>>>  SETDIS--beam angle=computational angle; change NSTR
  
 ids_8=(LC80140332014299LGN00 
+LC80160302014153LGN00
+LC80160302013166LGN04
 LC80170302014272LGN00) # modeled radiance is a nan (merra)
+
+#LC80150402013175LGN00
+ #******* WARNING >>>>>>  UPBEAM--SGECO SAYS MATRIX NEAR SINGULAR
+
 
 L8_wo_wgrib=(LC80130332013145LGN00 
 LC80140332013104LGN01 
@@ -134,9 +138,9 @@ LT50410372011064PAC01
 LT50410372011048PAC01
 )
 
-for i in "${landsat_5[@]}"
+for i in "${L8_all[@]}"
 do 
    echo $i
-   ./buoy-calib $i -ri
+   ./buoy-calib $i -rm
    echo
 done

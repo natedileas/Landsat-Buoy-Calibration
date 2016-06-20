@@ -1,10 +1,11 @@
+import datetime
+import logging
 import os
 import sys
-import datetime
 import re
 import subprocess
+
 import numpy
-import logging
 
 import modeled_processing as mod_proc
 import image_processing as img_proc
@@ -14,8 +15,47 @@ import narr_data
 import merra_data
 
 class CalibrationController(object):
+    """
+    Attributes:
+
+        buoy_id: NOAA Buoy ID, e.g. 44009, 41008, 46025
+        buoy_location: location of buoy [lat, lon]
+        skin_temp: skin temperature at buoy
+        buoy_press: pressure at buoy
+        buoy_airtemp: air temperature at buoy
+        buoy_dewpnt: dewpoint temperature at buoy
+        
+        modeled_radiance: radiance(s) calculated from NARR or MERRA data and MODTRAN
+        narr_coor: coordinates of atmospheric data points
+
+        image_radiance: radiance(s) calculated from landsat image(s) and metadata
+        metadata: landsat product metadata
+        scenedatetime:
+        poi:
+        
+        scene_id: Landsat Product ID e.g. LC80130332013145LGN00
+            This attribute is assembled from the below elements.
+        satelite: Landsat Satelite idenitfier, e.g. LC8, LE7, LT5
+        wrs2: WRS2 coordinates PTHROW, e.g. 013033, 037041
+        date: date of overpass, year and day of year, e.g. 2013145, 2014003
+        station: station to which the image was transmitted, e.g. LGN, EDC
+        version: version of image that is stored, e.g. 00, 04, etc.
+                
+        filepath_base:
+        data_base: 
+        scene_dir: Directory in which landsat images are stored
+        
+        atmo_src: Either 'narr' or 'merra', indicates which atmospheric data source to use
+    """
     def __init__(self, LID, BID=None, DIR='/dirs/home/ugrad/nid4986/landsat_data/', atmo_src='narr', verbose=False):
-        """ set up CalibrationController object. """
+        """
+        Args:
+            LID: Landsat product ID, see scene_id above
+            BID: NOAA buoy ID, see buoy_id above
+            DIR: base of data storage directory
+            atmo_src: see above
+            verbose: if true, output to stdout, otherwise log to file
+        """
         
         # buoy and related attributes
         self._buoy_id = None
@@ -62,20 +102,17 @@ class CalibrationController(object):
         else:
             logging.basicConfig(level=logging.INFO)
 
-    
-    ### GETTERS AND SETTERS ###
     @property
     def scene_id(self):
-        """ scene_id getter. stored internally as different parts. """
+        """ Stored internally as different parts. """
         
         lid = '%s%s%s%s%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'), \
         self.station, self.version)
         return lid
 
-
     @scene_id.setter
     def scene_id(self, new_id):
-        """ scene_id setter. check for validity before assignment. """
+        """ Check that the landsat id is valid before assignment. """
         
         match = re.match('^L(C8|E7|T5)\d{13}(LGN|EDC|SGS|AGS|ASN|SG1|GLC|ASA|KIR|MOR|KHC|PAC|KIS|CHM|LGS|MGR|COA|MPS)0[0-5]$', new_id)
 
@@ -92,13 +129,11 @@ class CalibrationController(object):
 
     @property
     def buoy_id(self):
-        """ buoy_id getter. """
-        
         return self._buoy_id
 
     @buoy_id.setter
     def buoy_id(self, new_id):
-        """ buoy_id setter. check for validity before assignment. """
+        """ Check that the buoy id is valid before assignment. """
         
         match = re.match('^\d{5}$', new_id)
 
@@ -108,12 +143,11 @@ class CalibrationController(object):
             self._buoy_id = new_id
             logging.warning('.buoy_id: @buoy_id.setter: %s is the wrong format' % new_id)
 
-    #### MEMBER FUNCTIONS ###
     def __repr__(self):
         return self.__str__()
         
     def __str__(self):
-        """ print calculated values. """
+        """ Control output of class. """
             
         output_items = ['Scene ID: %s'%self.scene_id]
         
@@ -124,8 +158,8 @@ class CalibrationController(object):
             
         return '\n'.join(output_items)
     
-    ### helper functions ###
     def calc_all(self):
+        """ Calculate Image and Modeled Radiances, as well as all the other variables. """
         self.download_img_data()
         self.calculate_buoy_information()
         self.download_mod_data()
@@ -144,7 +178,7 @@ class CalibrationController(object):
             img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6'])]]
 
         modtran_data = self.run_modtran()
-        
+
         for band, rsr_file in rsr_files:
             logging.info('Modeled Radiance Processing: Band %s' % (band))
             self.modeled_radiance.append(mod_proc.calc_radiance(self, rsr_file, modtran_data))
@@ -152,11 +186,16 @@ class CalibrationController(object):
         for band, img_file in img_files:
             logging.info('Image Radiance Processing: Band %s' % (band))
             self.image_radiance.append(img_proc.calc_radiance(self, img_file, band))
-
-    ### real work functions ###
   
     def download_mod_data(self):
-        """ download atmospheric data. """
+        """
+        Download atmospheric data.
+
+        Args: None
+
+        Returns: None
+        """
+
         logging.info('Downloading atmospheric data.')
 
         if self.atmo_src == 'narr':
@@ -165,6 +204,15 @@ class CalibrationController(object):
             merra_data.download(self)
             
     def run_modtran(self):
+        """
+        Make tape5, run modtran and parse tape7.scn for this instance.
+
+        Args: None
+
+        Returns: 
+            Relevant Modtran Outputs: spectral, units=[] TODO
+                upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
+        """
         logging.info('Generating tape5 files.')
         # read in narr data and generate tape5 files and caseList
         point_dir, self.narr_coor = mod_proc.make_tape5s(self)
@@ -178,7 +226,13 @@ class CalibrationController(object):
 
     
     def download_img_data(self):
-        """ download landsat images and parse metadata. """
+        """
+        Download landsat product and parse metadata.
+
+        Args: None
+
+        Returns: None
+        """
         
         logging.info('.download_img_data: Dealing with Landsat Data')
     
@@ -196,7 +250,13 @@ class CalibrationController(object):
         self.scenedatetime = datetime.datetime.strptime(date+' '+time, '%Y-%m-%d %H:%M:%S')
 
     def calculate_buoy_information(self):
-        """ pick buoy dataset, download, and calculate skin_temp. """
+        """
+        Pick buoy dataset, download, and calculate skin_temp.
+
+        Args: None
+
+        Returns: None
+        """
         
         corners = numpy.asarray([[0, 0]]*2, dtype=numpy.float32)
         corners[0] = self.metadata['CORNER_UR_LAT_PRODUCT'], \

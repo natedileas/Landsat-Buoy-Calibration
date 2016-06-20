@@ -1,21 +1,29 @@
 import datetime
 import os
 import math
-import numpy
 import subprocess
 import sys
 import logging
 import warnings
+
+import numpy
 
 import narr_data
 import merra_data
 import atmo_data
 import misc_functions as funcs
 
-### PRE MODTRAN FUNCTIONS ###
-
 def make_tape5s(cc):
-    """ Reads atmospheric data and generates tape5 files for modtran runs. """
+    """
+    Read atmospheric data and generates tape5 files for modtran runs. 
+
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        point_dir, data_coor: directory where modtran needs to be run, and the
+        coordinates of the points where the atmospheric data was taken from.
+    """
 
     if cc.atmo_src == 'narr':
         data, data_coor = get_narr_data(cc)
@@ -49,9 +57,18 @@ def make_tape5s(cc):
     return point_dir, data_coor
 
 def get_narr_data(cc):
-    """ choose points and retreive narr data from file. """
+    """
+    Choose points and retreive narr data from file.
 
-    # check if downloaded
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        data: atmospheric data, shape = (7, 4, 29)
+            ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
+        narr_coor: coordinates of the atmospheric data points
+    """
+
     temp, height, shum = narr_data.open(cc)
 
     # choose narr points
@@ -60,14 +77,22 @@ def get_narr_data(cc):
 
     # read in NARR data
     data = narr_data.read(cc, temp, height, shum, chosen_idxs)
-    #ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures = data   # unpack
 
     return data, narr_coor
 
 def get_merra_data(cc):
     """ choose points and retreive merra data from file. """ 
+    """
 
-    # check if downloaded
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        data: atmospheric data, shape = (7, 4, 42)
+            ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
+        chosen_points_lat_lon: coordinates of the atmospheric data points
+    """
+
     data = merra_data.open(cc)
 
     # choose points
@@ -80,8 +105,16 @@ def get_merra_data(cc):
     return data, chosen_points_lat_lon
 
 def generate_tape5(cc, profile):
-    """ write the tape5 file """
+    """
+    Write the profile to a tape5 file.
+    
+    Args:
+        cc: CalibrationController object
+        profile: atmospheric data: height, press, temp, relhum
 
+    Returns:
+        point_dir: directory in which the tape5 is written
+    """
     height, press, temp, relhum = profile
 
     # TODO streamline
@@ -136,9 +169,16 @@ def generate_tape5(cc, profile):
 
     return point_dir
 
-### MODTRAN FUNCTION ###
-
 def run_modtran(directory):
+    """
+    Run modtran in the specified directory.
+
+    Args:
+        directory: location to run modtran from.
+
+    Returns:
+        None
+    """
     exe = '/dirs/pkg/Mod4v3r1/Mod4v3r1.exe'
     d = os.getcwd()
     os.chdir(directory)
@@ -151,11 +191,19 @@ def run_modtran(directory):
 
     os.chdir(d)
 
-### POST MODTRAN FUNCTIONS ###
-
 def calc_radiance(cc, rsr_file, modtran_data):
-    """ calculate modeled radiance for band 10 and 11. """
-        
+    """
+    Calculate modeled radiance for band 10 and 11.
+
+    Args:
+        cc: CalibrationController object
+        rsr_file: relative spectral response data to use
+        modtran_data: modtran output
+            upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
+
+    Returns:
+        radiance: L [W m-2 sr-1 um-1]
+    """
     upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = modtran_data
 
     RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
@@ -191,8 +239,17 @@ def calc_radiance(cc, rsr_file, modtran_data):
     modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
     return modeled_rad
 
-
 def parse_tape7scn(directory):
+    """
+    Parse modtran output file into needed quantities.
+
+    Args:
+        directory: where the file is located
+
+    Returns:
+        upwell_rad, downwell_rad, wvlen, trans, gnd_ref:
+        Needed info for radiance calculation
+    """
     filename = os.path.join(directory, 'tape7.scn')
     
     data = numpy.genfromtxt(filename,  skip_header=11, skip_footer=1, \
@@ -213,19 +270,35 @@ def parse_tape7scn(directory):
     return upwell_rad, downwell_rad, wvlen, trans, gnd_ref
     
 def calc_temperature_array(wavelengths, temperature):
-    """ make array of blackbody radiances. """
+    """
+    Calculate spectral radiance array based on blackbody temperature.
+
+    Args:
+        wavelengths: wavelengths to calculate at
+        temperature: temp to use in blackbody calculation
+
+    Returns:
+        Lt: spectral radiance array
+    """
     Lt= []
 
-    # TODO try yield keyword
     for d_lambda in wavelengths:
         x = radiance(d_lambda, temperature)
         Lt.append(x)
         
     return Lt
         
-def radiance(wvlen, temp, units='microns'):
-    """calculate blackbody radiance given wavelength (in meters) and temperature. """
-    
+def radiance(wvlen, temp):
+    """
+    Calculate spectral blackbody radiance.
+
+    Args:
+        wvlen: wavelength to calculate blackbody at [<wvlen_unit>]
+        temp: temperature to calculate blackbody at [Kelvin]
+
+    Returns:
+        rad: [W m-2 sr-1 <wvlen_unit>-1]
+    """
     # define constants
     c = 3e8   # speed of light, m s-1
     h = 6.626e-34	# J*s = kg m2 s-1
@@ -237,6 +310,4 @@ def radiance(wvlen, temp, units='microns'):
     # calculate radiance
     rad = c1 / (((wvlen**5)) * (math.e**((c2 / (temp * wvlen))) - 1))
     
-    # UNITS
-    # (W / m^2 * sr) * <wavelength unit>
     return rad

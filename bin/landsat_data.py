@@ -1,14 +1,21 @@
+import datetime
+import logging
 import os
 import sys
-import subprocess
-import datetime
-import time
-import logging
-import urllib2, urllib
 import tarfile
+import urllib2, urllib
 
 def download(cc):
-    """ download landsat data and parse metadata. """
+    """ 
+    Download and extract landsat data. 
+
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        scene_id: scene_id that was downloaded
+
+    """
 
     usgs = {'username':'nid4986','password':'Carlson89'}
     if not os.path.exists(cc.scene_dir):
@@ -77,7 +84,15 @@ def download(cc):
     return scene_id
 
 def connect_earthexplorer_no_proxy(usgs):
-    """ Connect to EarthExplorer. """
+    """ 
+    Connect to EarthExplorer without a proxy.
+    
+    Args:
+        usgs: dict, user and password information
+
+    Returns:
+        None
+    """
     logging.info("Establishing connection to Earthexplorer...")
 
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
@@ -95,7 +110,16 @@ def connect_earthexplorer_no_proxy(usgs):
     logging.info('Connected')
 
 def download_landsat_product(url,out_file):
-    """ download the landsat prouct from the url. """
+    """
+    Download the landsat product from the url.
+
+    Args:
+        url: url to download from
+        out_file: file to save to
+
+    Returns:
+        True or False, depending on success
+    """
 
     try:
         req = urllib2.urlopen(url)
@@ -139,14 +163,31 @@ def download_landsat_product(url,out_file):
     return True
 
 def unzipimage(in_file, out_dir):
-    """ Unzip tar file. """
+    """ 
+    Unzip tar file.
+    
+    Args:
+        in_file: file to extract from
+        out_dir: directory to extract files to
+
+    Returns:
+        None
+    """
         
     with tarfile.open(in_file, 'r') as f:
         #files = f.getmembers()  # TODO choose which files to extract from info
         f.extractall(out_dir)
 
-
 def read_metadata(cc):
+    """ 
+    Read landsat metadata from MTL file and return a dict with the values.
+    
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        metadata: dict of landsat metadata from _MTL.txt file.
+    """
     filename = os.path.join(cc.scene_dir, cc.scene_id + '_MTL.txt')
     chars = ['\n', '"', '\'']    # characters to remove from lines
     desc = []

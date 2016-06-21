@@ -49,6 +49,7 @@ USAGE:
         ./buoy-calib -m LE70160382012268EDC00 : Use MERRA data instaed of NARR
         ./buoy-calib -b 44009 LT50410372011048PAC01 : use a specific NOAA buoy
         ./buoy-calib -imvr LC80130332013145LGN00 : Output an image, verbose, reprocesss, with MERRA data
+        ./buoy-calib LE70160382012268EDC00 LC80130332013145LGN00 : process more than one scene
 
 
     The Landsat ID can be any valid ID from landsat 5 or 8 with a level 1 product available.

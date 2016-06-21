@@ -14,7 +14,7 @@ if __name__=='__main__':
      it will take between 5-7 minutes for NARR, and 2-3 for MERRA. If nothing need to be downloaded,\
      it will usually take less than 2 minutes for a single scene.')
     
-    parser.add_argument('scene_id', help='LANDSAT scene ID. Examples: LC80330412013145LGN00, LE70160382012348EDC00, LT50410372011144PAC01')
+    parser.add_argument('scene_id', help='LANDSAT scene ID. Examples: LC80330412013145LGN00, LE70160382012348EDC00, LT50410372011144PAC01', nargs='+')
     
     parser.add_argument('-b','--buoy_id', help='NOAA Buoy ID. Example: 44009',default=None)
     parser.add_argument('-i','--image', help="draw NARR points and Buoy location on landsat image.", action='store_true', default=False)
@@ -28,43 +28,42 @@ if __name__=='__main__':
 
     args = parser.parse_args()
     
-    # assemble id
-    LID = args.scene_id
-    
-    atmo_data_src='narr'
-    if args.merra:
-        atmo_data_src='merra'
- 
-    cc = bc.CalibrationController(LID, BID=args.buoy_id, verbose=args.verbose, atmo_src=atmo_data_src)  # initialize
+    for LID in args.scene_id:
+        atmo_data_src='narr'
+        if args.merra:
+            atmo_data_src='merra'
+     
+        cc = bc.CalibrationController(LID, BID=args.buoy_id, verbose=args.verbose, atmo_src=atmo_data_src)  # initialize
 
-    if args.reprocess:
-        cc.calc_all()
-    else:
-        try:
-            cc = pickle.read_cache(cc)   # try to read in from pickle
-        except OSError:
+        if args.reprocess:
             cc.calc_all()
-        except AttributeError:
-            cc.calc_all()
+        else:
+            try:
+                cc = pickle.read_cache(cc)   # try to read in from pickle
+            except OSError:
+                cc.calc_all()
+            except AttributeError:
+                cc.calc_all()
 
-    print cc   # show values on screen
+        print cc   # show output
 
-    if args.Nooutput is False:
-        pickle.output_cache(cc)    # write out values to pickle
+        if args.Nooutput is False:
+            pickle.output_cache(cc)    # write out values to pickle
 
-    if args.image:
-        if cc.satelite == 'LC8':
-            img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_10'])
-        elif cc.satelite == 'LE7':
-            img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6_VCID_2'])
-        elif cc.satelite == 'LT5':
-            img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6'])
+        if args.image:
+            if cc.satelite == 'LC8':
+                img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_10'])
+            elif cc.satelite == 'LE7':
+                img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6_VCID_2'])
+            elif cc.satelite == 'LT5':
+                img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6'])
 
-        img_proc.write_im(cc, img_file)
-        
-        save_path = os.path.join(cc.scene_dir, 'output', cc.scene_id+'_mod')
-        if cc.atmo_src == 'narr':
-            save_path += '_narr.png'
-        elif cc.atmo_src == 'merra':
-            save_path += '_merra.png'
-        print 'Image with NARR points and buoy written to %s' % save_path
+            img_proc.write_im(cc, img_file)
+            
+            save_path = os.path.join(cc.scene_dir, 'output', cc.scene_id+'_mod')
+            if cc.atmo_src == 'narr':
+                save_path += '_narr.png'
+            elif cc.atmo_src == 'merra':
+                save_path += '_merra.png'
+            print 'Image with NARR points and buoy written to %s' % save_path
+        print 

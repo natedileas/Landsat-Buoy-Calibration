@@ -1,7 +1,7 @@
 from os.path import join, normpath
 
 # directories and files
-PACKAGE_BASE = normpath(join(__file__, '../..'))
+#PACKAGE_BASE = normpath(join(__file__, '../..'))
 DATA_BASE = '/dirs/home/ugrad/nid4986/landsat_data/'
 
 MERRA_DIR = join(DATA_BASE, 'merra')

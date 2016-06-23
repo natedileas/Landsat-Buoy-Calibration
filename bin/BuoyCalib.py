@@ -31,19 +31,16 @@ class CalibrationController(object):
 
         image_radiance: radiance(s) calculated from landsat image(s) and metadata
         metadata: landsat product metadata
-        scenedatetime:
-        poi:
+        scenedatetime: python datetime object constructed from landsat metadata
         
         scene_id: Landsat Product ID e.g. LC80130332013145LGN00
             This attribute is assembled from the below elements.
         satelite: Landsat Satelite idenitfier, e.g. LC8, LE7, LT5
         wrs2: WRS2 coordinates PTHROW, e.g. 013033, 037041
-        date: date of overpass, year and day of year, e.g. 2013145, 2014003
+        date: date of overpass, year and day of year, datetime object from landsat id
         station: station to which the image was transmitted, e.g. LGN, EDC
         version: version of image that is stored, e.g. 00, 04, etc.
-                
-        filepath_base:
-        data_base: 
+
         scene_dir: Directory in which landsat images are stored
         
         atmo_src: Either 'narr' or 'merra', indicates which atmospheric data source to use
@@ -74,7 +71,6 @@ class CalibrationController(object):
         self.image_radiance = []
         self.metadata = None    # landsat metadata
         self.scenedatetime = None 
-        self.poi = None
         
         # attributes that make up the lansat id
         self.satelite = None
@@ -86,14 +82,12 @@ class CalibrationController(object):
         self.scene_id = LID
         if BID: self.buoy_id = BID
 
-        self.scene_dir = os.path.normpath(os.path.join(settings.DATA_BASE, 'landsat_scenes', LID))
+        self.scene_dir = os.path.normpath(os.path.join(settings.LANDSAT_DIR, LID))
+        
         if not os.path.exists(self.scene_dir):
             os.makedirs(self.scene_dir)
         
         self.atmo_src = atmo_src
-
-        if not os.path.exists(self.scene_dir):
-            os.makedirs(self.scene_dir)
 
         if not os.path.exists(os.path.join(self.scene_dir, 'output')):
             os.makedirs(os.path.join(self.scene_dir, 'output'))
@@ -241,7 +235,6 @@ class CalibrationController(object):
         # download landsat image data and assign returns
         downloaded_LID = landsat_data.download(self)
 
-        self.satelite = downloaded_LID[2:3]
         self.scene_id = downloaded_LID
 
         # read in landsat metadata

@@ -12,6 +12,7 @@ import utm
 import image_processing as img_proc
 import atmo_data
 import misc_functions as funcs
+import settings
 
 def download(cc):
     """
@@ -23,17 +24,13 @@ def download(cc):
     Returns:
         None
     """
-
-    urlbase = 'ftp://goldsmr5.sci.gsfc.nasa.gov/data/s4pa/MERRA2/M2I3NPASM.5.12.4/%s/%s/MERRA2_400.inst3_3d_asm_Np.%s.nc4'
     # year with century, zero padded month, then full date
-    url = urlbase % (cc.date.strftime('%Y'), cc.date.strftime('%m'), cc.date.strftime('%Y%m%d'))
-
-    save_dir = os.path.join(cc.data_base, 'merra')
+    url = settings.MERRA_URL % (cc.date.strftime('%Y'), cc.date.strftime('%m'), cc.date.strftime('%Y%m%d'))
     
-    if os.path.isfile(os.path.join(save_dir, url.split('/')[-1])):   # if file already downloaded
+    if os.path.isfile(os.path.join(settings.MERRA_DIR, url.split('/')[-1])):   # if file already downloaded
         return
     
-    subprocess.check_call('wget %s -P %s' % (url, save_dir), shell=True)
+    subprocess.check_call('wget %s -P %s' % (url, settings.MERRA_DIR), shell=True)
 
 def open(cc):
     """
@@ -49,7 +46,7 @@ def open(cc):
         IOError: if file does not exist at the expected path
     """
 
-    merra_file = os.path.join(cc.data_base, 'merra', 'MERRA2_400.inst3_3d_asm_Np.%s.nc4' % cc.date.strftime('%Y%m%d'))
+    merra_file = os.path.join(settings.MERRA_DIR ,'MERRA2_400.inst3_3d_asm_Np.%s.nc4' % cc.date.strftime('%Y%m%d'))
 
     if os.path.isfile(merra_file) is not True:
         logging.error('MERRA Data file does not exist at the expected path: %' % merra_file)

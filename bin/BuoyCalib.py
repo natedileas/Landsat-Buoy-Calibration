@@ -13,6 +13,7 @@ import buoy_data
 import landsat_data
 import narr_data
 import merra_data
+import settings
 
 class CalibrationController(object):
     """
@@ -47,7 +48,7 @@ class CalibrationController(object):
         
         atmo_src: Either 'narr' or 'merra', indicates which atmospheric data source to use
     """
-    def __init__(self, LID, BID=None, DIR='/dirs/home/ugrad/nid4986/landsat_data/', atmo_src='narr', verbose=False):
+    def __init__(self, LID, BID=None, atmo_src='narr', verbose=False):
         """
         Args:
             LID: Landsat product ID, see scene_id above
@@ -84,10 +85,10 @@ class CalibrationController(object):
 
         self.scene_id = LID
         if BID: self.buoy_id = BID
-                
-        self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
-        self.data_base = os.path.realpath(DIR)
-        self.scene_dir = os.path.realpath(os.path.join(DIR, 'landsat_scenes', LID))
+
+        self.scene_dir = os.path.normpath(os.path.join(settings.DATA_BASE, 'landsat_scenes', LID))
+        if not os.path.exists(self.scene_dir):
+            os.makedirs(self.scene_dir)
         
         self.atmo_src = atmo_src
 
@@ -167,15 +168,15 @@ class CalibrationController(object):
         
         # modeled radiance processing
         if self.satelite == 'LC8':   # L8
-            rsr_files = [[10, os.path.join(self.data_base, 'misc', 'L8_B10.rsp')], \
-                        [11, os.path.join(self.data_base, 'misc', 'L8_B11.rsp')]]
+            rsr_files = [[10, os.path.join(settings.DATA_BASE, 'misc', 'L8_B10.rsp')], \
+                        [11, os.path.join(settings.DATA_BASE, 'misc', 'L8_B11.rsp')]]
             img_files = [[10, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10'])], \
                         [11, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]]
         elif self.satelite == 'LE7':   # L7
-            rsr_files = [[6, os.path.join(self.data_base, 'misc', 'L7_B6_2.rsp')]]
+            rsr_files = [[6, os.path.join(settings.DATA_BASE, 'misc', 'L7_B6_2.rsp')]]
             img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6_VCID_2'])]]
         elif self.satelite == 'LT5':   # L5
-            rsr_files = [[6, os.path.join(self.data_base, 'misc', 'L5_B6.rsp')]]
+            rsr_files = [[6, os.path.join(settings.DATA_BASE, 'misc', 'L5_B6.rsp')]]
             img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6'])]]
 
         modtran_data = self.run_modtran()
@@ -259,51 +260,36 @@ class CalibrationController(object):
         Returns: None
         """
         
-        corners = numpy.asarray([[0, 0]]*2, dtype=numpy.float32)
-        corners[0] = self.metadata['CORNER_UR_LAT_PRODUCT'], \
-            self.metadata['CORNER_UR_LON_PRODUCT']
+        buoy_data.get_stationtable()   # download station_table.txt
+        datasets, buoy_coors, depths = buoy_data.find_datasets(self)
 
-        corners[1] = self.metadata['CORNER_LL_LAT_PRODUCT'], \
-            self.metadata['CORNER_LL_LON_PRODUCT']
-
-        save_dir = os.path.join(self.data_base, 'noaa')
-        dataset = None
-        
-        buoy_data.get_stationtable(save_dir)   # download staion_table.txt
-        datasets, buoy_coors, depths = buoy_data.find_datasets(save_dir, corners)
-        
-        url_base = ['http://www.ndbc.noaa.gov/data/historical/stdmet/',
-                    'http://www.ndbc.noaa.gov/data/stdmet/']
-        mon_str = ['Jan/', 'Feb/', 'Apr/', 'May/', 'Jun/', 'Jul/', 'Aug/',
-                   'Sep/', 'Oct/', 'Nov/', 'Dec/']
-                   
         year = self.date.strftime('%Y')
+        mon_str = self.date.strftime('%b')
         month = self.date.strftime('%m')
         urls = []
         
         for dataset in datasets:
             if self.date.year < 2015:
-                urls.append(url_base[0] + dataset + 'h' + year + '.txt.gz')
+                urls.append(settings.NOAA_URLS[0] % (dataset, year))
             else:
-                urls.append(url_base[1] + mon_str[int(month)-1] + dataset +
-                            str(int(month)) + '2015.txt.gz')
+                urls.append(settings.NOAA_URLS[1] % (mon_str, dataset, int(month)))
             
         if self.buoy_id in datasets:
             idx = datasets.index(self.buoy_id)
             datasets.insert(0, datasets.pop(idx))
             urls.insert(0, urls.pop(idx))
         
-        for url in urls:
+        for idx, url in enumerate(urls):
             dataset = os.path.basename(url)
-            zipped_file = os.path.join(save_dir, dataset)
+            zipped_file = os.path.join(settings.NOAA_DIR, dataset)
             unzipped_file = zipped_file.replace('.gz', '')
             
             try:
                 buoy_data.get_buoy_data(zipped_file, url)   # download and unzip
-                temp, pres, atemp, dewp = buoy_data.find_skin_temp(self, unzipped_file, depths[urls.index(url)])
+                temp, pres, atemp, dewp = buoy_data.find_skin_temp(self, unzipped_file, depths[idx])
                 
-                self.buoy_id = datasets[urls.index(url)]
-                self.buoy_location = buoy_coors[urls.index(url)]
+                self.buoy_id = datasets[idx]
+                self.buoy_location = buoy_coors[idx]
                 self.skin_temp = temp
                 self.buoy_press = pres
                 self.buoy_airtemp = atemp

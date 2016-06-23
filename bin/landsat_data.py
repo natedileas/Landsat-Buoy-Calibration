@@ -5,6 +5,8 @@ import sys
 import tarfile
 import urllib2, urllib
 
+import settings
+
 def download(cc):
     """ 
     Download and extract landsat data. 
@@ -18,8 +20,6 @@ def download(cc):
     """
 
     usgs = {'username':'nid4986','password':'Carlson89'}
-    if not os.path.exists(cc.scene_dir):
-        os.makedirs(cc.scene_dir)
     
     # assign prefix, repert, stations
     if cc.satelite == 'LC8':
@@ -46,10 +46,10 @@ def download(cc):
     scene_ids = filter(None, scene_ids)
     
     # iterate through ids
-    tgz_out_dir = os.path.realpath(os.path.join(cc.data_base, 'landsat_scenes'))
+    
     for scene_id in scene_ids:
-        url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
-        tarfile = os.path.join(tgz_out_dir, scene_id + '.tgz')
+        url = settings.LANDSAT_URL % (repert, scene_id)
+        tarfile = os.path.join(settings.LANDSAT_DIR, scene_id + '.tgz')
         metafile = os.path.join(cc.scene_dir, scene_id + '_MTL.txt')
         
         # already downloaded and unzipped

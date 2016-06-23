@@ -2,7 +2,7 @@ Calculates and compares the radiance of a thermal LANSAT scene to the "ground tr
 radiance as measured by a NOAA buoy. Based on work by Frank Padula and Monica Cook.
 
 If you want to use this code, you should have a basic knowledge of python and/or basic coding.
-No warranty. Use it on armstrong or related servers, or not at all. Developed on Fedora x64 by Nathan Dileas. 
+No warranty. Use it on armstrong or related servers for best results. Developed on Fedora x64 by Nathan Dileas. 
 Copyright RIT 2015-2016
 
 OVERVIEW:

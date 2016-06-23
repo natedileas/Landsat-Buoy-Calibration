@@ -12,6 +12,7 @@ import narr_data
 import merra_data
 import atmo_data
 import misc_functions as funcs
+import settings
 
 def make_tape5s(cc):
     """
@@ -31,8 +32,7 @@ def make_tape5s(cc):
         data, data_coor = get_merra_data(cc)
 
     # load standard atmosphere for mid-lat summer
-    filename = os.path.join(cc.data_base, 'misc', 'stanAtm.txt')
-    stan_atmo = numpy.loadtxt(filename, unpack=True)
+    stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
     
     interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
     atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
@@ -134,9 +134,6 @@ def generate_tape5(cc, profile):
     except OSError:
         pass
 
-    modtran_directory = os.path.join(cc.data_base, 'misc')
-    head_file = os.path.join(modtran_directory, 'head.txt')
-    tail_file = os.path.join(modtran_directory, 'tail.txt')
     head = ''
     tail = ''
 
@@ -144,13 +141,13 @@ def generate_tape5(cc, profile):
     nml = str(numpy.shape(height)[0])
     gdalt = '%1.3f' % float(height[0])
 
-    with open(head_file,'r') as f:
+    with open(settings.HEAD_FILE_TEMP, 'r') as f:
         head = f.read()
         head = head.replace('nml', nml)
         head = head.replace('gdalt', gdalt)
         head = head.replace('tmp____', '%3.3f' % cc.skin_temp)
 
-    with open(tail_file,'r') as f:
+    with open(settings.TAIL_FILE_TEMP, 'r') as f:
         tail = f.read()
         tail = tail.replace('longit',lonString)
         tail = tail.replace('latitu',latString)
@@ -181,13 +178,12 @@ def run_modtran(directory):
     Returns:
         None
     """
-    exe = '/dirs/pkg/Mod4v3r1/Mod4v3r1.exe'
     d = os.getcwd()
     os.chdir(directory)
 
     try:
-        subprocess.check_call('ln -sf /dirs/pkg/Mod4v3r1/DATA', shell=True)
-        subprocess.check_call(exe, shell=True)
+        subprocess.check_call('ln -sf %s' % settings.MODTRAN_DATA, shell=True)
+        subprocess.check_call(settings.MODTRAN_EXE, shell=True)
     except subprocess.CalledProcessError:  # symlink already exists error
         pass
 
@@ -211,7 +207,7 @@ def calc_radiance(cc, rsr_file, modtran_data):
     RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
     
     # Load Emissivity / Reflectivity
-    water_file = os.path.join(cc.data_base, 'misc', 'water.txt')
+    water_file = os.path.join(settings.MISC_FILES, 'water.txt')
     spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
     
     # resample to rsr wavelength range

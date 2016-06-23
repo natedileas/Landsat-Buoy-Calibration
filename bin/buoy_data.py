@@ -8,6 +8,8 @@ import urllib2
 import numpy
 import utm
 
+import settings
+
 class BuoyDataError(Exception):
     """ Exception for lack of buoy data in the expected file. """
     def __init__(self, msg):
@@ -16,7 +18,7 @@ class BuoyDataError(Exception):
     def __str__(self):
         return repr(self.msg)
 
-def get_stationtable(save_dir):
+def get_stationtable():
     """ 
     Downloads and unzips station_table.txt. 
 
@@ -28,7 +30,7 @@ def get_stationtable(save_dir):
     """
 
     # define names
-    filename = os.path.join(save_dir, 'station_table.txt')
+    filename = os.path.join(settings.NOAA_DIR, 'station_table.txt')
     url = "http://www.ndbc.noaa.gov/data/stations/station_table.txt"
 
     if not os.path.exists(filename):
@@ -56,7 +58,7 @@ def get_stationtable(save_dir):
 
     return True
 
-def find_datasets(save_dir, corners):
+def find_datasets(cc):
     """
     Get list of possible datasets. 
 
@@ -68,10 +70,17 @@ def find_datasets(save_dir, corners):
         datasets, coordinates, depths: lists of buoy ids, their coordinates, and their depths
 
     Notes:
-        The staion_table.txt file is hugely inconsistent and not computer-friendly.
+        The station_table.txt file is hugely inconsistent and not really computer-friendly.
     """
 
-    filename = os.path.join(save_dir, 'station_table.txt')
+    corners = numpy.asarray([[0, 0]]*2, dtype=numpy.float32)
+    corners[0] = cc.metadata['CORNER_UR_LAT_PRODUCT'], \
+        cc.metadata['CORNER_UR_LON_PRODUCT']
+
+    corners[1] = cc.metadata['CORNER_LL_LAT_PRODUCT'], \
+        cc.metadata['CORNER_LL_LON_PRODUCT']
+
+    filename = os.path.join(settings.NOAA_DIR, 'station_table.txt')
 
     # read in and zip coordinates and buoy SIDs
     # use reg expressions to find matching strings in lines

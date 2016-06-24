@@ -18,34 +18,21 @@ def download(cc):
         scene_id: scene_id that was downloaded
 
     """
-
-    usgs = {'username':'nid4986','password':'Carlson89'}
-    
     # assign prefix, repert, stations
     if cc.satelite == 'LC8':
-        prefix = 'LC8'
         repert = '4923'
-        stations = ['LGN']
+        
     elif cc.satelite == 'LE7':
-        prefix = 'LE7'
         repert = '3373'
-        stations = ['EDC', 'SGS', 'AGS', 'ASN', 'SG1']
+
     elif cc.satelite == 'LT5':
-        prefix = 'LT5'
         repert = '3119'
-        stations = ['GLC','ASA','KIR','MOR','KHC', 'PAC', 'KIS', 'CHM', 'LGS', 'MGR', 'COA', 'MPS']
 
     scene_ids = [cc.scene_id]
     date = datetime.datetime.strftime(cc.date, '%Y%j')
 
-    for station in stations:
-        for version in ['00', '01', '02', '03', '04']:
-            scene_ids.append(prefix + cc.wrs2 + date + station + version)
-
-    # remove any ids which are None
-    scene_ids = filter(None, scene_ids)
-    
-    # iterate through ids
+    for version in ['00', '01', '02', '03', '04']:
+        scene_ids.append(cc.satelite + cc.wrs2 + date + cc.station + version)
     
     for scene_id in scene_ids:
         url = settings.LANDSAT_URL % (repert, scene_id)
@@ -68,7 +55,7 @@ def download(cc):
         else:
             logging.info('product %s not already downloaded ' % scene_id)
 
-            connect_earthexplorer_no_proxy(usgs)
+            connect_earthexplorer_no_proxy()
 
             if download_landsat_product(url, tarfile) is False:
                 continue
@@ -83,7 +70,7 @@ def download(cc):
 
     return scene_id
 
-def connect_earthexplorer_no_proxy(usgs):
+def connect_earthexplorer_no_proxy():
     """ 
     Connect to EarthExplorer without a proxy.
     
@@ -100,7 +87,7 @@ def connect_earthexplorer_no_proxy(usgs):
 
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
     urllib2.install_opener(opener)
-    params = urllib.urlencode(usgs)
+    params = urllib.urlencode(settings.USGS_LOGIN)
 
     f = opener.open("https://ers.cr.usgs.gov/login", params)
     data = f.read()
@@ -159,10 +146,10 @@ def download_landsat_product(url,out_file):
         if e.code == 500:
             logging.error('File doesn\'t exist')
         else:
-            logging.error("HTTP Error:", e.code , url)
+            logging.error("HTTP Error: %s %s:" % (e.reason , url))
         return False
     except urllib2.URLError, e:
-        logging.error("URL Error:",e.reason , url)
+        logging.error("URL Error: %s %s:" % (e.reason , url))
         return False
 
     logging.info('Finished Download')
@@ -182,6 +169,8 @@ def unzipimage(in_file, out_dir):
         
     with tarfile.open(in_file, 'r') as f:
         #files = f.getmembers()  # TODO choose which files to extract from info
+        # match regexs to files.name , search for bands and MTL file
+        # then f.extractfile(name or info_object)
         f.extractall(out_dir)
 
 def read_metadata(cc):

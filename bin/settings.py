@@ -25,3 +25,8 @@ NARR_URLS = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc',
 NOAA_URLS = ['http://www.ndbc.noaa.gov/data/historical/stdmet/%sh%s.txt.gz',
             'http://www.ndbc.noaa.gov/data/stdmet/%s%s%s2015.txt.gz']
 LANDSAT_URL = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE'
+
+# usgs login
+USERNAME = 'nid4986'
+PASSWORD = 'Carlson89'
+USGS_LOGIN = {'username':USERNAME, 'password':PASSWORD}

@@ -1,48 +1,42 @@
+import datetime
+import logging
 import os
 import sys
-import subprocess
-import datetime
-import time
-import logging
-import urllib2, urllib
 import tarfile
+import urllib2, urllib
+
+import settings
 
 def download(cc):
-    """ download landsat data and parse metadata. """
+    """ 
+    Download and extract landsat data. 
 
-    usgs = {'username':'nid4986','password':'Carlson89'}
-    if not os.path.exists(cc.scene_dir):
-        os.makedirs(cc.scene_dir)
-    
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        scene_id: scene_id that was downloaded
+
+    """
     # assign prefix, repert, stations
     if cc.satelite == 'LC8':
-        prefix = 'LC8'
         repert = '4923'
-        stations = ['LGN']
+        
     elif cc.satelite == 'LE7':
-        prefix = 'LE7'
         repert = '3373'
-        stations = ['EDC', 'SGS', 'AGS', 'ASN', 'SG1']
+
     elif cc.satelite == 'LT5':
-        prefix = 'LT5'
         repert = '3119'
-        stations = ['GLC','ASA','KIR','MOR','KHC', 'PAC', 'KIS', 'CHM', 'LGS', 'MGR', 'COA', 'MPS']
 
     scene_ids = [cc.scene_id]
     date = datetime.datetime.strftime(cc.date, '%Y%j')
 
-    for station in stations:
-        for version in ['00', '01', '02', '03', '04']:
-            scene_ids.append(prefix + cc.wrs2 + date + station + version)
-
-    # remove any ids which are None
-    scene_ids = filter(None, scene_ids)
+    for version in ['00', '01', '02', '03', '04']:
+        scene_ids.append(cc.satelite + cc.wrs2 + date + cc.station + version)
     
-    # iterate through ids
-    tgz_out_dir = os.path.realpath(os.path.join(cc.data_base, 'landsat_scenes'))
     for scene_id in scene_ids:
-        url = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE' % (repert, scene_id)
-        tarfile = os.path.join(tgz_out_dir, scene_id + '.tgz')
+        url = settings.LANDSAT_URL % (repert, scene_id)
+        tarfile = os.path.join(settings.LANDSAT_DIR, scene_id + '.tgz')
         metafile = os.path.join(cc.scene_dir, scene_id + '_MTL.txt')
         
         # already downloaded and unzipped
@@ -61,7 +55,7 @@ def download(cc):
         else:
             logging.info('product %s not already downloaded ' % scene_id)
 
-            connect_earthexplorer_no_proxy(usgs)
+            connect_earthexplorer_no_proxy()
 
             if download_landsat_product(url, tarfile) is False:
                 continue
@@ -76,26 +70,49 @@ def download(cc):
 
     return scene_id
 
-def connect_earthexplorer_no_proxy(usgs):
-    """ Connect to EarthExplorer. """
+def connect_earthexplorer_no_proxy():
+    """ 
+    Connect to EarthExplorer without a proxy.
+    
+    Args:
+        usgs: dict, user and password information
+
+    Returns:
+        None
+        
+    Raises:
+        urllib2.HTTPError: if authentication does not occur
+    """
     logging.info("Establishing connection to Earthexplorer...")
 
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor())
     urllib2.install_opener(opener)
-    params = urllib.urlencode(usgs)
+    params = urllib.urlencode(settings.USGS_LOGIN)
 
     f = opener.open("https://ers.cr.usgs.gov/login", params)
     data = f.read()
     f.close()
 
     if data.find('You must sign in as a registered user to download data or place orders for USGS EROS products')>0 :
-        logging.error("Authentification failed")
-        sys.exit(-1)
+        logging.error('Authentification failed')
+        raise urllib.HTTPError('Authentification failed')
 
     logging.info('Connected')
 
 def download_landsat_product(url,out_file):
-    """ download the landsat prouct from the url. """
+    """
+    Download the landsat product from the url.
+
+    Args:
+        url: url to download from
+        out_file: file to save to
+
+    Returns:
+        True or False, depending on success
+    
+    Raises: 
+        TypeError: if the downlaod is not found
+    """
 
     try:
         req = urllib2.urlopen(url)
@@ -107,7 +124,7 @@ def download_landsat_product(url,out_file):
             if lignes.find('Download Not Found')>0 :
                 raise TypeError('Download Not Found')
             else:
-                raise urllib2.HTTPError
+                raise urllib2.HTTPError()
 
         total_size = int(req.info().getheader('Content-Length').strip())
 
@@ -129,47 +146,62 @@ def download_landsat_product(url,out_file):
         if e.code == 500:
             logging.error('File doesn\'t exist')
         else:
-            logging.error("HTTP Error:", e.code , url)
+            logging.error("HTTP Error: %s %s:" % (e.reason , url))
         return False
     except urllib2.URLError, e:
-        logging.error("URL Error:",e.reason , url)
+        logging.error("URL Error: %s %s:" % (e.reason , url))
         return False
 
     logging.info('Finished Download')
     return True
 
 def unzipimage(in_file, out_dir):
-    """ Unzip tar file. """
+    """ 
+    Unzip tar file.
+    
+    Args:
+        in_file: file to extract from
+        out_dir: directory to extract files to
+
+    Returns:
+        None
+    """
         
     with tarfile.open(in_file, 'r') as f:
         #files = f.getmembers()  # TODO choose which files to extract from info
+        # match regexs to files.name , search for bands and MTL file
+        # then f.extractfile(name or info_object)
         f.extractall(out_dir)
 
-
 def read_metadata(cc):
+    """ 
+    Read landsat metadata from MTL file and return a dict with the values.
+    
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        metadata: dict of landsat metadata from _MTL.txt file.
+    """
     filename = os.path.join(cc.scene_dir, cc.scene_id + '_MTL.txt')
     chars = ['\n', '"', '\'']    # characters to remove from lines
     desc = []
     data = []
 
     # open file, split, and save to two lists
-    try:
-        with open(filename, 'r') as f:
-            for line in f:
-                try:
-                    info = line.strip(' ').split(' = ')
-                    info[1] = info[1].translate(None, ''.join(chars))
-                    desc.append(info[0])
-                    data.append(float(info[1]))
-                except ValueError:
-                    data.append(info[1])
-                except IndexError:
-                    #normal thing, caused by non-delimeted lines
-                    pass
-                    
-    except IOError:
-        logging.error('Metadata not in expected file path: %s.' % filename)
-        sys.exit(-1)
+
+    with open(filename, 'r') as f:
+        for line in f:
+            try:
+                info = line.strip(' ').split(' = ')
+                info[1] = info[1].translate(None, ''.join(chars))
+                desc.append(info[0])
+                data.append(float(info[1]))
+            except ValueError:
+                data.append(info[1])
+            except IndexError:
+                #normal thing, caused by non-delimeted lines
+                pass
     
     metadata = dict(zip(desc, data))   # create dictionary
 

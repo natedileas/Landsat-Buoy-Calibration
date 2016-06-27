@@ -1,13 +1,22 @@
-from osgeo import gdal, osr
-from PIL import Image, ImageDraw
-import numpy
 import os
-import utm
+from PIL import Image, ImageDraw
+
+from osgeo import gdal, osr
 import ogr
-import osr
+import utm
 
 def calc_radiance(cc, img_file, band):
-    """ calculate image radiance for a given image file. """
+    """
+    Calculate image radiance for a given image file.
+
+    Args:
+        cc: CalibrationController object
+        img_file: path/file of image to calculate radiance for
+        band: image band, needed for dc to rad conversion
+
+    Returns:
+        radiance: L [W m-2 sr-1 um-1] of the image at the buoy location
+    """
 
     # find Region Of Interest (PixelOI return)
     cc.poi = find_roi(img_file, cc.buoy_location[0], cc.buoy_location[1], cc.metadata['UTM_ZONE'])
@@ -19,10 +28,18 @@ def calc_radiance(cc, img_file, band):
     return radiance
 
 def find_roi(img_file, lat, lon, zone):
-    """ find pixel which corresponds to lat and lon in image. """
-    # img_file: full path to georeferenced image file
-    # lat, lon: float, location to find
-    # zone: utm zone in which the image is projected
+    """
+    Find pixel which corresponds to lat and lon in image.
+
+    Args:
+        img_file: full path to georeferenced image file
+        lat, lon: float, location to find
+        zone: utm zone in which the image is projected
+
+    Returns:
+        x, y: location in pixel space of the lat lon provided
+    """
+    
     
     ds = gdal.Open(img_file)   # open image
     gt = ds.GetGeoTransform()   # get data transform
@@ -40,7 +57,17 @@ def find_roi(img_file, lat, lon, zone):
     return x, y
     
 def convert_utm_zones(x, y, zone_from, zone_to):
-    """ convert lat/lon to appropriate utm zone. """
+    """
+    Convert lat/lon to appropriate utm zone.
+
+    Args:
+        x, y: lat and lon, projected in zone_from
+        zone_from: inital utm projection zone 
+        zone_to: final utm projection zone 
+
+    Returns:
+        x, y: lat and lon, projected in zone_to
+    """
 
     # Spatial Reference System
     inputEPSG = int(float('326' + str(zone_from)))
@@ -65,16 +92,24 @@ def convert_utm_zones(x, y, zone_from, zone_to):
     return point.GetX(), point.GetY()
      
 def calc_dc_avg(filename, poi):
-    """ calculate the digital count average of the region of interest. """
-    #open image
+    """
+    Calculate the digital count average of the region of interest.
+
+    Args:
+        filename: path/file of the image to operate on
+        poi: pixel around which to calculate the average [x, y]
+
+    Returns:
+        dc_avg: digital count average of the 3x3 region around poi
+    """
+
     im = Image.open(filename)
     im_loaded = im.load()
     
     roi = poi[0]-1, poi[1]+1   #ROI gives top left pixel location, 
                                #POI gives center tap location
 
-    dc_sum = 0   #allocate for ROI dc_sum
-    #extract ROI DCs
+    dc_sum = 0
     for i in range(3):
         for j in range(3):
             dc_sum += im_loaded[roi[0]+i, roi[1]+j]
@@ -83,8 +118,19 @@ def calc_dc_avg(filename, poi):
 
     return dc_avg
 
-def dc_to_rad(sat, band, metadata, DCavg):
-    """ Convert digital count average to radiance. """
+def dc_to_rad(sat, band, metadata, dig_count):
+    """
+    Convert a digital count to radiance based on landsat constants.
+
+    Args:
+        sat: satelite to calculate for
+        band: band to calculate for
+        metadata: landsat metadata, dict
+        dig_count: digital count to convert
+
+    Returns:
+        radiance: L [W m-2 sr-1 um-1]
+    """
     
     if sat == 'LC8':   # L8
         if band == 10:
@@ -95,7 +141,7 @@ def dc_to_rad(sat, band, metadata, DCavg):
             L_mult = metadata['RADIANCE_MULT_BAND_11']
         else:
             logging.error('Band was not 10 or 11 for landsat 8.')
-            sys.exit(1)
+            raise ValueError('Band was not 10 or 11 for landsat 8: %s' % band)
             
     elif sat == 'LE7':   # L7
         L_add = metadata['RADIANCE_ADD_BAND_6_VCID_2']
@@ -107,14 +153,23 @@ def dc_to_rad(sat, band, metadata, DCavg):
 
     else:
         logging.error('Sat was not 5, 7, or 8.')
-        sys.exit(1)
+        raise ValueError('Satelite string did not match: %s' % sat)
 
-    radiance = DCavg * L_mult + L_add
+    radiance = dig_count * L_mult + L_add
 
     return radiance
 
-
 def write_im(cc, img_file):
+    """
+    Write buoy and atmo data point locations on image for human inspection.
+
+    Args:
+        cc: CalibrationController object
+        img_file: path/file to write on
+
+    Returns:
+        None
+    """
     zone = cc.metadata['UTM_ZONE']
     narr_pix = []
     

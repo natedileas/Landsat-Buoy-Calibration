@@ -1,10 +1,11 @@
+import datetime
+import logging
 import os
 import sys
-import datetime
 import re
 import subprocess
+
 import numpy
-import logging
 
 import modeled_processing as mod_proc
 import image_processing as img_proc
@@ -12,10 +13,47 @@ import buoy_data
 import landsat_data
 import narr_data
 import merra_data
+import settings
 
 class CalibrationController(object):
-    def __init__(self, LID, BID=None, DIR='/dirs/home/ugrad/nid4986/landsat_data/', atmo_src='narr', verbose=False):
-        """ set up CalibrationController object. """
+    """
+    Attributes:
+
+        buoy_id: NOAA Buoy ID, e.g. 44009, 41008, 46025
+        buoy_location: location of buoy [lat, lon]
+        skin_temp: skin temperature at buoy
+        buoy_press: pressure at buoy
+        buoy_airtemp: air temperature at buoy
+        buoy_dewpnt: dewpoint temperature at buoy
+        
+        modeled_radiance: radiance(s) calculated from NARR or MERRA data and MODTRAN
+        narr_coor: coordinates of atmospheric data points
+
+        image_radiance: radiance(s) calculated from landsat image(s) and metadata
+        metadata: landsat product metadata
+        scenedatetime: python datetime object constructed from landsat metadata
+        
+        scene_id: Landsat Product ID e.g. LC80130332013145LGN00
+            This attribute is assembled from the below elements.
+        satelite: Landsat Satelite idenitfier, e.g. LC8, LE7, LT5
+        wrs2: WRS2 coordinates PTHROW, e.g. 013033, 037041
+        date: date of overpass, year and day of year, datetime object from landsat id
+        station: station to which the image was transmitted, e.g. LGN, EDC
+        version: version of image that is stored, e.g. 00, 04, etc.
+
+        scene_dir: Directory in which landsat images are stored
+        
+        atmo_src: Either 'narr' or 'merra', indicates which atmospheric data source to use
+    """
+    def __init__(self, LID, BID=None, atmo_src='narr', verbose=False):
+        """
+        Args:
+            LID: Landsat product ID, see scene_id above
+            BID: NOAA buoy ID, see buoy_id above
+            DIR: base of data storage directory
+            atmo_src: see above
+            verbose: if true, output to stdout, otherwise log to file
+        """
         
         # buoy and related attributes
         self._buoy_id = None
@@ -33,7 +71,6 @@ class CalibrationController(object):
         self.image_radiance = []
         self.metadata = None    # landsat metadata
         self.scenedatetime = None 
-        self.poi = None
         
         # attributes that make up the lansat id
         self.satelite = None
@@ -43,15 +80,14 @@ class CalibrationController(object):
         self.version = None
 
         self.scene_id = LID
-                
-        self.filepath_base = os.path.realpath(os.path.join(__file__, '../..'))
-        self.data_base = os.path.realpath(DIR)
-        self.scene_dir = os.path.realpath(os.path.join(DIR, 'landsat_scenes', LID))
-        
-        self.atmo_src = atmo_src
+        if BID: self.buoy_id = BID
 
+        self.scene_dir = os.path.normpath(os.path.join(settings.LANDSAT_DIR, LID))
+        
         if not os.path.exists(self.scene_dir):
             os.makedirs(self.scene_dir)
+        
+        self.atmo_src = atmo_src
 
         if not os.path.exists(os.path.join(self.scene_dir, 'output')):
             os.makedirs(os.path.join(self.scene_dir, 'output'))
@@ -62,20 +98,17 @@ class CalibrationController(object):
         else:
             logging.basicConfig(level=logging.INFO)
 
-    
-    ### GETTERS AND SETTERS ###
     @property
     def scene_id(self):
-        """ scene_id getter. stored internally as different parts. """
+        """ Stored internally as different parts. """
         
         lid = '%s%s%s%s%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'), \
         self.station, self.version)
         return lid
 
-
     @scene_id.setter
     def scene_id(self, new_id):
-        """ scene_id setter. check for validity before assignment. """
+        """ Check that the landsat id is valid before assignment. """
         
         match = re.match('^L(C8|E7|T5)\d{13}(LGN|EDC|SGS|AGS|ASN|SG1|GLC|ASA|KIR|MOR|KHC|PAC|KIS|CHM|LGS|MGR|COA|MPS)0[0-5]$', new_id)
 
@@ -92,13 +125,11 @@ class CalibrationController(object):
 
     @property
     def buoy_id(self):
-        """ buoy_id getter. """
-        
         return self._buoy_id
 
     @buoy_id.setter
     def buoy_id(self, new_id):
-        """ buoy_id setter. check for validity before assignment. """
+        """ Check that the buoy id is valid before assignment. """
         
         match = re.match('^\d{5}$', new_id)
 
@@ -108,12 +139,11 @@ class CalibrationController(object):
             self._buoy_id = new_id
             logging.warning('.buoy_id: @buoy_id.setter: %s is the wrong format' % new_id)
 
-    #### MEMBER FUNCTIONS ###
     def __repr__(self):
         return self.__str__()
         
     def __str__(self):
-        """ print calculated values. """
+        """ Control output of class. """
             
         output_items = ['Scene ID: %s'%self.scene_id]
         
@@ -124,27 +154,27 @@ class CalibrationController(object):
             
         return '\n'.join(output_items)
     
-    ### helper functions ###
     def calc_all(self):
+        """ Calculate Image and Modeled Radiances, as well as all the other variables. """
         self.download_img_data()
         self.calculate_buoy_information()
         self.download_mod_data()
         
         # modeled radiance processing
         if self.satelite == 'LC8':   # L8
-            rsr_files = [[10, os.path.join(self.data_base, 'misc', 'L8_B10.rsp')], \
-                        [11, os.path.join(self.data_base, 'misc', 'L8_B11.rsp')]]
+            rsr_files = [[10, os.path.join(settings.DATA_BASE, 'misc', 'L8_B10.rsp')], \
+                        [11, os.path.join(settings.DATA_BASE, 'misc', 'L8_B11.rsp')]]
             img_files = [[10, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_10'])], \
                         [11, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_11'])]]
         elif self.satelite == 'LE7':   # L7
-            rsr_files = [[6, os.path.join(self.data_base, 'misc', 'L7_B6_2.rsp')]]
+            rsr_files = [[6, os.path.join(settings.DATA_BASE, 'misc', 'L7_B6_2.rsp')]]
             img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6_VCID_2'])]]
         elif self.satelite == 'LT5':   # L5
-            rsr_files = [[6, os.path.join(self.data_base, 'misc', 'L5_B6.rsp')]]
+            rsr_files = [[6, os.path.join(settings.DATA_BASE, 'misc', 'L5_B6.rsp')]]
             img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6'])]]
 
         modtran_data = self.run_modtran()
-        
+
         for band, rsr_file in rsr_files:
             logging.info('Modeled Radiance Processing: Band %s' % (band))
             self.modeled_radiance.append(mod_proc.calc_radiance(self, rsr_file, modtran_data))
@@ -152,11 +182,16 @@ class CalibrationController(object):
         for band, img_file in img_files:
             logging.info('Image Radiance Processing: Band %s' % (band))
             self.image_radiance.append(img_proc.calc_radiance(self, img_file, band))
-
-    ### real work functions ###
   
     def download_mod_data(self):
-        """ download atmospheric data. """
+        """
+        Download atmospheric data.
+
+        Args: None
+
+        Returns: None
+        """
+
         logging.info('Downloading atmospheric data.')
 
         if self.atmo_src == 'narr':
@@ -165,6 +200,15 @@ class CalibrationController(object):
             merra_data.download(self)
             
     def run_modtran(self):
+        """
+        Make tape5, run modtran and parse tape7.scn for this instance.
+
+        Args: None
+
+        Returns: 
+            Relevant Modtran Outputs: spectral, units=[] TODO
+                upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
+        """
         logging.info('Generating tape5 files.')
         # read in narr data and generate tape5 files and caseList
         point_dir, self.narr_coor = mod_proc.make_tape5s(self)
@@ -178,14 +222,19 @@ class CalibrationController(object):
 
     
     def download_img_data(self):
-        """ download landsat images and parse metadata. """
+        """
+        Download landsat product and parse metadata.
+
+        Args: None
+
+        Returns: None
+        """
         
         logging.info('.download_img_data: Dealing with Landsat Data')
     
         # download landsat image data and assign returns
         downloaded_LID = landsat_data.download(self)
 
-        self.satelite = downloaded_LID[2:3]
         self.scene_id = downloaded_LID
 
         # read in landsat metadata
@@ -196,63 +245,49 @@ class CalibrationController(object):
         self.scenedatetime = datetime.datetime.strptime(date+' '+time, '%Y-%m-%d %H:%M:%S')
 
     def calculate_buoy_information(self):
-        """ pick buoy dataset, download, and calculate skin_temp. """
-        
-        corners = numpy.asarray([[0, 0]]*2, dtype=numpy.float32)
-        corners[0] = self.metadata['CORNER_UR_LAT_PRODUCT'], \
-            self.metadata['CORNER_UR_LON_PRODUCT']
+        """
+        Pick buoy dataset, download, and calculate skin_temp.
 
-        corners[1] = self.metadata['CORNER_LL_LAT_PRODUCT'], \
-            self.metadata['CORNER_LL_LON_PRODUCT']
+        Args: None
 
-        save_dir = os.path.join(self.data_base, 'noaa')
-        dataset = None
+        Returns: None
+        """
         
-        buoy_data.get_stationtable(save_dir)   # download staion_table.txt
-        datasets, buoy_coors, depths = buoy_data.find_datasets(save_dir, corners)
-        
-        url_base = ['http://www.ndbc.noaa.gov/data/historical/stdmet/',
-                    'http://www.ndbc.noaa.gov/data/stdmet/']
-        mon_str = ['Jan/', 'Feb/', 'Apr/', 'May/', 'Jun/', 'Jul/', 'Aug/',
-                   'Sep/', 'Oct/', 'Nov/', 'Dec/']
-                   
+        buoy_data.get_stationtable()   # download station_table.txt
+        datasets, buoy_coors, depths = buoy_data.find_datasets(self)
+
         year = self.date.strftime('%Y')
+        mon_str = self.date.strftime('%b')
         month = self.date.strftime('%m')
         urls = []
         
-        if self.buoy_id:
-            urls.append('%s%sh%s.txt.gz'%(url_base[0], self.buoy_id, year))
-            urls.append('%s%s%s%s2015.txt.gz' % (url_base[1], mon_str[int(month)-1], self.buoy_id, str(int(month))))
-
-            ret_vals = buoy_data.search_stationtable(save_dir, self.buoy_id)
-            if ret_vals != -1:
-                datasets, buoy_coors, depths = ret_vals
-            else: 
-                logging.warning('.start_download: _save_buoy_data failed')
-   
         for dataset in datasets:
-            if year != '2015':
-                urls.append(url_base[0] + dataset + 'h' + year + '.txt.gz')
+            if self.date.year < 2015:
+                urls.append(settings.NOAA_URLS[0] % (dataset, year))
             else:
-                urls.append(url_base[1] + mon_str[int(month)-1] + dataset +
-                            str(int(month)) + '2015.txt.gz')
+                urls.append(settings.NOAA_URLS[1] % (mon_str, dataset, int(month)))
+            
+        if self.buoy_id in datasets:
+            idx = datasets.index(self.buoy_id)
+            datasets.insert(0, datasets.pop(idx))
+            urls.insert(0, urls.pop(idx))
         
-        for url in urls:
+        for idx, url in enumerate(urls):
             dataset = os.path.basename(url)
-            zipped_file = os.path.join(save_dir, dataset)
+            zipped_file = os.path.join(settings.NOAA_DIR, dataset)
             unzipped_file = zipped_file.replace('.gz', '')
             
             try:
                 buoy_data.get_buoy_data(zipped_file, url)   # download and unzip
-                temp, pres, atemp, dewp = buoy_data.find_skin_temp(unzipped_file, self.metadata, url, depths[urls.index(url)])
+                temp, pres, atemp, dewp = buoy_data.find_skin_temp(self, unzipped_file, depths[idx])
                 
-                self.buoy_id = datasets[urls.index(url)]
-                self.buoy_location = buoy_coors[urls.index(url)]
+                self.buoy_id = datasets[idx]
+                self.buoy_location = buoy_coors[idx]
                 self.skin_temp = temp
                 self.buoy_press = pres
                 self.buoy_airtemp = atemp
                 self.buoy_dewpnt = dewp
-                  
+
                 logging.info('Used buoy dataset %s.'% dataset)
                 break
                 

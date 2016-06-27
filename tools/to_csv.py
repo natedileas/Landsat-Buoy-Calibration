@@ -42,12 +42,10 @@ def fmt_items(cc):
     return items
         
 if __name__ == '__main__':
-    filename = 'output_narr.csv'
+    filename = 'output_merra.csv'
     
     # options
-    a = 'narr'   # atmo data src
-    b = None   # buoy
-    d = '/dirs/home/ugrad/nid4986/Landsat_Buoy_Calibration/data/scenes/'  # directory
+    a = 'merra'   # atmo data src
     v = False   # verbose
     
     with open(filename, 'wb') as f:
@@ -56,12 +54,12 @@ if __name__ == '__main__':
         for s in scenes:
             try:
                 #print s, '%s of %s' % (scenes.index(s) + 1, len(scenes))
-                cc = bc.CalibrationController(s, b, d, verbose=v, atmo_src=a)
+                cc = bc.CalibrationController(s, verbose=v, atmo_src=a)
                 cc_loaded = pickle_funcs.read_cache(cc)
                 w.writerow(fmt_items(cc_loaded))
             except AttributeError:
-                pass
+                w.writerow([s])
             except KeyboardInterrupt:
                 break
             except OSError:
-                pass
+                w.writerow([s])

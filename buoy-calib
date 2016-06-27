@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import bin.BuoyCalib as bc
+import landsatbuoycalib.BuoyCalib as bc
 import tools.pickle_funcs as pickle
 import os
 

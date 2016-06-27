@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-import landsatbuoycalib.BuoyCalib as bc
-import tools.pickle_funcs as pickle
-import os
-
 if __name__=='__main__':
     import argparse
-    import bin.image_processing as img_proc
+    import os
+    
+    import landsatbuoycalib.BuoyCalib as bc
+    import tools.pickle_funcs as pickle
+    import landsatbuoycalib.image_processing as img_proc
 
     parser = argparse.ArgumentParser(description='Compute and compare the radiance values of \
      a landsat image to the propogated radiance of a NOAA buoy, using NARR data and MODTRAN. \

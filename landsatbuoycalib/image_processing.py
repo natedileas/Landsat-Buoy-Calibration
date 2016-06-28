@@ -1,6 +1,8 @@
 import os
 from PIL import Image, ImageDraw
 
+import cv2
+import numpy
 from osgeo import gdal, osr
 import ogr
 import utm
@@ -182,31 +184,40 @@ def write_im(cc, img_file):
     
     # convert to proper format
     if image.mode == 'L':
-        image = image.convert('RGBA')
+        image = image.convert('RGB')
     elif 'I;16' in image.mode:
-        image = image.point(lambda i:i*(1./256.0)).convert('RGBA')
+        image = image.point(lambda i:i*(1./256.0)).convert('RGB')
+
+    img = numpy.asarray(image)
+    gray_image = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    cl1 = clahe.apply(gray_image)
+
+    img_corrected = Image.fromarray(cl1)
+    img_corrected = img_corrected.convert('RGBA')
     
-    draw = ImageDraw.Draw(image)
-    rx = 80
+    draw = ImageDraw.Draw(img_corrected)
+    r = 80
     
     for x, y in narr_pix:
-        draw.ellipse((x-rx, y-rx, x+rx, y+rx), fill=(255, 0, 0))
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, 0, 0))
         
     # draw buoy onto image
     x = cc.poi[0]
     y = cc.poi[1]
-    draw.ellipse((x-rx, y-rx, x+rx, y+rx), fill=(0, 255, 0))
+    draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
 
     # downsample
     new_size = (int(image.size[0] / 15), int(image.size[1] / 15))
-    image = image.resize(new_size, Image.ANTIALIAS)
+    image = img_corrected.resize(new_size, Image.ANTIALIAS)
     
     # put alpha mask in
     data = image.getdata()
     newData = []
     
     for item in data:
-        if item[0] == item[1] == item[2] == 0:
+        #print item
+        if item[0] < 5 and item[1] < 5 and item[2] < 5:
             newData.append((255, 255, 255, 0))
         else:
             newData.append(item)

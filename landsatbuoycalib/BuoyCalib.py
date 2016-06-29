@@ -174,10 +174,11 @@ class CalibrationController(object):
             img_files = [[6, os.path.join(self.scene_dir, self.metadata['FILE_NAME_BAND_6'])]]
 
         modtran_data = self.run_modtran()
+        ltoa = mod_proc.calc_ltoa(self, modtran_data)
 
         for band, rsr_file in rsr_files:
             logging.info('Modeled Radiance Processing: Band %s' % (band))
-            self.modeled_radiance.append(mod_proc.calc_radiance(self, rsr_file, modtran_data))
+            self.modeled_radiance.append(mod_proc.calc_radiance(modtran_data[2], ltoa, rsr_file))
                     
         for band, img_file in img_files:
             logging.info('Image Radiance Processing: Band %s' % (band))
@@ -217,7 +218,7 @@ class CalibrationController(object):
         mod_proc.run_modtran(point_dir)
         
         logging.info('Parsing modtran output.')
-        upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = mod_proc.parse_tape7scn(point_dir)
+        upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = mod_proc.parse_tape6(point_dir)
         return upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
 
     

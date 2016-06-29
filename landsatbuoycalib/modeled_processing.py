@@ -189,52 +189,63 @@ def run_modtran(directory):
 
     os.chdir(d)
 
-def calc_radiance(cc, rsr_file, modtran_data):
+def calc_ltoa(cc, modtran_data):
     """
     Calculate modeled radiance for band 10 and 11.
 
     Args:
         cc: CalibrationController object
-        rsr_file: relative spectral response data to use
+        
         modtran_data: modtran output
             upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
 
     Returns:
-        radiance: L [W m-2 sr-1 um-1]
+        top of atmosphere radiance: Ltoa [W m-2 sr-1 um-1]
     """
-    upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = modtran_data
+    upwell, downwell, wavelengths, tau, gnd_ref = modtran_data
 
-    RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
-    
+    # calculate temperature array
+    Lt = calc_temperature_array(wavelengths, cc.skin_temp)  # w m-2 sr-1 um-1
+
     # Load Emissivity / Reflectivity
     water_file = os.path.join(settings.MISC_FILES, 'water.txt')
-    spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
-    
-    # resample to rsr wavelength range
-    upwell = numpy.interp(RSR_wavelengths, wavelengths, upwell_rad)
-    downwell = numpy.interp(RSR_wavelengths, wavelengths, downwell_rad)
-    tau = numpy.interp(RSR_wavelengths, wavelengths, transmission)
-    gnd_ref = numpy.interp(RSR_wavelengths, wavelengths, gnd_reflect)
-    spec_ref = numpy.interp(RSR_wavelengths, spec_r_wvlens, spec_r)
-    
+    spec_r_wvlens, spec_ref = numpy.loadtxt(water_file, unpack=True, skiprows=3)
+    spec_ref = numpy.interp(wavelengths, spec_r_wvlens, spec_ref)
     spec_emis = 1 - spec_ref   # calculate emissivity
 
-    RSR_wavelengths = RSR_wavelengths / 1e6   # convert to meters
-    
-    # calculate temperature array
-    Lt = calc_temperature_array(RSR_wavelengths, cc.skin_temp)  # w m-2 sr-1 m-1
-    
     # calculate top of atmosphere radiance (spectral)
     ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
-    term1 = Lt * spec_emis * tau # W m-2 sr-1 m-1
-    term2 = spec_ref * gnd_ref * 1e10 # W m-2 sr-1 m-1
-    Ltoa = (upwell * 1e10) + term1 + term2   # W m-2 sr-1 m-1
+    Ltoa = upwell + (Lt * spec_emis * tau) + (spec_ref * gnd_ref)   # W m-2 sr-1 um-1
+    print funcs.integrate(wavelengths, Ltoa)
+    return Ltoa
+
+def calc_radiance(wavelengths, ltoa, rsr_file):
+    """
+    Calculate modeled radiance for band 10 and 11.
+
+    Args:
+        wavelengths: for LToa [um]
+        LToa: top of atmosphere radiance [W m-2 sr-1 um-1]
+        rsr_file: relative spectral response data to use
+
+    Returns:
+        radiance: L [W m-2 sr-1 um-1]
+    """
+    RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
+
+    w = numpy.where((wavelengths > RSR_wavelengths.min()) & (wavelengths < RSR_wavelengths.max()))
     
+    wvlens = wavelengths[w]
+    ltoa_trimmed = ltoa[w]
+
+    # upsample to wavelength range
+    RSR = numpy.interp(wvlens, RSR_wavelengths, RSR)
+
     # calculate observed radiance
-    numerator = funcs.integrate(RSR_wavelengths, Ltoa * RSR)
-    denominator = funcs.integrate(RSR_wavelengths, RSR)
+    numerator = funcs.integrate(wvlens, ltoa_trimmed * RSR)
+    denominator = funcs.integrate(wvlens, RSR)
     
-    modeled_rad = (numerator / denominator) / 1e6  # W m-2 sr-1 um-1
+    modeled_rad = numerator / denominator  # W m-2 sr-1 um-1
     return modeled_rad
 
 def parse_tape7scn(directory):
@@ -266,6 +277,53 @@ def parse_tape7scn(directory):
        sys.exit(-1)
 
     return upwell_rad, downwell_rad, wvlen, trans, gnd_ref
+
+def parse_tape6(directory):
+    """
+    Parse modtran output file into needed quantities.
+
+    Args:
+        directory: where the file is located
+
+    Returns:
+        upwell_rad, downwell_rad, wvlen, trans, gnd_ref:
+        Needed info for radiance calculation
+    """
+    filename = os.path.join(directory, 'tape6')
+
+    with open(filename, 'r') as f:
+        data = f.read()
+
+    d = data.split('\n')
+    a = []
+    
+    for idx, i in enumerate(d):
+        i = i.split()
+        
+        try:
+            if 710 <= float(i[0]) <= 1120 and len(i) == 15:
+                a.append(i)
+        except IndexError:
+            pass
+        except ValueError:
+            pass
+    
+    data = numpy.array(a, dtype=numpy.float64)
+    data = data[:, (1,3,9,12,14)]
+            
+    wvlen, pth_thm, gnd_ref, total, trans = data.T
+    
+    downwell_rad = gnd_ref / trans   # calculate downwelled radiance
+    upwell_rad = pth_thm   # calc upwelled radiance
+    
+    # sanity check
+    check = downwell_rad - ((total - upwell_rad) / trans)
+    if numpy.sum(numpy.absolute(check)) >= .05:
+       logging.error('Error in modtran module. Total Radiance minus upwelled \
+       radiance is not (approximately) equal to downwelled radiance*transmission')
+       sys.exit(-1)
+
+    return upwell_rad[::-1], downwell_rad[::-1], wvlen[::-1], trans[::-1], gnd_ref[::-1]
     
 def calc_temperature_array(wavelengths, temperature):
     """

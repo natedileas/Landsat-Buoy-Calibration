@@ -7,6 +7,7 @@ import subprocess
 
 import numpy
 
+import atmo_data
 import modeled_processing as mod_proc
 import image_processing as img_proc
 import buoy_data
@@ -146,12 +147,13 @@ class CalibrationController(object):
         """ Control output of class. """
             
         output_items = ['Scene ID: %s'%self.scene_id]
-        
-        output_items.append('Modeled: %s' % (self.modeled_radiance))
-        output_items.append('Image: %s' % (self.image_radiance))
+        output_items.append('Overpass Date and Time: %s' % self.scenedatetime.strftime('%m-%d-%Y %I:%M'))
+        output_items.append('Atmospheric Data Source: %s' % self.atmo_src)
+        output_items.append('Modeled Radiance: %s [ W m-2 sr-1 um-1 ]' % (self.modeled_radiance))
+        output_items.append('Image Radiance: %s [ W m-2 sr-1 um-1 ]' % (self.image_radiance))
         
         output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %s' %(self.buoy_id, self.buoy_location, self.skin_temp))
-            
+        output_items.append('Buoy: Pressure: %s Air Temp: %s Dewpoint Temp: %s' % (self.buoy_press, self.buoy_airtemp, self.buoy_dewpnt))
         return '\n'.join(output_items)
     
     def calc_all(self):
@@ -253,51 +255,63 @@ class CalibrationController(object):
 
         Returns: None
         """
-        
-        buoy_data.get_stationtable()   # download station_table.txt
         datasets, buoy_coors, depths = buoy_data.find_datasets(self)
-
+        
+        filename = os.path.join(settings.NOAA_DIR, 'buoy_height.txt')
+        buoys, heights = numpy.genfromtxt(filename, skip_header=7, usecols=(0,1), unpack=True)
+        buoy_heights = dict(zip(buoys, heights))
+        
         year = self.date.strftime('%Y')
         mon_str = self.date.strftime('%b')
         month = self.date.strftime('%m')
-        urls = []
+        hour = self.scenedatetime.hour
         
-        for dataset in datasets:
-            if self.date.year < 2015:
-                urls.append(settings.NOAA_URLS[0] % (dataset, year))
+        if self.buoy_id:
+            if self.buoy_id in datasets:
+                idx = datasets.index(self.buoy_id)
+                datasets = [datasets[idx]]
+                depths = [depths[idx]]
             else:
-                urls.append(settings.NOAA_URLS[1] % (mon_str, dataset, int(month)))
-            
-        if self.buoy_id in datasets:
-            idx = datasets.index(self.buoy_id)
-            datasets.insert(0, datasets.pop(idx))
-            urls.insert(0, urls.pop(idx))
+                logging.error('User Requested Buoy is not in scene.')
+                sys.exit(-1)
         
-        for idx, url in enumerate(urls):
-            dataset = os.path.basename(url)
-            zipped_file = os.path.join(settings.NOAA_DIR, dataset)
+        for idx, buoy in enumerate(datasets):
+            if self.date.year < 2016:
+                url = settings.NOAA_URLS[0] % (buoy, year)
+            else:
+                url = settings.NOAA_URLS[1] % (mon_str, buoy, int(month))
+            
+            zipped_file = os.path.join(settings.NOAA_DIR, os.path.basename(url))
             unzipped_file = zipped_file.replace('.gz', '')
             
             try:
-                buoy_data.get_buoy_data(zipped_file, url)   # download and unzip
-                temp, pres, atemp, dewp = buoy_data.find_skin_temp(self, unzipped_file, depths[idx])
-                
-                self.buoy_id = datasets[idx]
-                self.buoy_location = buoy_coors[idx]
-                self.skin_temp = temp
-                self.buoy_press = pres
-                self.buoy_airtemp = atemp
-                self.buoy_dewpnt = dewp
+                if not buoy_data.get_buoy_data(zipped_file, url): 
+                    continue
 
-                logging.info('Used buoy dataset %s.'% dataset)
+                data = buoy_data.open_buoy_data(self, unzipped_file)
+                self.skin_temp = buoy_data.find_skin_temp(hour, data, depths[idx])
+                
+                self.buoy_id = buoy
+                self.buoy_location = buoy_coors[idx]
+                
+                try:
+                    self.buoy_height = buoy_heights[self.buoy_id]
+                except KeyError:
+                    self.buoy_height = 0.0
+                    
+                self.buoy_press = data[hour][12]
+                self.buoy_airtemp = data[hour][13]
+                self.buoy_dewpnt = data[hour][15]
+                self.buoy_rh = atmo_data.calc_rh(self.buoy_airtemp, self.buoy_dewpnt)
+                print self.buoy_rh
+
+                logging.info('Used buoy: %s'% buoy)
                 break
                 
             except buoy_data.BuoyDataError:
                 logging.warning('Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (dataset))
                 continue
-            except ValueError:
-                logging.warning('Dataset %s didn\'t work (ValueError). Trying a new one' % (dataset))
-                continue
-            except IOError:
-                logging.warning('Dataset %s didn\'t work (IOError). Trying a new one' % (dataset))
-                continue
+                
+        if not self.buoy_location:
+            logging.error('User Requested Buoy Did not work.')
+            sys.exit(-1)

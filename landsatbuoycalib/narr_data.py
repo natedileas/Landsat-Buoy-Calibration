@@ -34,7 +34,7 @@ def download(cc):
             
         subprocess.check_call('wget %s -P %s' % (url, settings.NARR_DIR), shell=True)
 
-def open(cc):
+def open_(cc):
     """
     Open NARR files (netCDF4 format).
 
@@ -167,3 +167,35 @@ def read(cc, temp, height, shum, chosen_points):
     rhum_2 = atmo_data.convert_sh_rh(shum_2, tmp_2, pressure)
     
     return ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressure
+
+def calc_profile(cc):
+    """
+    Choose points and retreive narr data from file.
+
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        data: atmospheric data, shape = (7, 4, 29)
+            ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
+        narr_coor: coordinates of the atmospheric data points
+    """
+
+    temp, height, shum = open_(cc)
+
+    # choose narr points
+    narr_indices, lat, lon = get_points(cc.metadata, temp)
+    chosen_idxs, narr_coor = choose_points(narr_indices, lat, lon, cc.buoy_location)
+
+    # read in NARR data
+    data = read(cc, temp, height, shum, chosen_idxs)
+    
+    # load standard atmosphere for mid-lat summer
+    stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
+    
+    interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
+    atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
+
+    interp_profile = atmo_data.offset_interp_space(cc.buoy_location, atmo_profiles, narr_coor)
+
+    return interp_profile, narr_coor

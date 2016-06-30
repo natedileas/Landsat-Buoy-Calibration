@@ -49,6 +49,26 @@ def dewpoint_temp(temp, relhum):
     """
     
     return temp - ((100 - relhum) / 5)   # kelvin
+
+def calc_rh(atmp, dewpoint):
+    """ 
+    Calculate relative humidity from temperature and dewpoint.
+
+    Args:
+        atmp: air temperature [C]
+        depoint: dewpoint temperature [C]
+
+    Returns:
+        rh: relative humidity [%]
+
+    Notes:
+        http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html
+    """
+    c1 = 17.625
+    c2 = 243.04
+    
+    rh = 100 * math.exp((c1*dewpoint)/(c2+dewpoint)) / math.exp((c1*atmp)/(c2+atmp))
+    return rh
         
 def convert_geopotential_geometric(geopotential, lat):
     """

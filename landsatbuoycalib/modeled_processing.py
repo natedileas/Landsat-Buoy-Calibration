@@ -196,7 +196,7 @@ def calc_ltoa(cc, modtran_data):
     Args:
         cc: CalibrationController object
         
-        modtran_data: modtran output
+        modtran_data: modtran output, Units: [W cm-2 sr-1 um-1]
             upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
 
     Returns:
@@ -205,18 +205,18 @@ def calc_ltoa(cc, modtran_data):
     upwell, downwell, wavelengths, tau, gnd_ref = modtran_data
 
     # calculate temperature array
-    Lt = calc_temperature_array(wavelengths, cc.skin_temp)  # w m-2 sr-1 um-1
+    Lt = calc_temperature_array(wavelengths / 1e6, cc.skin_temp) / 1e6   # w m-2 sr-1 um-1
 
     # Load Emissivity / Reflectivity
     water_file = os.path.join(settings.MISC_FILES, 'water.txt')
-    spec_r_wvlens, spec_ref = numpy.loadtxt(water_file, unpack=True, skiprows=3)
-    spec_ref = numpy.interp(wavelengths, spec_r_wvlens, spec_ref)
+    spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
+    spec_ref = numpy.interp(wavelengths, spec_r_wvlens, spec_r)
     spec_emis = 1 - spec_ref   # calculate emissivity
 
     # calculate top of atmosphere radiance (spectral)
-    ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
-    Ltoa = upwell + (Lt * spec_emis * tau) + (spec_ref * gnd_ref)   # W m-2 sr-1 um-1
-    print funcs.integrate(wavelengths, Ltoa)
+    ## Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal  [W m-2 sr-1 um-1]
+    Ltoa = (upwell * 1e4 + (Lt * spec_emis * tau) + (spec_ref * gnd_ref * 1e4))
+
     return Ltoa
 
 def calc_radiance(wavelengths, ltoa, rsr_file):
@@ -241,11 +241,9 @@ def calc_radiance(wavelengths, ltoa, rsr_file):
     # upsample to wavelength range
     RSR = numpy.interp(wvlens, RSR_wavelengths, RSR)
 
-    # calculate observed radiance
-    numerator = funcs.integrate(wvlens, ltoa_trimmed * RSR)
-    denominator = funcs.integrate(wvlens, RSR)
+    # calculate observed radiance [ W m-2 sr-1 um-1 ]
+    modeled_rad = numpy.trapz(ltoa_trimmed * RSR, wvlens) / numpy.trapz(RSR, wvlens)
     
-    modeled_rad = numerator / denominator  # W m-2 sr-1 um-1
     return modeled_rad
 
 def parse_tape7scn(directory):
@@ -257,7 +255,7 @@ def parse_tape7scn(directory):
 
     Returns:
         upwell_rad, downwell_rad, wvlen, trans, gnd_ref:
-        Needed info for radiance calculation
+        Needed info for radiance calculation Units: [W cm-2 sr-1 um-1]
     """
     filename = os.path.join(directory, 'tape7.scn')
     
@@ -276,6 +274,7 @@ def parse_tape7scn(directory):
        radiance is not (approximately) equal to downwelled radiance*transmission')
        sys.exit(-1)
 
+    trans[numpy.where(trans == 0)] = 0.000001
     return upwell_rad, downwell_rad, wvlen, trans, gnd_ref
 
 def parse_tape6(directory):
@@ -288,6 +287,7 @@ def parse_tape6(directory):
     Returns:
         upwell_rad, downwell_rad, wvlen, trans, gnd_ref:
         Needed info for radiance calculation
+        Units: [W cm-2 sr-1 um-1]
     """
     filename = os.path.join(directory, 'tape6')
 
@@ -311,30 +311,20 @@ def parse_tape6(directory):
     data = numpy.array(a, dtype=numpy.float64)
     data = data[:, (1,3,9,12,14)]
             
-    wvlen, pth_thm, gnd_ref, total, trans = data.T
-    
-    downwell_rad = gnd_ref / trans   # calculate downwelled radiance
-    upwell_rad = pth_thm   # calc upwelled radiance
-    
-    # sanity check
-    check = downwell_rad - ((total - upwell_rad) / trans)
-    if numpy.sum(numpy.absolute(check)) >= .05:
-       logging.error('Error in modtran module. Total Radiance minus upwelled \
-       radiance is not (approximately) equal to downwelled radiance*transmission')
-       sys.exit(-1)
+    wvlen, upwell_rad, gnd_ref, total, trans = data.T
 
-    return upwell_rad[::-1], downwell_rad[::-1], wvlen[::-1], trans[::-1], gnd_ref[::-1]
+    return upwell_rad[::-1], None, wvlen[::-1], trans[::-1], gnd_ref[::-1]
     
 def calc_temperature_array(wavelengths, temperature):
     """
     Calculate spectral radiance array based on blackbody temperature.
 
     Args:
-        wavelengths: wavelengths to calculate at
-        temperature: temp to use in blackbody calculation
+        wavelengths: wavelengths to calculate at [meters]
+        temperature: temp to use in blackbody calculation [Kelvin]
 
     Returns:
-        Lt: spectral radiance array
+        Lt: spectral radiance array [W m-2 sr-1 m-1]
     """
     Lt= []
 
@@ -342,18 +332,18 @@ def calc_temperature_array(wavelengths, temperature):
         x = radiance(d_lambda, temperature)
         Lt.append(x)
         
-    return Lt
+    return numpy.asarray(Lt)
         
 def radiance(wvlen, temp):
     """
     Calculate spectral blackbody radiance.
 
     Args:
-        wvlen: wavelength to calculate blackbody at [<wvlen_unit>]
+        wvlen: wavelength to calculate blackbody at [meters]
         temp: temperature to calculate blackbody at [Kelvin]
 
     Returns:
-        rad: [W m-2 sr-1 <wvlen_unit>-1]
+        rad: [W m-2 sr-1 m-1]
     """
     # define constants
     c = 3e8   # speed of light, m s-1
@@ -363,7 +353,6 @@ def radiance(wvlen, temp):
     c1 = 2 * (c * c) * h   # units = kg m4 s-3
     c2 = (h * c) / k    # (h * c) / k, units = m K    
         
-    # calculate radiance
-    rad = c1 / (((wvlen**5)) * (math.e**((c2 / (temp * wvlen))) - 1))
+    rad = c1 / ((wvlen**5) * (math.e**((c2 / (temp * wvlen))) - 1))
     
     return rad

@@ -153,7 +153,7 @@ class CalibrationController(object):
         output_items.append('Image Radiance: %s [ W m-2 sr-1 um-1 ]' % (self.image_radiance))
         
         output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %s' %(self.buoy_id, self.buoy_location, self.skin_temp))
-        output_items.append('Buoy: Pressure: %s Air Temp: %s Dewpoint Temp: %s' % (self.buoy_press, self.buoy_airtemp, self.buoy_dewpnt))
+        output_items.append('Buoy: Pressure: %s Air Temp: %s Dewpoint Temp: %s Relativity: %s' % (self.buoy_press, self.buoy_airtemp, self.buoy_dewpnt, self.buoy_rh))
         return '\n'.join(output_items)
     
     def calc_all(self):
@@ -303,13 +303,12 @@ class CalibrationController(object):
                 self.buoy_airtemp = data[hour][13]
                 self.buoy_dewpnt = data[hour][15]
                 self.buoy_rh = atmo_data.calc_rh(self.buoy_airtemp, self.buoy_dewpnt)
-                print self.buoy_rh
 
                 logging.info('Used buoy: %s'% buoy)
                 break
                 
             except buoy_data.BuoyDataError:
-                logging.warning('Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (dataset))
+                logging.warning('Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (buoy))
                 continue
                 
         if not self.buoy_location:

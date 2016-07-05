@@ -190,7 +190,7 @@ def write_im(cc, img_file):
 
     img = numpy.asarray(image)
     gray_image = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    clahe = cv2.createCLAHE(clipLimit=6.0, tileGridSize=(8,8))
     cl1 = clahe.apply(gray_image)
 
     img_corrected = Image.fromarray(cl1)

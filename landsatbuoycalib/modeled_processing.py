@@ -65,9 +65,9 @@ def write_tape5(cc, profile):
     except OSError:
         pass
 
-    jay = datetime.datetime.strftime(cc.date, '%j')
-    nml = str(numpy.shape(height)[0])
-    gdalt = '%1.3f' % float(height[0])
+    jay = datetime.datetime.strftime(cc.date, '%j')   # day of year (julian)
+    nml = str(numpy.shape(height)[0])   # number of layers
+    gdalt = '%1.3f' % float(height[0])   # ground altitude
 
     with open(settings.HEAD_FILE_TEMP, 'r') as f:
         head = f.read()
@@ -79,7 +79,7 @@ def write_tape5(cc, profile):
         tail = f.read()
         tail = tail.replace('longit', lonString)
         tail = tail.replace('latitu', '%2.3f' % cc.buoy_location[0])
-        tail = tail.replace('jay',jay)
+        tail = tail.replace('jay', jay)
 
     tape5_file = os.path.join(point_dir, 'tape5')
 

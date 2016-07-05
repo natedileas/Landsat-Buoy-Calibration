@@ -2,6 +2,7 @@ import math
 import os
 
 import numpy
+import matplotlib.pyplot as plt
 
 def convert_sh_rh(specHum, T_k, pressure):
     """ 
@@ -393,3 +394,46 @@ def write_atmo(cc, atmo):
     save_array = numpy.transpose(numpy.reshape(save_array, (5, numpy.shape(atmo[2])[0])))
 
     numpy.savetxt(filename, save_array, fmt='%f\t%f\t%f\t%f\t%f')
+
+def plot_atmo(cc, atmo):
+    """
+    Plots interpolated atmospheric data for user.
+
+    Args:
+        cc: CalibrationController object (for save paths)
+        atmo: atmospheric profile data to draw plots for
+
+    Returns:
+        figure: matplotlib.pyplot figure object, can be saved or displayed 
+    """
+    height, press, temp, hum = atmo
+    dewpoint =  dewpoint_temp(temp, hum)
+
+    figure = plt.figure('%s Atmospheric Profile' % cc.atmo_src, (12, 6)) #make figure  
+    
+    plt.subplot(131)
+    a, = plt.plot(temp, height, 'r', label='Temperature')
+    b, = plt.plot(dewpoint, height, 'b', label='Dewpoint')
+    plt.legend(handles=[a, b])
+    plt.xlabel('Temperature [K]')
+    plt.ylabel('Geometric Height [km]')
+    
+    plt.subplot(132)
+    a, plt.plot(temp, press, 'r', label='Temperature')
+    plt.legend(handles=[a])
+    plt.xlabel('Temperature [K]')
+    plt.ylabel('Pressure [hPa]')
+    plt.ylim([0,1100])
+    plt.gca().invert_yaxis()
+    
+    plt.subplot(133)
+    a, = plt.plot(hum, press, 'g', label='Humidity')
+    plt.legend(handles=[a])
+    plt.xlabel('Relative Humidity [%]')
+    plt.ylabel('Pressure [hPa]')
+    plt.ylim([0,1100])
+    plt.xlim([0,100])
+    plt.gca().invert_yaxis()
+
+    return figure
+

@@ -1,12 +1,60 @@
 #!/usr/bin/env python
 
+def plot_points(cc, args):
+    import landsatbuoycalib.image_processing as img_proc
+
+    if cc.satelite == 'LC8':
+        img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_10'])
+    elif cc.satelite == 'LE7':
+        img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6_VCID_2'])
+    elif cc.satelite == 'LT5':
+        img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6'])
+
+    image = img_proc.write_im(cc, img_file)   # PIL image object
+
+    if args.show == True:
+        image.show()
+    
+    save_path = os.path.join(cc.scene_dir, 'output', cc.scene_id+'_mod')
+    if cc.atmo_src == 'narr':
+        save_path += '_narr.png'
+    elif cc.atmo_src == 'merra':
+        save_path += '_merra.png'
+    image.save(save_path)
+
+def plot_atmo(cc, args):
+    import landsatbuoycalib.atmo_data as atmo_data
+    import landsatbuoycalib.narr_data as narr_data
+    import landsatbuoycalib.merra_data as merra_data
+    import matplotlib.pyplot as plt
+    import numpy
+
+    if cc.atmo_src == 'narr':
+        interp_profile, data_coor = narr_data.calc_profile(cc)
+    elif cc.atmo_src == 'merra':
+        interp_profile, data_coor = merra_data.calc_profile(cc)
+        
+    # add buoy data at bottom of atmosphere
+    interp_profile = numpy.insert(interp_profile, 0, [cc.buoy_height, cc.buoy_press, cc.buoy_airtemp + 273.13, cc.buoy_rh], axis=1)
+    
+    figure = atmo_data.plot_atmo(cc, interp_profile)
+
+    if args.show == True:
+        plt.show(figure)
+
+    save_path = os.path.join(cc.scene_dir, 'output', cc.scene_id+'_atmo')
+    if cc.atmo_src == 'narr':
+        save_path += '_narr.png'
+    elif cc.atmo_src == 'merra':
+        save_path += '_merra.png'
+    figure.savefig(save_path)
+
 if __name__=='__main__':
     import argparse
     import os
     
     import landsatbuoycalib.BuoyCalib as bc
     import tools.pickle_funcs as pickle
-    import landsatbuoycalib.image_processing as img_proc
 
     parser = argparse.ArgumentParser(description='Compute and compare the radiance values of \
      a landsat image to the propogated radiance of a NOAA buoy, using NARR data and MODTRAN. \
@@ -18,10 +66,13 @@ if __name__=='__main__':
     
     parser.add_argument('-b','--buoy_id', help='NOAA Buoy ID. Example: 44009',default=None)
     parser.add_argument('-i','--image', help="draw NARR points and Buoy location on landsat image.", action='store_true', default=False)
+    parser.add_argument('-s', '--show', help="show images on command line.", action='store_true', default=False)
     parser.add_argument('-o','--Nooutput', help="Don't serialize, useful for testing.", action='store_true', default=False)
     parser.add_argument('-m','--merra', help='Use MERRA-2 Data instead of NARR Data.', action='store_true', default=False)
     parser.add_argument('-v', '--verbose', help="Verbose: Specify to see command line output.", action='store_true', default=False)
     parser.add_argument('-r', '--reprocess', help="Add to explicitly reprocess.", action='store_true', default=False)
+
+    # deprecated
     #parser.add_argument('-n', '--narr', help='Use NARR Atmospheric Data.', action='store_false', default=True)
     #parser.add_argument('-d', '--directory', help="Directory to search for landsat images.", default='')
     #parser.add_argument('-c', '--cloud' , help="Maximum desired cloud coverage in percent", type=int, default=100)
@@ -51,19 +102,9 @@ if __name__=='__main__':
             pickle.output_cache(cc)    # write out values to pickle
 
         if args.image:
-            if cc.satelite == 'LC8':
-                img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_10'])
-            elif cc.satelite == 'LE7':
-                img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6_VCID_2'])
-            elif cc.satelite == 'LT5':
-                img_file = os.path.join(cc.scene_dir, cc.metadata['FILE_NAME_BAND_6'])
+            plot_points(cc, args)
+            plot_atmo(cc, args)
 
-            img_proc.write_im(cc, img_file)
-            
-            save_path = os.path.join(cc.scene_dir, 'output', cc.scene_id+'_mod')
-            if cc.atmo_src == 'narr':
-                save_path += '_narr.png'
-            elif cc.atmo_src == 'merra':
-                save_path += '_merra.png'
-            print 'Image with NARR points and buoy written to %s' % save_path
+            save_path = os.path.join(cc.scene_dir, 'output')
+            print 'Figures written to: %s' % save_path
         print 

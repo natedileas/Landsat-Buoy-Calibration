@@ -213,10 +213,4 @@ def write_im(cc, img_file):
     
     image.putdata(newData)
 
-    # save
-    save_path = os.path.join(cc.scene_dir, 'output', cc.scene_id+'_mod')
-    if cc.atmo_src == 'narr':
-        save_path += '_narr.png'
-    elif cc.atmo_src == 'merra':
-        save_path += '_merra.png'
-    image.save(save_path)
+    return image

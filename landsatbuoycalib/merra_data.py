@@ -32,7 +32,7 @@ def download(cc):
     
     subprocess.check_call('wget %s -P %s' % (url, settings.MERRA_DIR), shell=True)
 
-def open(cc):
+def open_(cc):
     """
     Open MERRA data file (in netCDF4 format).
 
@@ -188,3 +188,51 @@ def read(cc, data, chosen_points):
     height2 = numpy.diagonal(data.variables['H'][index2], axis1=1, axis2=2).T
     
     return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1 * 100, rh2 * 100, pressure
+
+def calc_profile(cc):
+    """ 
+    Choose points and retreive merra data from file.
+
+    Args:
+        cc: CalibrationController object
+
+    Returns:
+        data: atmospheric data, shape = (7, 4, 42)
+            ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
+        chosen_points_lat_lon: coordinates of the atmospheric data points
+    """
+
+    data = open_(cc)
+
+    # choose points
+    points_in_scene, points_in_scene_idx = get_points(cc.metadata, data)
+    chosen_points_idxs, data_coor = choose_points(points_in_scene, points_in_scene_idx, cc.buoy_location)
+
+    # retrieve data
+    data = read(cc, data, chosen_points_idxs)
+    
+    # load standard atmosphere for mid-lat summer
+    stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
+    
+    interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
+    atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
+    atmo_profiles = numpy.asarray(atmo_profiles)
+    
+    if len(numpy.where(atmo_profiles > 1e10)[0]) != 0:
+        logging.warning('No data for some points. Extrapolating.')
+        
+        bad_points = zip(*numpy.where(atmo_profiles > 1e10))
+        
+        for i in bad_points:
+            profile = numpy.delete(atmo_profiles[i[0], i[1]], i[2])
+            
+            fit = numpy.polyfit(range(i[2], 5+i[2]), profile[:5], 1)   # linear extrap
+            line = numpy.poly1d(fit)
+            
+            new_profile = numpy.insert(profile, 0, line(i[2]))
+            atmo_profiles[i[0], i[1]] = new_profile
+        
+    interp_profile = atmo_data.bilinear_interp_space(cc.buoy_location, atmo_profiles, data_coor)
+    interp_profile = numpy.asarray(interp_profile)
+    
+    return interp_profile, data_coor

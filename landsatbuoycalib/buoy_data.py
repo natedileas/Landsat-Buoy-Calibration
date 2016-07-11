@@ -18,46 +18,6 @@ class BuoyDataError(Exception):
     def __str__(self):
         return repr(self.msg)
 
-def get_stationtable():
-    """ 
-    Downloads and unzips station_table.txt. 
-
-    Args:
-        save_dir: directory in which to save the file
-
-    Returns:
-        True or False: depending on whether or not it has been downloaded 
-    """
-
-    # define names
-    filename = os.path.join(settings.NOAA_DIR, 'station_table.txt')
-    url = "http://www.ndbc.noaa.gov/data/stations/station_table.txt"
-
-    if not os.path.exists(filename):
-        try:
-            # open url
-            f = urllib2.urlopen(url)
-
-            data = f.read()
-
-            # write data to file
-            with open(filename, "wb") as local_file:
-                local_file.write(data)
-
-            return 0
-
-        except urllib2.HTTPError, e:
-            print "HTTP Error:", e.code, url
-            return False
-        except urllib2.URLError, e:
-            print "URL Error:", e.reason, url
-            return False
-        except OSError, e:
-            print 'OSError: ', e.reason
-            return False
-
-    return True
-
 def find_datasets(cc):
     """
     Get list of possible datasets. 
@@ -175,6 +135,7 @@ def get_buoy_data(filename, url):
             # subprocess.Popen('rm '+filename, shell=True)
 
     except urllib2.HTTPError, e:
+        logging.error("HTTP Error: %s %s" % (e.reason, url))
         return False
     except urllib2.URLError, e:
         logging.error("URL Error:", e.reason, url)
@@ -184,19 +145,54 @@ def get_buoy_data(filename, url):
         return False
 
     return True
+    
+def open_buoy_data(cc, filename):
+    """
+    Open a downloaded buoy data file and extract data from it.
+    
+    Args:
+        cc: calibrationcontroller object, for date
+        filename: buoy file to open
+    
+    Returns:
+        data: from file, trimmed to date
+        
+    Raises:
+        BuoyDataError: if no data is found in file
+    
+    """
+    date = cc.date.strftime('%Y %m %d')
+    date_short_year = date[2:]
+    data = []
+
+    with open(filename, 'r') as f:
+        header = f.readline()
+
+        for line in f:
+            if date in line or date_short_year in line:
+                data.append(line.strip('\n').split())
+
+    if data == []:
+        raise BuoyDataError('No data in file? %s.'% filename)
+        
+    data = numpy.asarray(data, dtype=float)
+
+    headers = dict(zip(header.split(), range(len(data[:,0]))))
+
+    return data, headers
 
 
-def find_skin_temp(cc, filename, depth):
+def find_skin_temp(hour, data, headers, depth):
     """
     Convert bulk temp -> skin temperature.
 
     Args:
         cc: calibrationcontroller object, for data and time information
-        filename: filename to get data from
+        data: data from buoy file
         depth: depth of thermometer on buoy
 
     Returns:
-        skin_temp, pres, atemp, dewp: all parameters of the buoy
+        skin_temp [Kelvin]
 
     Raises:
         BuoyDataError: if no data, date range wrong, etc.
@@ -204,30 +200,9 @@ def find_skin_temp(cc, filename, depth):
     Notes:
         source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
     """
-
-    hour = cc.scenedatetime.hour
-    
-    date = cc.date.strftime('%Y %m %d')
-    data = []
-
-    with open(filename, 'r') as f:
-        for line in f:
-            if date in line:
-                data.append(line.strip('\n').split())
-
-    if data == []:
-        raise BuoyDataError('No data in file? %s.'% filename)
-        
-    data = numpy.asarray(data, dtype=float)
-    #print data
-
     # compute 24hr wind speed and temperature
-    avg_wspd = data[:,6].mean()   # [m s-1]
-    avg_wtmp = data[:,14].mean()   # [C]
-    
-    pres = data[:,12].mean()
-    atemp = data[:,13].mean()
-    dewp = data[:,15].mean()
+    avg_wspd = data[:, headers['WSPD']].mean()   # [m s-1]
+    avg_wtmp = data[:, headers['WTMP']].mean()   # [C]
 
     # calculate skin temperature
     # part 1
@@ -241,13 +216,13 @@ def find_skin_temp(cc, filename, depth):
     c = 1.32 - (0.64 * math.log(avg_wspd))
     
     t = int(hour - (c * z))
-    T_zt = float(data[t][14])    # temperature data from closest hour
+    T_zt = float(data[t, headers['WTMP']])    # temperature data from closest hour
     f_cz = (T_zt - avg_skin_temp) / math.exp(b*z)
 
     # combine
-    skin_temp = avg_skin_temp + f_cz + 273.15
+    skin_temp = avg_skin_temp + f_cz + 273.15   # [K]
 
     if skin_temp >= 600:
-        raise BuoyDataError('No water temp data for selected date range in the data set %s.'% filename)
+        raise BuoyDataError('No water temp data for selected date range in the data set')
 
-    return skin_temp, pres, atemp, dewp
+    return skin_temp

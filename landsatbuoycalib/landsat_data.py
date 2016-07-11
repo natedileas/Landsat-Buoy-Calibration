@@ -98,6 +98,7 @@ def connect_earthexplorer_no_proxy():
         raise urllib.HTTPError('Authentification failed')
 
     logging.info('Connected')
+    return True
 
 def download_landsat_product(url,out_file):
     """
@@ -173,24 +174,23 @@ def unzipimage(in_file, out_dir):
         # then f.extractfile(name or info_object)
         f.extractall(out_dir)
 
-def read_metadata(cc):
+def read_metadata(mtl_file):
     """ 
     Read landsat metadata from MTL file and return a dict with the values.
     
     Args:
-        cc: CalibrationController object
+        mtl_file: file to read landsat metadata from
 
     Returns:
         metadata: dict of landsat metadata from _MTL.txt file.
     """
-    filename = os.path.join(cc.scene_dir, cc.scene_id + '_MTL.txt')
     chars = ['\n', '"', '\'']    # characters to remove from lines
     desc = []
     data = []
 
     # open file, split, and save to two lists
 
-    with open(filename, 'r') as f:
+    with open(mtl_file, 'r') as f:
         for line in f:
             try:
                 info = line.strip(' ').split(' = ')

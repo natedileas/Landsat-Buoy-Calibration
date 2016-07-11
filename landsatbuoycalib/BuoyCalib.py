@@ -238,7 +238,8 @@ class CalibrationController(object):
         self.scene_id = downloaded_LID
 
         # read in landsat metadata
-        self.metadata = landsat_data.read_metadata(self)
+        mtl_file = os.path.join(self.scene_dir, self.scene_id + '_MTL.txt')
+        self.metadata = landsat_data.read_metadata(mtl_file)
         
         date = self.metadata['DATE_ACQUIRED']
         time = self.metadata['SCENE_CENTER_TIME'].replace('"', '')[0:7]

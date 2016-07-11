@@ -153,7 +153,7 @@ class CalibrationController(object):
         output_items.append('Image Radiance: %s [ W m-2 sr-1 um-1 ]' % (self.image_radiance))
         
         output_items.append('Buoy ID: %7s Lat-Lon: %8s Skin Temp: %s' %(self.buoy_id, self.buoy_location, self.skin_temp))
-        output_items.append('Buoy: Pressure: %s Air Temp: %s Dewpoint Temp: %s Relativity: %s' % (self.buoy_press, self.buoy_airtemp, self.buoy_dewpnt, self.buoy_rh))
+        output_items.append('Buoy: Pressure: %s Air Temp: %s Dewpoint Temp: %s Relative Humidity: %s' % (self.buoy_press, self.buoy_airtemp, self.buoy_dewpnt, self.buoy_rh))
         return '\n'.join(output_items)
     
     def calc_all(self):
@@ -288,8 +288,8 @@ class CalibrationController(object):
                 if not buoy_data.get_buoy_data(zipped_file, url): 
                     continue
 
-                data = buoy_data.open_buoy_data(self, unzipped_file)
-                self.skin_temp = buoy_data.find_skin_temp(hour, data, depths[idx])
+                data, headers = buoy_data.open_buoy_data(self, unzipped_file)
+                self.skin_temp = buoy_data.find_skin_temp(hour, data, headers, depths[idx])
                 
                 self.buoy_id = buoy
                 self.buoy_location = buoy_coors[idx]
@@ -298,17 +298,21 @@ class CalibrationController(object):
                     self.buoy_height = buoy_heights[self.buoy_id]
                 except KeyError:
                     self.buoy_height = 0.0
-                    
-                self.buoy_press = data[hour][12]
-                self.buoy_airtemp = data[hour][13]
-                self.buoy_dewpnt = data[hour][15]
+                
+                try:
+                    self.buoy_press = data[hour, headers['BAR']]
+                except KeyError:
+                    self.buoy_press = data[hour, headers['PRES']]
+
+                self.buoy_airtemp = data[hour, headers['ATMP']]
+                self.buoy_dewpnt = data[hour, headers['DEWP']]
                 self.buoy_rh = atmo_data.calc_rh(self.buoy_airtemp, self.buoy_dewpnt)
 
                 logging.info('Used buoy: %s'% buoy)
                 break
                 
-            except buoy_data.BuoyDataError:
-                logging.warning('Dataset %s didn\'t work (BuoyDataError). Trying a new one' % (buoy))
+            except buoy_data.BuoyDataError as e:
+                logging.warning('Dataset %s didn\'t work (%s). Trying a new one' % (buoy, e))
                 continue
                 
         if not self.buoy_location:

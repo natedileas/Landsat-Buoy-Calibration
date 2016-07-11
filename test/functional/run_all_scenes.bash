@@ -155,5 +155,6 @@ for i in "${L8_wo_wgrib[@]}"
 do 
    echo $i
    ./buoy-calib $i -r
+   #./buoy-calib $i -rmi
    echo
 done

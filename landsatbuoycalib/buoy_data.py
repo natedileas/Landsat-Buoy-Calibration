@@ -162,22 +162,27 @@ def open_buoy_data(cc, filename):
     
     """
     date = cc.date.strftime('%Y %m %d')
+    date_short_year = date[2:]
     data = []
 
     with open(filename, 'r') as f:
+        header = f.readline()
+
         for line in f:
-            if date in line:
+            if date in line or date_short_year in line:
                 data.append(line.strip('\n').split())
 
     if data == []:
         raise BuoyDataError('No data in file? %s.'% filename)
         
     data = numpy.asarray(data, dtype=float)
-    
-    return data
+
+    headers = dict(zip(header.split(), range(len(data[:,0]))))
+
+    return data, headers
 
 
-def find_skin_temp(hour, data, depth):
+def find_skin_temp(hour, data, headers, depth):
     """
     Convert bulk temp -> skin temperature.
 
@@ -196,8 +201,8 @@ def find_skin_temp(hour, data, depth):
         source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
     """
     # compute 24hr wind speed and temperature
-    avg_wspd = data[:,6].mean()   # [m s-1]
-    avg_wtmp = data[:,14].mean()   # [C]
+    avg_wspd = data[:, headers['WSPD']].mean()   # [m s-1]
+    avg_wtmp = data[:, headers['WTMP']].mean()   # [C]
 
     # calculate skin temperature
     # part 1
@@ -211,13 +216,13 @@ def find_skin_temp(hour, data, depth):
     c = 1.32 - (0.64 * math.log(avg_wspd))
     
     t = int(hour - (c * z))
-    T_zt = float(data[t][14])    # temperature data from closest hour
+    T_zt = float(data[t, headers['WTMP']])    # temperature data from closest hour
     f_cz = (T_zt - avg_skin_temp) / math.exp(b*z)
 
     # combine
     skin_temp = avg_skin_temp + f_cz + 273.15   # [K]
 
     if skin_temp >= 600:
-        raise BuoyDataError('No water temp data for selected date range in the data set %s.'% filename)
+        raise BuoyDataError('No water temp data for selected date range in the data set')
 
     return skin_temp

@@ -40,9 +40,10 @@ def find_roi(img_file, lat, lon, zone):
 
     Returns:
         x, y: location in pixel space of the lat lon provided
+
+    Raises:
+        OutOfRangeError: if x or y lies outside the limits of the image
     """
-    
-    
     ds = gdal.Open(img_file)   # open image
     gt = ds.GetGeoTransform()   # get data transform
     
@@ -56,6 +57,9 @@ def find_roi(img_file, lat, lon, zone):
     x = int((l_x - gt[0]) / gt[1])
     y = int((l_y - gt[3]) / gt[5])
     
+    if x > ds.RasterXSize or x < 0 or y > ds.RasterYSize or y < 0:
+        raise OutOfRangeError('POI out of range.')
+
     return x, y
     
 def convert_utm_zones(x, y, zone_from, zone_to):
@@ -69,7 +73,12 @@ def convert_utm_zones(x, y, zone_from, zone_to):
 
     Returns:
         x, y: lat and lon, projected in zone_to
+
+    Raises: 
+        OutOfRangeError: if utm zones are out of valid ranges
     """
+    if zone_from < 0 or zone_from > 60 or zone_to < 0 or zone_to > 60:
+        raise OutOfRangeError('UTM Zone(s) not valid. Zone_From: %s Zone_To: %s' % (zone_from, zone_to))
 
     # Spatial Reference System
     inputEPSG = int(float('326' + str(zone_from)))
@@ -106,6 +115,10 @@ def calc_dc_avg(filename, poi):
     """
 
     im = Image.open(filename)
+
+    if poi[0] > im.size[0] or poi[0] < 1 or poi[1] > im.size[1] or poi[1] < 1:
+        raise OutOfRangeError('ROI %s, %s does not lie within the image.' % poi)
+
     im_loaded = im.load()
     
     roi = poi[0]-1, poi[1]+1   #ROI gives top left pixel location, 
@@ -132,8 +145,11 @@ def dc_to_rad(sat, band, metadata, dig_count):
 
     Returns:
         radiance: L [W m-2 sr-1 um-1]
-    """
-    
+
+    Raises:
+        ValueError: if satelite string did not match
+        OutOfRangeError: if DC average was out of range
+    """  
     if sat == 'LC8':   # L8
         if band == 10:
             L_add = metadata['RADIANCE_ADD_BAND_10']
@@ -144,18 +160,24 @@ def dc_to_rad(sat, band, metadata, dig_count):
         else:
             logging.error('Band was not 10 or 11 for landsat 8.')
             raise ValueError('Band was not 10 or 11 for landsat 8: %s' % band)
+        max_dc = metadata['QUANTIZE_CAL_MAX_BAND_10']
             
     elif sat == 'LE7':   # L7
         L_add = metadata['RADIANCE_ADD_BAND_6_VCID_2']
         L_mult = metadata['RADIANCE_MULT_BAND_6_VCID_2']
+        max_dc = metadata['QUANTIZE_CAL_MAX_BAND_6_VCID_2']
         
     elif sat == 'LT5':   # L5
         L_add = metadata['RADIANCE_ADD_BAND_6']
         L_mult = metadata['RADIANCE_MULT_BAND_6']
+        max_dc = metadata['QUANTIZE_CAL_MAX_BAND_6']
 
     else:
         logging.error('Sat was not 5, 7, or 8.')
         raise ValueError('Satelite string did not match: %s' % sat)
+
+    if dig_count < 1 or dig_count > max_dc:
+        raise OutOfRangeError('Digital Count was out of range.')
 
     radiance = dig_count * L_mult + L_add
 
@@ -231,3 +253,11 @@ def write_im(cc, img_file):
     elif cc.atmo_src == 'merra':
         save_path += '_merra.png'
     image.save(save_path)
+
+class OutOfRangeError(Exception):
+    """ Exception for lat/lon being out of the image. """
+    def __init__(self, msg):
+        self.msg=msg
+
+    def __str__(self):
+        return repr(self.msg)

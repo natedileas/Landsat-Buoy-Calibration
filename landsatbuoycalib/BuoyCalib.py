@@ -111,7 +111,7 @@ class CalibrationController(object):
     def scene_id(self, new_id):
         """ Check that the landsat id is valid before assignment. """
         
-        match = re.match('^L(C8|E7|T5)\d{13}(LGN|EDC|SGS|AGS|ASN|SG1|GLC|ASA|KIR|MOR|KHC|PAC|KIS|CHM|LGS|MGR|COA|MPS)0[0-5]$', new_id)
+        match = re.match('^L(C8|E7|T5)\d{13}(LGN|EDC|SGS|AGS|ASN|SG1|GNC|ASA|KIR|MOR|KHC|PAC|KIS|CHM|LGS|MGR|COA|MPS)0[0-5]$', new_id)
 
         if match:
             self.satelite = new_id[0:3]

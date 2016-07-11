@@ -194,8 +194,23 @@ def calc_profile(cc):
     stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
     
     interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
-    atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
+    atmo_profiles = numpy.asarray(atmo_data.generate_profiles(interp_time, stan_atmo, data[6]))
 
     interp_profile = atmo_data.offset_interp_space(cc.buoy_location, atmo_profiles, narr_coor)
+
+    if len(numpy.where(atmo_profiles > 32765)[0]) != 0:
+        print numpy.where(atmo_profiles > 32765)
+        logging.warning('No data for some points. Extrapolating.')
+        
+        bad_points = zip(*numpy.where(atmo_profiles > 32765))
+        
+        for i in bad_points:
+            profile = numpy.delete(atmo_profiles[i[0], i[1]], i[2])
+            
+            fit = numpy.polyfit(range(i[2], 5+i[2]), profile[:5], 1)   # linear extrap
+            line = numpy.poly1d(fit)
+            
+            new_profile = numpy.insert(profile, 0, line(i[2]))
+            atmo_profiles[i[0], i[1]] = new_profile
 
     return interp_profile, narr_coor

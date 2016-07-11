@@ -3,31 +3,27 @@ import os
 
 import numpy
 
-def convert_sh_rh(specHum, T_k, pressure):
+def convert_sh_rh(q, T_k, p):
     """ 
     Converts specific humidity to relative humidity. 
 
+    Works with single values or numpy arrays (all of the same size).
+
     Args:
-        specHum: specific humidity
-        T_k: temperature, in kelvin
-        pressure: pressure, in mB
+        q: specific humidity, [no units]
+        T_k: temperature, [Kelvin]
+        p: pressure, [kPa]
 
     Returns:
-        rh: relative humidity, (1d numpy array)
+        rh: relative humidity [%]
 
     Notes:
         http://earthscience.stackexchange.com/questions/2360/how-do-i-convert-specific-humidity-to-relative-humidity
     """
-    
-    T_k = numpy.asarray(T_k, dtype=numpy.float64)  #numpy.float64
-    
-    # convert input variables
-    T_c = numpy.subtract(T_k, 273.15)   #celcius
-    q = specHum   #specific humidity
-    p = pressure   #pressures
+    T_c = T_k - 273.15   # celcius
     
     # compute relative humidity
-    a = numpy.divide(numpy.multiply(17.67, T_c), numpy.subtract(T_k, 29.65))
+    a = (17.67 * T_c) / (T_k - 29.65)
     
     rh = 26.3 * p * q * (1 / numpy.exp(a))
     
@@ -37,12 +33,14 @@ def dewpoint_temp(temp, relhum):
     """
     Calculates dewpoint temperature. 
 
+    Works with single values or numpy arrays (all of the same size).
+
     Args:
-        temp: temperature, in celcius (1d numpy array)
-        relhum: relative humidity, in percent (0-100), (1d numpy array)
+        temp: temperature, [C/K]
+        relhum: relative humidity, [% (0-100)]
 
     Returns:
-        dewpoint temperature, in celcius (1d numpy array)
+        dewpoint temperature, [C/K]
 
     Notes:
         source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf

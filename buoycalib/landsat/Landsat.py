@@ -1,21 +1,30 @@
+import ..settings
+import .landsat_data
+from .image_processing import *
+from ..memoize import memoize
+
+import re
+import datetime
 
 class LandsatProduct(class):
 	# image radiance and related attributes
-    self.image_radiance = []
-    self.metadata = None    # landsat metadata
-    self.scenedatetime = None 
-    
-    # attributes that make up the lansat id
-    self.satelite = None
-    self.wrs2 = None
-    self.date = None
-    self.station = None
-    self.version = None
-        
-	self.scene_dir = os.path.normpath(os.path.join(settings.LANDSAT_DIR, LID))
-        
-    if not os.path.exists(self.scene_dir):
-        os.makedirs(self.scene_dir)
+    def __init__(self, LID, date):
+        self.metadata = {}    # landsat metadata
+        self.scenedatetime = date 
+        self.radiance = []
+
+        # attributes that make up the lansat id
+        self.satelite = None
+        self.wrs2 = None
+        self.date = None
+        self.station = None
+        self.version = None
+            
+    	self.scene_dir = os.path.normpath(os.path.join(settings.LANDSAT_DIR, LID))
+            
+        if not os.path.exists(self.scene_dir):
+            os.makedirs(self.scene_dir)
+
 
 	@property
     def scene_id(self):
@@ -24,6 +33,7 @@ class LandsatProduct(class):
         lid = '%s%s%s%s%s' % (self.satelite, self.wrs2, self.date.strftime('%Y%j'), \
         self.station, self.version)
         return lid
+
 
     @scene_id.setter
     def scene_id(self, new_id):
@@ -42,16 +52,14 @@ class LandsatProduct(class):
             logging.error('scene_id.setter: %s is the wrong format' % new_id)
             sys.exit(-1)
 
-	def download_img_data(self):
+
+    @memoize
+	def download(self):
         """
         Download landsat product and parse metadata.
-
-        Args: None
-
-        Returns: None
         """
         
-        logging.info('.download_img_data: Dealing with Landsat Data')
+        logging.info('.download: Dealing with Landsat Data')
     
         # download landsat image data and assign returns
         downloaded_LID = landsat_data.download(self)
@@ -64,3 +72,20 @@ class LandsatProduct(class):
         date = self.metadata['DATE_ACQUIRED']
         time = self.metadata['SCENE_CENTER_TIME'].replace('"', '')[0:7]
         self.scenedatetime = datetime.datetime.strptime(date+' '+time, '%Y-%m-%d %H:%M:%S')
+
+        return self
+
+
+    def load(self):
+        # load in relevant images
+        pass
+
+
+    def calc_radiance(self):
+        self.poi = find_roi(img_file, cc.buoy_location[0], cc.buoy_location[1], self.metadata['UTM_ZONE'])
+
+        # calculate digital count average and convert to radiance of 3x3 area around poi
+        dc_avg = calc_dc_avg(img_file, cc.poi)
+        self.radiance = dc_to_rad(cc.satelite, band, cc.metadata, dc_avg)
+
+        return self

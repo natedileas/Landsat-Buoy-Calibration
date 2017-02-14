@@ -5,39 +5,39 @@ import sys
 import tarfile
 import urllib2, urllib
 
-import settings
+import ..settings
 
-def download(cc):
+def download(product):
     """ 
     Download and extract landsat data. 
 
     Args:
-        cc: CalibrationController object
+        product: LandsatProduct object
 
     Returns:
         scene_id: scene_id that was downloaded
 
     """
     # assign prefix, repert, stations
-    if cc.satelite == 'LC8':
+    if product.satelite == 'LC8':
         repert = '4923'
         
-    elif cc.satelite == 'LE7':
+    elif product.satelite == 'LE7':
         repert = '3373'
 
-    elif cc.satelite == 'LT5':
+    elif product.satelite == 'LT5':
         repert = '3119'
 
-    scene_ids = [cc.scene_id]
-    date = datetime.datetime.strftime(cc.date, '%Y%j')
+    scene_ids = [product.scene_id]
+    date = datetime.datetime.strftime(product.date, '%Y%j')
 
     for version in ['00', '01', '02', '03', '04']:
-        scene_ids.append(cc.satelite + cc.wrs2 + date + cc.station + version)
+        scene_ids.append(product.satelite + product.wrs2 + date + product.station + version)
     
     for scene_id in scene_ids:
         url = settings.LANDSAT_URL % (repert, scene_id)
         tarfile = os.path.join(settings.LANDSAT_DIR, scene_id + '.tgz')
-        metafile = os.path.join(cc.scene_dir, scene_id + '_MTL.txt')
+        metafile = os.path.join(product.scene_dir, scene_id + '_MTL.txt')
         
         # already downloaded and unzipped
         if os.path.exists(metafile):
@@ -47,7 +47,7 @@ def download(cc):
         # already downloaded
         elif os.path.isfile(tarfile):
             logging.info('product %s already downloaded ' % scene_id)
-            unzipimage(tarfile, cc.scene_dir)
+            unzipimage(tarfile, product.scene_dir)
             os.remove(tarfile)
             break
             
@@ -60,12 +60,12 @@ def download(cc):
             if download_landsat_product(url, tarfile) is False:
                 continue
 
-            unzipimage(tarfile, cc.scene_dir)
+            unzipimage(tarfile, product.scene_dir)
             os.remove(tarfile)
 
             break
 
-    if cc.scene_id != scene_id:
+    if product.scene_id != scene_id:
         logging.warning('scene_id and landsat_id do not match')
 
     return scene_id

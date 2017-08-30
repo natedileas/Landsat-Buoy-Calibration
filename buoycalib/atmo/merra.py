@@ -13,8 +13,10 @@ import image_processing as img_proc
 import atmo_data
 import misc_functions as funcs
 import settings
+from ..download import url_download
 
-def download(cc):
+
+def download(metadata):
     """
     Download MERRA data via ftp.
 
@@ -25,14 +27,16 @@ def download(cc):
         None
     """
     # year with century, zero padded month, then full date
-    url = settings.MERRA_URL % (cc.date.strftime('%Y'), cc.date.strftime('%m'), cc.date.strftime('%Y%m%d'))
-    
-    if os.path.isfile(os.path.join(settings.MERRA_DIR, url.split('/')[-1])):   # if file already downloaded
-        return
-    
-    subprocess.check_call('wget %s -P %s' % (url, settings.MERRA_DIR), shell=True)
+    # TODO fix merra url to include new format strings
+    date = metadata['date']
+    url = settings.MERRA_URL % (date.strftime('%Y'), date.strftime('%m'),
+                                date.strftime('%Y%m%d'))
 
-def open_(cc):
+    filename = url_download(url, settings.MERRA_DIR)
+    metadata['merra_file'] = filename
+
+
+def open_(metadata):
     """
     Open MERRA data file (in netCDF4 format).
 
@@ -41,16 +45,15 @@ def open_(cc):
 
     Returns:
         rootgrp: data reference to variables stored in MERRA data file.
-    
+
     Raises:
         IOError: if file does not exist at the expected path
     """
 
-    merra_file = os.path.join(settings.MERRA_DIR ,'MERRA2_400.inst3_3d_asm_Np.%s.nc4' % cc.date.strftime('%Y%m%d'))
+    merra_file = metadata['merra_file']
 
-    if os.path.isfile(merra_file) is not True:
-        logging.error('MERRA Data file does not exist at the expected path: %' % merra_file)
-        raise IOError('MERRA Data file does not exist at the expected path: %' % merra_file)
+    if not os.path.isfile(merra_file):
+        raise IOError('MERRA Data file not at path: {0}'.format(merra_file))
 
     rootgrp = Dataset(merra_file, "r", format="NETCDF4")
     return rootgrp
@@ -92,6 +95,7 @@ def get_points(metadata, data):
 
     return in_image_lat_lon, in_image_idx
 
+
 def choose_points(points_in_image, points_in_image_idx, buoy_coors):
     """
     Choose the four points which will be used.
@@ -110,12 +114,12 @@ def choose_points(points_in_image, points_in_image_idx, buoy_coors):
 
     eastvector = []
     northvector = []
-    
-    for i in range(len(points_in_image)): 
-        narr_utm_ret = utm.from_latlon(latvalues[i],lonvalues[i])
+
+    for i in range(len(points_in_image)):
+        narr_utm_ret = utm.from_latlon(latvalues[i], lonvalues[i])
         eastvector.append(narr_utm_ret[0])
         northvector.append(narr_utm_ret[1])
-        
+
     eastvector = numpy.asarray(eastvector)
     northvector = numpy.asarray(northvector)
 
@@ -137,11 +141,12 @@ def choose_points(points_in_image, points_in_image_idx, buoy_coors):
 
     for chosen_points in itertools.combinations(sorted_points, 4):
         chosen_points = numpy.asarray(chosen_points)
-        
-        if funcs.is_square_test(chosen_points[:,1:3]) is True:
+
+        if funcs.is_square_test(chosen_points[:, 1:3]) is True:
             break
 
-    return chosen_points[:,3], chosen_points[:, 1:3]
+    return chosen_points[:, 3], chosen_points[:, 1:3]
+
 
 def read(cc, data, chosen_points):
     """
@@ -170,13 +175,13 @@ def read(cc, data, chosen_points):
 
     t1 = numpy.where(data.variables['time'][:] == hour1)[0][0]
     t2 = numpy.where(data.variables['time'][:] == hour2)[0][0]
-    
+
     index1 = (t1, slice(None), latidx, lonidx)
     index2 = (t2, slice(None), latidx, lonidx)
-    
+
     p = numpy.array(data.variables['lev'][:])
     pressure = numpy.reshape([p]*4, (4, len(p)))
-    
+
     # the .T on the end is a transpose
     temp1 = numpy.diagonal(data.variables['T'][index1], axis1=1, axis2=2).T
     temp2 = numpy.diagonal(data.variables['T'][index2], axis1=1, axis2=2).T
@@ -186,11 +191,12 @@ def read(cc, data, chosen_points):
 
     height1 = numpy.diagonal(data.variables['H'][index1], axis1=1, axis2=2).T   # height
     height2 = numpy.diagonal(data.variables['H'][index2], axis1=1, axis2=2).T
-    
+
     return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1 * 100, rh2 * 100, pressure
 
-def calc_profile(cc):
-    """ 
+
+def calc_profile(metadata):
+    """
     Choose points and retreive merra data from file.
 
     Args:
@@ -202,37 +208,37 @@ def calc_profile(cc):
         chosen_points_lat_lon: coordinates of the atmospheric data points
     """
 
-    data = open_(cc)
+    data = open_(metadata)
 
     # choose points
-    points_in_scene, points_in_scene_idx = get_points(cc.metadata, data)
+    points_in_scene, points_in_scene_idx = get_points(metadata, data)
     chosen_points_idxs, data_coor = choose_points(points_in_scene, points_in_scene_idx, cc.buoy_location)
 
     # retrieve data
     data = read(cc, data, chosen_points_idxs)
-    
+
     # load standard atmosphere for mid-lat summer
     stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
-    
-    interp_time = atmo_data.interpolate_time(cc.metadata, *data)   # interplolate in time
+
+    interp_time = atmo_data.interpolate_time(metadata, *data)   # interplolate in time
     atmo_profiles = atmo_data.generate_profiles(interp_time, stan_atmo, data[6])
     atmo_profiles = numpy.asarray(atmo_profiles)
-    
+
     if len(numpy.where(atmo_profiles > 1e10)[0]) != 0:
         logging.warning('No data for some points. Extrapolating.')
-        
+
         bad_points = zip(*numpy.where(atmo_profiles > 1e10))
-        
+
         for i in bad_points:
             profile = numpy.delete(atmo_profiles[i[0], i[1]], i[2])
-            
+
             fit = numpy.polyfit(range(i[2], 5+i[2]), profile[:5], 1)   # linear extrap
             line = numpy.poly1d(fit)
-            
+
             new_profile = numpy.insert(profile, 0, line(i[2]))
             atmo_profiles[i[0], i[1]] = new_profile
-        
+
     interp_profile = atmo_data.bilinear_interp_space(cc.buoy_location, atmo_profiles, data_coor)
     interp_profile = numpy.asarray(interp_profile)
-    
+
     return interp_profile, data_coor

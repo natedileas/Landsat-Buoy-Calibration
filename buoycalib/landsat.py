@@ -4,6 +4,8 @@ import requests
 
 import settings
 import download
+import image_processing as img
+
 
 def download_amazons3(scene_id, bands=['MTL', 10, 11]):
     sat = parse_scene(scene_id)
@@ -98,20 +100,32 @@ def read_metadata(filename):
     return metadata
 
 
-def calc_radiance(metadata, band):
-    img_file = metadata['img_file']
-    poi = img.find_roi(img_file, metadata['BUOY_LAT'], metadata['BUOY_LON'], metadata['UTM_ZONE'])
+def calc_radiance(metadata, lat, lon, band):
+    """
+    Calculate image radiance from metadata
+
+    Args:
+        metadata: landsat scene metadata
+        lat: point of interest latitude
+        lon: point of interest longitude
+        band: image band to calculate form
+
+    Returns:
+        radiance: L [W m-2 sr-1 um-1] of the image at the buoy location
+    """
+    img_file = metadata['img_file']   # TODO fix this
+    poi = img.find_roi(img_file, lat, lon, metadata['UTM_ZONE'])
 
     # calculate digital count average of 3x3 area around poi
     dc_avg = img.calc_dc_avg(img_file, poi)
 
     if band == 10:
-        L_add = metadata['RADIANCE_ADD_BAND_10']
-        L_mult = metadata['RADIANCE_MULT_BAND_10']
+        add = metadata['RADIANCE_ADD_BAND_10']
+        mult = metadata['RADIANCE_MULT_BAND_10']
     elif band == 11:
-        L_add = metadata['RADIANCE_ADD_BAND_11']
-        L_mult = metadata['RADIANCE_MULT_BAND_11']
+        add = metadata['RADIANCE_ADD_BAND_11']
+        mult = metadata['RADIANCE_MULT_BAND_11']
 
-    radiance = dc_avg * L_mult + L_add
+    radiance = dc_avg * mult + add
 
     return radiance

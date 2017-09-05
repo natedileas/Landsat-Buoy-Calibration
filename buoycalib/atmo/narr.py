@@ -1,13 +1,8 @@
-import itertools
-import os
-import logging
-
-from netCDF4 import num2date
 import numpy
 
+import data
 from .. import settings
 from ..download import url_download
-import data
 
 
 def download(date):
@@ -31,7 +26,7 @@ def download(date):
     return narr_files
 
 
-def read(cc, temp, height, shum, chosen_points):
+def read(date, temp, height, shum, chosen_points):
     """
     Pull out chosen data and do some basic processing.
 
@@ -49,9 +44,8 @@ def read(cc, temp, height, shum, chosen_points):
     latidx = tuple(chosen_points[:, 0])
     lonidx = tuple(chosen_points[:, 1])
 
-    times = temp.variables['time']
-    dates = num2date(times[:], times.units)
-    t1, t2 = sorted(abs(dates-cc.scenedatetime).argsort()[:2])
+    t1, t2 = data.closest_hours(temp.variables['time'][:], 
+                                temp.variables['time'].units, date)
 
     p = numpy.array(temp.variables['level'][:])
     pressure = numpy.reshape([p]*4, (4, len(p)))
@@ -71,7 +65,7 @@ def read(cc, temp, height, shum, chosen_points):
     return ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressure
 
 
-def calc_profile(metadata, buoy):
+def calc_profile(metadata, buoy_info):
     """
     Choose points and retreive narr data from file.
 
@@ -89,24 +83,26 @@ def calc_profile(metadata, buoy):
     height = data.open_netcdf4(height_file)
     shum = data.open_netcdf4(shum_file)
 
-    # choose narr points
+    # choose points
     indices, lat, lon = data.points_in_scene(metadata, temp)
-    chosen_idxs, narr_coor = data.choose_points(indices, lat, lon, metadata['buoy_location'])
+    chosen_idxs, data_coor = data.choose_points(indices, lat, lon, buoy_info[1], buoy_info[2])
 
     # read in NARR data
-    narr_data = read(metadata, temp, height, shum, chosen_idxs)
+    raw_atmo = read(metadata['date'], temp, height, shum, chosen_idxs)
 
     # load standard atmosphere for mid-lat summer
     stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
 
-    interp_time = data.interpolate_time(metadata, *data)   # interplolate in time
-    atmo_profiles = numpy.asarray(atmo_data.generate_profiles(interp_time, stan_atmo, data[6]))
+    interp_time = data.interpolate_time(metadata, *raw_atmo)   # interplolate in time
+    atmo_profiles = data.generate_profiles(interp_time, stan_atmo, raw_atmo[6])
 
-    interp_profile = atmo_data.offset_interp_space(metadata['buoy_location'], atmo_profiles, narr_coor)
+    interp_profile = data.offset_interp_space([buoy_info[1], buoy_info[2]], atmo_profiles, data_coor)
+    interp_profile = numpy.asarray(interp_profile)
 
+    """
     if len(numpy.where(atmo_profiles > 32765)[0]) != 0:
         print(numpy.where(atmo_profiles > 32765))
-        logging.warning('No data for some points. Extrapolating.')
+        print('No data for some points. Extrapolating.')
 
         bad_points = zip(*numpy.where(atmo_profiles > 32765))
 
@@ -118,5 +114,6 @@ def calc_profile(metadata, buoy):
 
             new_profile = numpy.insert(profile, 0, line(i[2]))
             atmo_profiles[i[0], i[1]] = new_profile
+    """
 
-    return interp_profile, narr_coor
+    return interp_profile, data_coor

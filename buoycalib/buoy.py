@@ -88,6 +88,8 @@ def all_datasets():
         for line in f:
             info = line.split('|')
             sid = info[0]   # 1st column, Station ID
+            if not sid.isdigit():  # TODO check if is buoy or ground station
+                continue
             payload = info[5]   # 6th column, buoy payload type
 
             lat_lon = info[6].split(' (')[0]   # 7th column, discard part

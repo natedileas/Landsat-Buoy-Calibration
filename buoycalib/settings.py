@@ -31,5 +31,10 @@ NOAA_URLS = ['http://www.ndbc.noaa.gov/data/historical/stdmet/%sh%s.txt.gz',
 S3_URL = 'https://landsat-pds.s3.amazonaws.com'
 
 # relative spectral responses
+
 RSR_L8_B10 = join(MISC_FILES, 'L8_B10.rsp')
 RSR_L8_B11 = join(MISC_FILES, 'L8_B11.rsp')
+RSR_L8 = {
+    10: RSR_L8_B10,
+    11: RSR_L8_B11,
+}

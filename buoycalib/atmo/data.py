@@ -3,7 +3,6 @@ import os
 import itertools
 
 import numpy
-#import matplotlib.pyplot as plt
 from netCDF4 import Dataset, num2date
 import utm
 
@@ -102,46 +101,46 @@ def choose_points(in_landsat, lat, lon, buoy_lat, buoy_lon):
     return chosen_points[:, 3], chosen_points[:, 1:3]
 
 
-def closest_hours(times, date):
-    dates = num2date(times[:].data, times.units)
+def closest_hours(time_data, time_units, date):
+    dates = num2date(time_data, time_units)
     t1, t2 = sorted(abs(dates - date).argsort()[:2])
 
     return t1, t2
 
 
-def convert_sh_rh(specHum, T_k, pressure):
-    """ 
-    Converts specific humidity to relative humidity. 
+def convert_sh_rh(spec_hum, temp_k, pressure):
+    """
+    Converts specific humidity to relative humidity.
 
     Args:
-        specHum: specific humidity
-        T_k: temperature, in kelvin
+        spec_hum: specific humidity
+        temp_k: temperature, in kelvin
         pressure: pressure, in mB
 
     Returns:
-        rh: relative humidity, (1d numpy array)
+        rel_hum: relative humidity, (1d numpy array)
 
     Notes:
         http://earthscience.stackexchange.com/questions/2360/how-do-i-convert-specific-humidity-to-relative-humidity
     """
-    
-    T_k = numpy.asarray(T_k, dtype=numpy.float64)  #numpy.float64
-    
+    # TODO add units to docstring and formulas
+
+    temp_k = numpy.asarray(temp_k, dtype=numpy.float64)
+
     # convert input variables
-    T_c = numpy.subtract(T_k, 273.15)   #celcius
-    q = specHum   #specific humidity
-    p = pressure   #pressures
-    
+    temp_c = temp_k - 273.15   # convert to celcius from kelvin
+
     # compute relative humidity
-    a = numpy.divide(numpy.multiply(17.67, T_c), numpy.subtract(T_k, 29.65))
-    
-    rh = 26.3 * p * q * (1 / numpy.exp(a))
-    
-    return rh
-    
+    a = (17.67 * temp_c) / (temp_k - 29.65)
+
+    rel_hum = 26.3 * pressure * spec_hum * (1 / numpy.exp(a))
+
+    return rel_hum
+
+
 def dewpoint_temp(temp, relhum):
     """
-    Calculates dewpoint temperature. 
+    Calculates dewpoint temperature from temp and humidity.
 
     Args:
         temp: temperature, in celcius (1d numpy array)
@@ -151,13 +150,13 @@ def dewpoint_temp(temp, relhum):
         dewpoint temperature, in celcius (1d numpy array)
 
     Notes:
-        source: http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
+        source:http://climate.envsci.rutgers.edu/pdf/LawrenceRHdewpointBAMS.pdf
     """
-    
     return temp - ((100 - relhum) / 5)   # kelvin
 
+
 def calc_rh(atmp, dewpoint):
-    """ 
+    """
     Calculate relative humidity from temperature and dewpoint.
 
     Args:
@@ -172,10 +171,11 @@ def calc_rh(atmp, dewpoint):
     """
     c1 = 17.625
     c2 = 243.04
-    
+
     rh = 100 * math.exp((c1*dewpoint)/(c2+dewpoint)) / math.exp((c1*atmp)/(c2+atmp))
     return rh
-        
+
+
 def convert_geopotential_geometric(geopotential, lat):
     """
     Convert array of geopotential heights to geometric heights.
@@ -191,36 +191,36 @@ def convert_geopotential_geometric(geopotential, lat):
         source: http://www.ofcm.gov/fmh3/pdf/12-app-d.pdf
         http://gis.stackexchange.com/questions/20200/how-do-you-compute-the-earths-radius-at-a-given-geodetic-latitude
     """
-    
     radlat = (lat * math.pi) / 180.0   # convert latitiude to radians
-    
+
     # gravity at latitude
     grav_lat = 9.80616 * (1 - 0.002637 * numpy.cos(2 * radlat) + 0.0000059 * numpy.power(numpy.cos(2 * radlat), 2))
 
     # radius of earth at latitude: R(f)^2 = ( (a^2 cos(f))^2 + (b^2 sin(f))^2 ) / ( (a cos(f))^2 + (b sin(f))^2 )
     R_max = 6378.137    # km
     R_min = 6356.752    # km
-    
+
     part1 = numpy.power((R_max ** 2) * numpy.cos(radlat), 2)
     part2 = numpy.power((R_min ** 2) * numpy.sin(radlat), 2) 
     part3 = numpy.power(R_max * numpy.cos(radlat), 2)
     part4 = numpy.power(R_min * numpy.sin(radlat), 2)
     R_lat = numpy.sqrt((part1 + part2) / (part3 + part4))
-    
+
     # ratio of average gravity to estimated gravity
     grav_ratio = grav_lat * R_lat / 9.80665   #average gravity
-    
+
     # calculate geometric height
     geometric_height = [[0]]*4
     for i in range(4):
         geometric_height[i] = ((R_lat[i] * geopotential[i]) / numpy.absolute(grav_ratio[i] - geopotential[i]))
-    
+
     return numpy.asarray(geometric_height)
-        
+
+ 
 def distance_in_utm(e1, n1, e2, n2):
     """
     Calculate distance between 2 sets of UTM coordinates.
-    
+
     Args:
         e1: east value for point 1
         n1: north value for point 1
@@ -230,22 +230,21 @@ def distance_in_utm(e1, n1, e2, n2):
     Returns:
         d: distance (in UTM space) between point 1 and 2
     """
-    
-    s = 0.9996    # scale factor 
+    s = 0.9996    # scale factor
     r = 6378137.0    # Earth radius
-    
+
     SR1 = s / (math.cos(e1 / r))
     SR2 = s / (math.cos(((e2 - e1) / 6) / r))
     SR3 = s / (math.cos(e2 / r))
-    
+
     Edist = ((e2 - e1) / 6) * (SR1 + 4 * SR2 + SR3)
-    
-    d = math.sqrt(Edist**2 + (n2 - n1)**2)
-    
-    return d
+
+    dist = math.sqrt(Edist**2 + (n2 - n1)**2)
+
+    return dist
 
 def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
-    """ 
+    """
     Interpolate in time. 7 profiles -> 4 profiles.
 
     Args:
@@ -257,16 +256,17 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
 
     Returns:
         height, rhum, temp: all the parts of the profile
-    
+
     Notes:
         Credit: Monica Cook.
     """
     # determine three hour-increment before and after scene center scan time
+    # TODO replace with python datetime methods
     time = metadata['SCENE_CENTER_TIME'].replace('"', '')
     hour = int(time[0:2])
     minute = int(time[3:5])
     second = int(time[6:8])
-    
+
     date = metadata['DATE_ACQUIRED']
     year = int(date[0:4])
     month = int(date[5:7])
@@ -290,9 +290,10 @@ def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
 
     return height, rhum, temp
 
+
 def offset_interp_space(buoy_coor, atmo_profiles, narr_coor):
-    """ 
-    Interpolate in space between the 4 profiles with an offset algorithm. 
+    """
+    Interpolate in space between the 4 profiles with an offset algorithm.
 
     Args:
         buoy_coor: coordinates to interpolate to
@@ -304,14 +305,14 @@ def offset_interp_space(buoy_coor, atmo_profiles, narr_coor):
     """
     atmo_profiles = numpy.array(atmo_profiles)
     length = numpy.shape(atmo_profiles)[2]
-    atmo_profiles = numpy.array(atmo_profiles[:,:length])
+    atmo_profiles = numpy.array(atmo_profiles[:, :length])
     narr_coor = numpy.asarray(narr_coor, dtype=float).round(8)
 
     alpha, beta = calc_interp_weights(narr_coor, buoy_coor)
 
     if abs(alpha) > 100 or abs(beta) > 100:
         alpha, beta = calc_interp_weights(numpy.absolute(narr_coor), numpy.absolute(buoy_coor))
-        
+
     height = use_interp_weights(atmo_profiles[:, 0], alpha, beta)
     press = use_interp_weights(atmo_profiles[:, 1], alpha, beta)
     temp = use_interp_weights(atmo_profiles[:, 2], alpha, beta)
@@ -319,9 +320,10 @@ def offset_interp_space(buoy_coor, atmo_profiles, narr_coor):
 
     return height, press, temp, relhum
 
+
 def calc_interp_weights(interp_from, interp_to):
     """
-    Calculate weights for the offset bilinear interpolation  of 4 points. 
+    Calculate weights for the offset bilinear interpolation  of 4 points.
 
     Args:
         interp_from: coordinates to interpolate from
@@ -351,14 +353,16 @@ def calc_interp_weights(interp_from, interp_to):
 
     return alpha, beta
 
+
 def use_interp_weights(array, alpha, beta):
     """ Calculate the offset bilinear interpolation  of 4 points. """
     return ((1 - alpha) * ((1 - beta) * array[0] + beta * array[1]) + \
             alpha * ((1 - beta) * array[2] + beta * array[3]))
 
+
 def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
-    """ 
-    Interpolate in space between the 4 profiles. 
+    """
+    Interpolate in space between the 4 profiles.
 
     Args:
         buoy_coor: coordinates to interpolate to
@@ -366,7 +370,7 @@ def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
         data_coor: coordinates to interpolate from
 
     Returns:
-        the interpolated profile   
+        the interpolated profile
     """
     # shape of atmo profiles - 4 x 4 x X
     #                     points x data type x layers
@@ -374,7 +378,7 @@ def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
     length = numpy.shape(atmo_profiles)[2]
     atmo_profiles = numpy.array(atmo_profiles[:,:length])
     data_coor = list(data_coor)
-    
+
     height_points = [(data_coor[i][0], data_coor[i][1], atmo_profiles[i,0,:]) for i in range(4)]
     height = bilinear_interpolation(buoy_coor[0], buoy_coor[1], height_points)
 
@@ -388,6 +392,7 @@ def bilinear_interp_space(buoy_coor, atmo_profiles, data_coor):
     relhum = bilinear_interpolation(buoy_coor[0], buoy_coor[1], relhum_points)
 
     return [height, press, temp, relhum]
+
 
 def bilinear_interpolation(x, y, points):
     """Interpolate (x,y) from values associated with four points.
@@ -409,7 +414,6 @@ def bilinear_interpolation(x, y, points):
 
     points = sorted(points)               # order points by x, then by y
     (x1, y1, q11), (_x1, y2, q12), (x2, _y1, q21), (_x2, _y2, q22) = points
-    
 
     if x1 != _x1 or x2 != _x2 or y1 != _y1 or y2 != _y2:
         raise ValueError('points do not form a rectangle')
@@ -421,6 +425,7 @@ def bilinear_interpolation(x, y, points):
             q12 * (x2 - x) * (y - y1) +
             q22 * (x - x1) * (y - y1)
            ) / ((x2 - x1) * (y2 - y1) + 0.0)
+
 
 def generate_profiles(interp_atmo, stan_atmo, pressures):
     """
@@ -438,21 +443,21 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
     stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
 
     profiles = []
-    
+
     for point_idx in range(4):
-        
+
         p = pressures[0]
         t = temp[point_idx]
         hgt = height[point_idx]
         rh = rhum[point_idx]
 
         gdalt = hgt[0]
-        
+
         # interpolate linearly between stan atmo and input data
         above = numpy.where(stan_height > hgt[-1])[0]
         if len(above) > 0:
             interpolateTo = above[0]
-          
+
             newHeight = (stan_height[interpolateTo] + hgt[-1]) / 2.0
 
             newPressure2 = p[-1] + (newHeight - hgt[-1]) * \
@@ -463,7 +468,7 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
 
             newRelativeHumidity2 = rh[-1] + (newHeight - hgt[-1]) * \
             ((stan_rhum[interpolateTo] - rh[-1]) / (stan_height[interpolateTo] - hgt[-1]))
-            
+
             hgt = numpy.append(numpy.append(hgt, newHeight), stan_height[interpolateTo:-1])
             p = numpy.append(numpy.append(p, newPressure2), stan_press[interpolateTo:-1])
             t = numpy.append(numpy.append(t, newTemperature2), stan_temp[interpolateTo:-1])
@@ -472,73 +477,3 @@ def generate_profiles(interp_atmo, stan_atmo, pressures):
         profiles.append([hgt, p, t, rh])
 
     return profiles
-
-def write_atmo(cc, atmo):
-    """
-    Writes the interpolated atmosphere data to a file. 
-
-    Args:
-        cc: CalibrationController object (for save paths)
-        atmo: atmospheric profile data to save
-    """
-    dir_ = os.path.join(cc.scene_dir,'atmo')
-    if not os.path.exists(dir_):
-        os.makedirs(dir_)
-    
-    filename = os.path.join(dir_,'atmo_interp')
-    
-    if cc.atmo_src == 'narr':
-        filename += '_narr.txt'
-    elif cc.atmo_src == 'merra':
-        filename += '_merra.txt'
-    
-    atmo = numpy.array(atmo)
-    dewpoint =  dewpoint_temp(atmo[2], atmo[3])
-
-    save_array = numpy.append(atmo, dewpoint)
-    save_array = numpy.transpose(numpy.reshape(save_array, (5, numpy.shape(atmo[2])[0])))
-
-    numpy.savetxt(filename, save_array, fmt='%f\t%f\t%f\t%f\t%f')
-
-def plot_atmo(cc, atmo):
-    """
-    Plots interpolated atmospheric data for user.
-
-    Args:
-        cc: CalibrationController object (for save paths)
-        atmo: atmospheric profile data to draw plots for
-
-    Returns:
-        figure: matplotlib.pyplot figure object, can be saved or displayed 
-    """
-    height, press, temp, hum = atmo
-    dewpoint =  dewpoint_temp(temp, hum)
-
-    figure = plt.figure('%s Atmospheric Profile' % cc.atmo_src, (12, 6)) #make figure  
-    
-    plt.subplot(131)
-    a, = plt.plot(temp, height, 'r', label='Temperature')
-    b, = plt.plot(dewpoint, height, 'b', label='Dewpoint')
-    plt.legend(handles=[a, b])
-    plt.xlabel('Temperature [K]')
-    plt.ylabel('Geometric Height [km]')
-    
-    plt.subplot(132)
-    a, plt.plot(temp, press, 'r', label='Temperature')
-    plt.legend(handles=[a])
-    plt.xlabel('Temperature [K]')
-    plt.ylabel('Pressure [hPa]')
-    plt.ylim([0,1100])
-    plt.gca().invert_yaxis()
-    
-    plt.subplot(133)
-    a, = plt.plot(hum, press, 'g', label='Humidity')
-    plt.legend(handles=[a])
-    plt.xlabel('Relative Humidity [%]')
-    plt.ylabel('Pressure [hPa]')
-    plt.ylim([0,1100])
-    plt.xlim([0,100])
-    plt.gca().invert_yaxis()
-
-    return figure
-

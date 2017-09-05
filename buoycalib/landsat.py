@@ -6,7 +6,7 @@ from download import url_download, remote_file_exists
 import image_processing as img
 
 
-def download_amazons3(scene_id, bands=['MTL', 10, 11]):
+def download_amazons3(scene_id, bands=[10, 11, 'MTL']):
     sat = parse_scene(scene_id)
 
     if 'MTL' not in bands:
@@ -100,7 +100,7 @@ def read_metadata(filename):
     return metadata
 
 
-def calc_radiance(metadata, lat, lon, band):
+def calc_ltoa(metadata, lat, lon, band):
     """
     Calculate image radiance from metadata
 
@@ -113,18 +113,15 @@ def calc_radiance(metadata, lat, lon, band):
     Returns:
         radiance: L [W m-2 sr-1 um-1] of the image at the buoy location
     """
-    img_file = metadata['img_file']   # TODO fix this
+    # TODO fix this
+    img_file = metadata['scene_dir'] + '/' + metadata['FILE_NAME_BAND_' + str(band)]
     poi = img.find_roi(img_file, lat, lon, metadata['UTM_ZONE'])
 
     # calculate digital count average of 3x3 area around poi
     dc_avg = img.calc_dc_avg(img_file, poi)
 
-    if band == 10:
-        add = metadata['RADIANCE_ADD_BAND_10']
-        mult = metadata['RADIANCE_MULT_BAND_10']
-    elif band == 11:
-        add = metadata['RADIANCE_ADD_BAND_11']
-        mult = metadata['RADIANCE_MULT_BAND_11']
+    add = metadata['RADIANCE_ADD_BAND_' + str(band)]
+    mult = metadata['RADIANCE_MULT_BAND_' + str(band)]
 
     radiance = dc_avg * mult + add
 

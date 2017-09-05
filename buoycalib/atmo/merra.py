@@ -1,10 +1,3 @@
-import datetime
-import logging
-import itertools
-import os
-import subprocess
-import sys
-
 import numpy
 import utm
 
@@ -50,7 +43,8 @@ def read(date, atmo_data, chosen_points):
     latidx = tuple(chosen_points[:, 0])
     lonidx = tuple(chosen_points[:, 1])
 
-    t1, t2 = data.closest_hours(atmo_data.variables['time'], date)
+    t1, t2 = data.closest_hours(atmo_data.variables['time'][:].data,
+                                atmo_data.variables['time'].units, date)
 
     index1 = (t1, slice(None), latidx, lonidx)
     index2 = (t2, slice(None), latidx, lonidx)

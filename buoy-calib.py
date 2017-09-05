@@ -15,10 +15,13 @@ def run_all(scene_id, buoy_id, atmo_source='merra', bands=[10, 11]):
 
     modtran_out = buoycalib.modtran.process(atmosphere, buoy_info[1], buoy_info[2], metadata['date'], metadata['scene_dir'])
 
-    mod_ltoa_spectral = buoycalib.radiance.calc_ltoa_spectral(modtran_out, buoy_info[4])
+    mod_ltoa_spectral = buoycalib.radiance.calc_ltoa_spectral(modtran_out, buoy_info[5])
+
+    if 'MTL' in bands: bands.remove('MTL')   # TODO fix stupid thing here
+
     for b in bands:
-        mod_ltoa = buoycalib.radiance.calc_ltoa(modtran_out[2], mod_ltoa_spectral, buoycalib.settings.RSR_L8_B10)
-        img_ltoa = buoycalib.landsat.calc_ltoa(metadata)
+        mod_ltoa = buoycalib.radiance.calc_ltoa(modtran_out[2], mod_ltoa_spectral, buoycalib.settings.RSR_L8[b])
+        img_ltoa = buoycalib.landsat.calc_ltoa(metadata, buoy_info[1], buoy_info[2], b)
 
         print('band: {0} ltoa: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))
 

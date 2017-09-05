@@ -5,7 +5,8 @@ from os import path
 import csv
 
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
-import bin.BuoyCalib as bc
+import landsatbuoycalib.BuoyCalib as bc
+#import landsatbuoycalib as bin
 
 import pickle_funcs
 from scenes import all as scenes
@@ -42,10 +43,10 @@ def fmt_items(cc):
     return items
         
 if __name__ == '__main__':
-    filename = 'output_merra.csv'
+    filename = 'output_narr.csv'
     
     # options
-    a = 'merra'   # atmo data src
+    a = 'narr'   # atmo data src
     v = False   # verbose
     
     with open(filename, 'wb') as f:
@@ -62,4 +63,6 @@ if __name__ == '__main__':
             except KeyboardInterrupt:
                 break
             except OSError:
+                w.writerow([s])
+            except ImportError:
                 w.writerow([s])

@@ -1,7 +1,7 @@
 from os.path import join, normpath
 
 # directories and files
-#PACKAGE_BASE = normpath(join(__file__, '../..'))
+# PACKAGE_BASE = normpath(join(__file__, '../..'))
 DATA_BASE = '/dirs/home/ugrad/nid4986/landsat_data/'
 
 MERRA_DIR = join(DATA_BASE, 'merra')
@@ -16,17 +16,25 @@ MISC_FILES = join(DATA_BASE, 'misc')
 HEAD_FILE_TEMP = join(MISC_FILES, 'head.txt')  # tape5 templates
 TAIL_FILE_TEMP = join(MISC_FILES, 'tail.txt')
 STAN_ATMO = join(MISC_FILES, 'stanAtm.txt')
+WATER_TXT = join(MISC_FILES, 'water.txt')
+
+BUOY_TXT = join(NOAA_DIR, 'buoy_height.txt')
+STATION_TXT = join(NOAA_DIR, 'station_table.txt')
 
 # urls
 MERRA_URL = 'ftp://goldsmr5.sci.gsfc.nasa.gov/data/s4pa/MERRA2/M2I3NPASM.5.12.4/%s/%s/MERRA2_400.inst3_3d_asm_Np.%s.nc4'
-NARR_URLS = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc', 
-            'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/hgt.%s.nc',
-            'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/shum.%s.nc']
+NARR_URLS = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc',
+             'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/hgt.%s.nc',
+             'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/shum.%s.nc']
 NOAA_URLS = ['http://www.ndbc.noaa.gov/data/historical/stdmet/%sh%s.txt.gz',
-            'http://www.ndbc.noaa.gov/data/stdmet/%s%s%s2015.txt.gz']
-LANDSAT_URL = 'http://earthexplorer.usgs.gov/download/%s/%s/STANDARD/EE'
+             'http://www.ndbc.noaa.gov/data/stdmet/%s%s%s2015.txt.gz']
+S3_URL = 'https://landsat-pds.s3.amazonaws.com'
 
-# usgs login
-USERNAME = 'nid4986'
-PASSWORD = 'Carlson89'
-USGS_LOGIN = {'username':USERNAME, 'password':PASSWORD}
+# relative spectral responses
+
+RSR_L8_B10 = join(MISC_FILES, 'L8_B10.rsp')
+RSR_L8_B11 = join(MISC_FILES, 'L8_B11.rsp')
+RSR_L8 = {
+    10: RSR_L8_B10,
+    11: RSR_L8_B11,
+}

@@ -50,8 +50,7 @@ def calc_ltoa(wavelengths, ltoa, rsr_file):
     """
     RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
 
-    w = numpy.where((wavelengths > RSR_wavelengths.min()) &
-                    (wavelengths < RSR_wavelengths.max()))
+    w = (wavelengths > RSR_wavelengths.min()) & (wavelengths < RSR_wavelengths.max())
 
     wvlens = wavelengths[w]
     ltoa_trimmed = ltoa[w]

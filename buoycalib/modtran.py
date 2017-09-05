@@ -7,7 +7,7 @@ import numpy
 import settings
 
 
-def run_modtran(atmosphere, lat, lon, date, directory):
+def process(atmosphere, lat, lon, date, directory):
     """
     Make tape5, run modtran and parse tape7.scn for this instance.
 
@@ -65,7 +65,8 @@ def make_tape5s(profile, lat, lon, date, directory):
     tail = tail.replace('latitu', '%2.3f' % lat)
     tail = tail.replace('jay', jay)
 
-    os.makedirs(directory)
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
 
     with open(os.path.join(directory, 'tape5'), 'w') as f:
         f.write(head)

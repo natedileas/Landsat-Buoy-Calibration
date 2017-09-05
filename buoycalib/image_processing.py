@@ -1,7 +1,7 @@
 import os
 from PIL import Image, ImageDraw
 
-import cv2
+#import cv2
 import numpy
 from osgeo import gdal, osr
 import ogr

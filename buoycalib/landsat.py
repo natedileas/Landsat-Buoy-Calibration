@@ -1,9 +1,8 @@
 import os
+import datetime
 
-import requests
-
-import settings
-import download
+from . import settings
+from download import url_download, remote_file_exists
 import image_processing as img
 
 
@@ -26,7 +25,7 @@ def download_amazons3(scene_id, bands=['MTL', 10, 11]):
     scene_dir = settings.LANDSAT_DIR + '/' + scene_id
 
     for url in urls:
-        download.url_download(url, scene_dir)
+        url_download(url, scene_dir)
 
     meta_file = '{0}/{1}_MTL.txt'.format(scene_dir, scene_id)
     metadata = read_metadata(meta_file)
@@ -56,13 +55,6 @@ def parse_scene(scene_id):
     return anatomy
 
 
-def remote_file_exists(url):
-    status = requests.head(url).status_code
-
-    if status != 200:
-        raise Exception('RemoteFileDoesntExist')
-
-
 def amazon_s3_url(sat, band):
     if band != 'MTL':
         filename = '%s_B%s.TIF' % (sat['scene'], band)
@@ -82,20 +74,28 @@ def read_metadata(filename):
     Returns:
         metadata: dict of landsat metadata from _MTL.txt file.
     """
-    # TODO strip group and end-group statements, add date handling, make really robust
+    def _replace(string, chars):
+        for c in chars:
+            string = string.replace(c, '')
+        return string
+
+    # TODO make really robust
     chars = ['\n', '"', '\'']    # characters to remove from lines
     metadata = {}
 
     with open(filename, 'r') as mtl_file:
         for line in mtl_file:
             try:
-                info = line.strip(' ').split(' = ')
+                info = _replace(line.strip(' '), chars).split(' = ')
+                if 'GROUP' in info or 'END_GROUP' in info or 'END' in info:
+                    continue
                 info[1] = info[1].translate(None, ''.join(chars))
                 metadata[info[0]] = float(info[1])
             except ValueError:
                 metadata[info[0]] = info[1]
-            except IndexError:
-                metadata[info[0]] = info[0]
+
+    dt_str = metadata['DATE_ACQUIRED'] + ' ' + metadata['SCENE_CENTER_TIME'][:8]
+    metadata['date'] = datetime.datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
 
     return metadata
 

@@ -1,8 +1,113 @@
 import math
 import os
+import itertools
 
 import numpy
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
+from netCDF4 import Dataset, num2date
+import utm
+
+import funcs
+
+
+def open_netcdf4(filename):
+    """
+    Open data file in netCDF4 format.
+
+    Args:
+        filename: file to open
+
+    Returns:
+        rootgrp: data reference to variables stored in data file.
+
+    Raises:
+        IOError: if file does not exist at the expected path
+    """
+    if not os.path.isfile(filename):
+        raise IOError('Data file not at path: {0}'.format(filename))
+
+    rootgrp = Dataset(filename, "r", format="NETCDF4")
+    return rootgrp
+
+
+def points_in_scene(metadata, rootgrp, flat=False):
+    """
+    Get points which lie inside the landsat image.
+
+    Args:
+        metadata: landsat metadata, for edges
+        rootgrp: netcdf4 object with NARR/MERRA data
+
+    Returns:
+        indexs, lat, lon: indexs and corresponding lat and lon for the points
+        which lie inside the landsat image
+    """
+
+    lat = rootgrp.variables['lat'][:]
+    lon = rootgrp.variables['lon'][:]
+
+    if flat:
+        lat = numpy.stack([lat]*lon.shape[0], axis=0)
+        lon = numpy.stack([lon]*lat.shape[1], axis=1)
+
+    # define corners
+    ul_lat = metadata['CORNER_UL_LAT_PRODUCT'] + 0.5
+    ul_lon = metadata['CORNER_UL_LON_PRODUCT'] - 0.5
+    lr_lat = metadata['CORNER_LR_LAT_PRODUCT'] - 0.5
+    lr_lon = metadata['CORNER_LR_LON_PRODUCT'] + 0.5
+
+    # pull out points that lie within the corners (only works for NW quadrant)
+    # TODO make better, make work for all quadrants
+    indexs = numpy.where((lat < ul_lat) & (lat > lr_lat) & (lon > ul_lon) &
+                         (lon < lr_lon))
+
+    return indexs, lat, lon
+
+
+def choose_points(in_landsat, lat, lon, buoy_lat, buoy_lon):
+    """
+    Choose the four points which will be used.
+
+    Args:
+        in_landsat, lat, lon: points which lie inside, in lat and lon
+            as well as indices into the netcdf4 variables.
+        buoy_coors: lat, lon where the buoy is
+
+    Returns:
+        chosen indices, and chosen lats and lons
+    """
+
+    latvalues = lat[in_landsat]
+    lonvalues = lon[in_landsat]
+
+    buoy_x, buoy_y, buoy_zone_num, __ = utm.from_latlon(buoy_lat, buoy_lon)
+    distances = []
+
+    for i in range(len(latvalues)):
+        east, north, zone_num, zone_let = utm.from_latlon(latvalues[i], lonvalues[i])
+
+        dist = distance_in_utm(east, north, buoy_x, buoy_y)
+        distances.append(dist)
+
+    in_landsat = zip(in_landsat[0], in_landsat[1])
+    narr_dict = zip(distances, latvalues, lonvalues, numpy.asarray(in_landsat, dtype=object))
+    sorted_points = sorted(narr_dict)
+
+    for chosen_points in itertools.combinations(sorted_points, 4):
+        chosen_points = numpy.asarray(chosen_points)
+
+        if funcs.is_square_test(chosen_points[:,1:3]) is True:
+            break
+
+    return chosen_points[:, 3], chosen_points[:, 1:3]
+
+
+def closest_hours(times, date):
+    dates = num2date(times[:].data, times.units)
+    t1, t2 = sorted(abs(dates - date).argsort()[:2])
+
+    return t1, t2
+
 
 def convert_sh_rh(specHum, T_k, pressure):
     """ 

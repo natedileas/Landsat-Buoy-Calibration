@@ -1,18 +1,10 @@
-import narr
-import merra
+from . import narr
+from . import merra
 
 
-def download(source, metadata):
-    """
-    Download atmospheric data.
-    """
-    source = narr if source == 'narr' else merra
-    source.download(metadata)
-
-
-def process(source, metadata):
+def process(source, metadata, buoy):
     """
     process atmospheric data, yield an atmosphere
     """
     source = narr if source == 'narr' else merra
-    return source.calc_profile(metadata)
+    return source.calc_profile(metadata, buoy)

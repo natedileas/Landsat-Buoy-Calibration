@@ -5,7 +5,8 @@ from os import path
 import csv
 
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
-import bin.BuoyCalib as bc
+import landsatbuoycalib.BuoyCalib as bc
+#import landsatbuoycalib as bin
 
 import pickle_funcs
 from scenes import all as scenes
@@ -54,12 +55,15 @@ if __name__ == '__main__':
         
         for s in scenes:
             try:
+
                 cc = bc.CalibrationController(s, verbose=v, atmo_src=a)
                 cc_loaded = pickle_funcs.read_cache(cc)
                 w.writerow(fmt_items(cc_loaded))
             except AttributeError:
-                pass
+                w.writerow([s])
             except KeyboardInterrupt:
                 break
             except OSError:
-                pass
+                w.writerow([s])
+            except ImportError:
+                w.writerow([s])

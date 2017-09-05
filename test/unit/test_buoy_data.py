@@ -1,7 +1,9 @@
 import unittest
-from test_landsatbuoycalib import TestLandsatBuoyCalib_NARR as TestLandsatBuoyCalib
 
-class TestBuoyDataFuncs(TestLandsatBuoyCalib):
+from buoycalib import buoy
+
+
+class TestBuoyDataFuncs(unittest.TestCase):
     def test_find_datasets(self):
         self.fail('Yet to be implemented')
 

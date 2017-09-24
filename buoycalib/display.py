@@ -90,3 +90,67 @@ def plot_atmo(cc, atmo):
 
     return figure
 
+def write_im(cc, img_file):
+    """
+    Write buoy and atmo data point locations on image for human inspection.
+
+    Args:
+        cc: CalibrationController object
+        img_file: path/file to write on
+
+    Returns:
+        None
+    """
+    zone = cc.metadata['UTM_ZONE']
+    narr_pix = []
+
+    # get narr point locations
+    for lat, lon in cc.narr_coor:
+        narr_pix.append(find_roi(img_file, lat, lon, zone))
+
+    # draw circle on top of image to signify narr points
+    image = Image.open(img_file)
+
+    # convert to proper format
+    if image.mode == 'L':
+        image = image.convert('RGB')
+    elif 'I;16' in image.mode:
+        image = image.point(lambda i:i*(1./256.0)).convert('RGB')
+
+    img = numpy.asarray(image)
+    gray_image = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=6.0, tileGridSize=(8,8))
+    cl1 = clahe.apply(gray_image)
+
+    img_corrected = Image.fromarray(cl1)
+    img_corrected = img_corrected.convert('RGBA')
+
+    draw = ImageDraw.Draw(img_corrected)
+    r = 80
+
+    for x, y in narr_pix:
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, 0, 0))
+
+    # draw buoy onto image
+    x = cc.poi[0]
+    y = cc.poi[1]
+    draw.ellipse((x - r, y - r, x + r, y + r), fill=(0, 255, 0))
+
+    # downsample
+    new_size = (int(image.size[0] / 15), int(image.size[1] / 15))
+    image = img_corrected.resize(new_size, Image.ANTIALIAS)
+
+    # put alpha mask in
+    data = image.getdata()
+    newData = []
+
+    for item in data:
+        #print item
+        if item[0] < 5 and item[1] < 5 and item[2] < 5:
+            newData.append((255, 255, 255, 0))
+        else:
+            newData.append(item)
+
+    image.putdata(newData)
+
+    return image

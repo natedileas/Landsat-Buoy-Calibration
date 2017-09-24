@@ -2,16 +2,16 @@ from osgeo import ogr
 import shapely.geometry
 import shapely.wkt
 
+from . import settings
+
 # credit to here: 
 # https://earthdatascience.org/tutorials/convert-landsat-path-row-to-lat-lon/
-
 # shapefile from here: https://landsat.usgs.gov/pathrow-shapefiles
-SHAPEFILE = "data/wrs2/wrs2_descending.shp"
 
 class ogrError(Exception): pass
 
 
-def wrs2_to_latlon(wrs2_path, wrs2_row, shapefile=SHAPEFILE):
+def wrs2_to_latlon(wrs2_path, wrs2_row, shapefile=settings.WRS2):
     """ Convert a WRS-2 Path and Row to Latitude and Longitude """
     dataSource = ogr.Open(shapefile)
     layer = dataSource.GetLayer()

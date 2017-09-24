@@ -1,4 +1,3 @@
-import os
 import datetime
 
 from . import settings
@@ -61,7 +60,7 @@ def amazon_s3_url(sat, band):
     else:
         filename = '%s_%s.txt' % (sat['scene'], band)
 
-    return '/'.join([settings.S3_URL, sat['sat'], sat['path'], sat['row'], sat['scene'], filename])
+    return '/'.join([settings.LANDSAT_S3_URL, sat['sat'], sat['path'], sat['row'], sat['scene'], filename])
 
 
 def read_metadata(filename):

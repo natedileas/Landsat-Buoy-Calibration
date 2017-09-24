@@ -24,7 +24,7 @@ def wrs2_to_latlon(wrs2_path, wrs2_row, shapefile=settings.WRS2):
     raise ogrError('Path and Row Not Found')
 
 
-def latlon_to_wrs2(lat, lon, shapefile=SHAPEFILE):
+def latlon_to_wrs2(lat, lon, shapefile=settings.WRS2):
     """ Convert Latitude and Longitude to a WRS-2 Path and Row """
     dataSource = ogr.Open(shapefile)
     layer = dataSource.GetLayer()

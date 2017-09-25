@@ -1,3 +1,10 @@
+from PIL import Image
+from PIL import ImageFont
+from PIL import ImageDraw 
+import validators
+import cStringIO
+import urllib2
+
 def plot_points(cc, args):
     import landsatbuoycalib.image_processing as img_proc
 
@@ -89,6 +96,40 @@ def plot_atmo(cc, atmo):
     plt.gca().invert_yaxis()
 
     return figure
+
+
+def draw_latlon(image_file, new_file, corners, text=[], loc=[], r=10, color=(255, 0, 0)):
+    if validators.url(image_file):
+        image_file = cStringIO.StringIO(urllib2.urlopen(image_file).read())
+    image = Image.open(image_file)
+    image = image.convert('RGB')
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()#truetype("sans-serif.ttf", 16)
+
+    for i, point in enumerate(loc):
+        pr, pc = latlon_to_pixel_naive(image.size, corners, point)
+        circ = [pc - r, pr - r, pc + r, pr + r]
+        print circ
+        draw.ellipse(circ, fill=color)
+        draw.text((pc + r + 5, pr + r + 5), text[i], color, font=font)
+
+    image.save(new_file)
+    return new_file
+
+
+def latlon_to_pixel_naive(shape, corners, point):
+    """
+    assume indexing in image is from upper left (like opencv)
+    """
+    r, c = shape
+    ur_lat, ll_lat, ur_lon, ll_lon = corners
+    lat, lon = point
+
+    row_percent = (lat - ll_lat) / (ur_lat - ll_lat)
+    col_percent = (lon - ll_lon) / (ur_lon - ll_lon)
+
+    return int(row_percent * r), int(col_percent * c)
+
 
 def write_im(cc, img_file):
     """

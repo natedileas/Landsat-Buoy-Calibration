@@ -19,7 +19,13 @@ def calculate_buoy_information(metadata, buoy_id=''):
 
     Returns: None
     """
-    datasets = datasets_in_corners(metadata)
+    ur_lat = metadata['CORNER_UR_LAT_PRODUCT']
+    ur_lon = metadata['CORNER_UR_LON_PRODUCT']
+    ll_lat = metadata['CORNER_LL_LAT_PRODUCT']
+    ll_lon = metadata['CORNER_LL_LON_PRODUCT']
+    corners = ur_lat, ll_lat, ur_lon, ll_lon
+
+    datasets = datasets_in_corners(corners)
 
     if buoy_id and buoy_id in datasets:
         info = calc_ds_info(datasets[buoy_id], metadata['date'])
@@ -118,9 +124,12 @@ def all_datasets():
     return buoy_stations
 
 
-def datasets_in_corners(metadata):
+def datasets_in_corners(corners):
     """
     Get list of all NOAA buoy datasets that fall within a landsat scene.
+
+    Args:
+        corners: tuple of: (ur_lat, ll_lat, ur_lon, ll_lon)
 
     Return:
         [[Buoy_ID, lat, lon, thermometer_depth], [ ... ]]
@@ -128,10 +137,7 @@ def datasets_in_corners(metadata):
     """
     stations = all_datasets()
 
-    ur_lat = metadata['CORNER_UR_LAT_PRODUCT']
-    ur_lon = metadata['CORNER_UR_LON_PRODUCT']
-    ll_lat = metadata['CORNER_LL_LAT_PRODUCT']
-    ll_lon = metadata['CORNER_LL_LON_PRODUCT']
+    ur_lat, ll_lat, ur_lon, ll_lon = corners
 
     inside = {}
 

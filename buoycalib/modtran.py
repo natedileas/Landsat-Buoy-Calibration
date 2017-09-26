@@ -4,7 +4,7 @@ import subprocess
 
 import numpy
 
-import settings
+from . import settings
 
 
 def process(atmosphere, lat, lon, date, directory):

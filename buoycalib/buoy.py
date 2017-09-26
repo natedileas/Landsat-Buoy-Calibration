@@ -2,9 +2,9 @@ import math
 
 import numpy
 
-import settings
-from download import url_download, remote_file_exists, ungzip, RemoteFileException
-import atmo
+from . import settings
+from .download import url_download, remote_file_exists, ungzip, RemoteFileException
+from . import atmo
 
 
 class BuoyDataException(Exception):
@@ -74,6 +74,7 @@ def calc_ds_info(dataset, date):
 
 
 def all_datasets():
+	# TODO memoize
     """
     Get list of all NOAA buoy datasets.
 

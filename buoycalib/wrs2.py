@@ -2,7 +2,7 @@ from osgeo import ogr
 import shapely.geometry
 import shapely.wkt
 
-import settings
+from . import settings
 
 # credit to here: 
 # https://earthdatascience.org/tutorials/convert-landsat-path-row-to-lat-lon/
@@ -53,6 +53,6 @@ def latlon_to_wrs2(lat, lon, shapefile=settings.WRS2):
 
 
 if __name__ == '__main__':
-    print 'Lat, Lon: ', wrs2_to_latlon(13, 33)
-    print 'WRS2: ', latlon_to_wrs2(-73.8077, 38.9073)
-    print 'Corners: ', wrs2_to_corners(13, 33)
+    print ('Lat, Lon: ', wrs2_to_latlon(13, 33))
+    print ('WRS2: ', latlon_to_wrs2(-73.8077, 38.9073))
+    print ('Corners: ', wrs2_to_corners(13, 33))

@@ -1,8 +1,8 @@
 import datetime
 
 from . import settings
-from download import url_download, remote_file_exists
-import image_processing as img
+from .download import url_download, remote_file_exists
+from . import image_processing as img
 
 
 def download_amazons3(scene_id, bands=[10, 11, 'MTL']):

@@ -3,7 +3,7 @@ import math
 
 import numpy
 
-import settings
+from . import settings
 
 
 def calc_ltoa_spectral(modtran_data, skin_temp, water_file=settings.WATER_TXT):

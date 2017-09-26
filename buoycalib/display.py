@@ -2,8 +2,8 @@ from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw 
 import validators
-import cStringIO
-import urllib2
+import io
+import urllib.request
 
 def plot_points(cc, args):
     import landsatbuoycalib.image_processing as img_proc
@@ -100,7 +100,7 @@ def plot_atmo(cc, atmo):
 
 def draw_latlon(image_file, new_file, corners, text=[], loc=[], r=10, color=(255, 0, 0)):
     if validators.url(image_file):
-        image_file = cStringIO.StringIO(urllib2.urlopen(image_file).read())
+        image_file = io.BytesIO(urllib.request.urlopen(image_file).read())
     image = Image.open(image_file)
     image = image.convert('RGB')
     draw = ImageDraw.Draw(image)
@@ -109,7 +109,6 @@ def draw_latlon(image_file, new_file, corners, text=[], loc=[], r=10, color=(255
     for i, point in enumerate(loc):
         pr, pc = latlon_to_pixel_naive(image.size, corners, point)
         circ = [pc - r, pr - r, pc + r, pr + r]
-        print circ
         draw.ellipse(circ, fill=color)
         draw.text((pc + r + 5, pr + r + 5), text[i], color, font=font)
 

@@ -6,7 +6,7 @@ import numpy
 from netCDF4 import Dataset, num2date
 import utm
 
-import funcs
+from . import funcs
 
 
 def open_netcdf4(filename):

@@ -1,7 +1,7 @@
 import numpy
 import utm
 
-import data
+from . import data
 from .. import settings
 from ..download import url_download
 

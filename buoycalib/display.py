@@ -1,9 +1,11 @@
 from PIL import Image
 from PIL import ImageFont
-from PIL import ImageDraw 
+from PIL import ImageDraw
 import validators
 import io
 import urllib.request
+import base64
+
 
 def plot_points(cc, args):
     import landsatbuoycalib.image_processing as img_proc
@@ -19,7 +21,7 @@ def plot_points(cc, args):
 
     if args.show == True:
         image.show()
-    
+
     save_path = os.path.join(cc.scene_dir, 'output', cc.scene_id+'_mod')
     if cc.atmo_src == 'narr':
         save_path += '_narr.png'
@@ -39,10 +41,10 @@ def plot_atmo(cc, args):
         interp_profile, data_coor = narr_data.calc_profile(cc)
     elif cc.atmo_src == 'merra':
         interp_profile, data_coor = merra_data.calc_profile(cc)
-        
+
     # add buoy data at bottom of atmosphere
     interp_profile = numpy.insert(interp_profile, 0, [cc.buoy_height, cc.buoy_press, cc.buoy_airtemp + 273.13, cc.buoy_rh], axis=1)
-    
+
     figure = atmo_data.plot_atmo(cc, interp_profile)
 
     if args.show == True:
@@ -64,20 +66,20 @@ def plot_atmo(cc, atmo):
         atmo: atmospheric profile data to draw plots for
 
     Returns:
-        figure: matplotlib.pyplot figure object, can be saved or displayed 
+        figure: matplotlib.pyplot figure object, can be saved or displayed
     """
     height, press, temp, hum = atmo
     dewpoint =  dewpoint_temp(temp, hum)
 
-    figure = plt.figure('%s Atmospheric Profile' % cc.atmo_src, (12, 6)) #make figure  
-    
+    figure = plt.figure('%s Atmospheric Profile' % cc.atmo_src, (12, 6)) #make figure
+
     plt.subplot(131)
     a, = plt.plot(temp, height, 'r', label='Temperature')
     b, = plt.plot(dewpoint, height, 'b', label='Dewpoint')
     plt.legend(handles=[a, b])
     plt.xlabel('Temperature [K]')
     plt.ylabel('Geometric Height [km]')
-    
+
     plt.subplot(132)
     a, plt.plot(temp, press, 'r', label='Temperature')
     plt.legend(handles=[a])
@@ -85,7 +87,7 @@ def plot_atmo(cc, atmo):
     plt.ylabel('Pressure [hPa]')
     plt.ylim([0,1100])
     plt.gca().invert_yaxis()
-    
+
     plt.subplot(133)
     a, = plt.plot(hum, press, 'g', label='Humidity')
     plt.legend(handles=[a])
@@ -98,10 +100,11 @@ def plot_atmo(cc, atmo):
     return figure
 
 
-def draw_latlon(image_file, new_file, corners, text=[], loc=[], r=10, color=(255, 0, 0)):
+def draw_latlon(image_file, corners, text=[], loc=[], r=5, color=(255, 0, 0), size=(300,300)):
     if validators.url(image_file):
         image_file = io.BytesIO(urllib.request.urlopen(image_file).read())
     image = Image.open(image_file)
+    image = image.resize(size)
     image = image.convert('RGB')
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()#truetype("sans-serif.ttf", 16)
@@ -112,22 +115,24 @@ def draw_latlon(image_file, new_file, corners, text=[], loc=[], r=10, color=(255
         draw.ellipse(circ, fill=color)
         draw.text((pc + r + 5, pr + r + 5), text[i], color, font=font)
 
-    image.save(new_file)
-    return new_file
+    _buffer = io.BytesIO()
+    image.save(_buffer, format="JPEG")
+    img_str = base64.b64encode(_buffer.getvalue()).decode('ascii')
+    return 'data:image/jpg;base64, '+str(img_str)
 
 
 def latlon_to_pixel_naive(shape, corners, point):
     """
     assume indexing in image is from upper left (like opencv)
     """
-    r, c = shape
+    c, r = shape
     ur_lat, ll_lat, ur_lon, ll_lon = corners
     lat, lon = point
 
     row_percent = (lat - ll_lat) / (ur_lat - ll_lat)
     col_percent = (lon - ll_lon) / (ur_lon - ll_lon)
 
-    return int(row_percent * r), int(col_percent * c)
+    return int(col_percent * c), int(row_percent * r)
 
 
 def write_im(cc, img_file):

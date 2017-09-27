@@ -88,7 +88,7 @@ def read_metadata(filename):
                 info = _replace(line.strip(' '), chars).split(' = ')
                 if 'GROUP' in info or 'END_GROUP' in info or 'END' in info:
                     continue
-                info[1] = info[1].translate(None, ''.join(chars))
+                info[1] = _replace(info[1], chars)
                 metadata[info[0]] = float(info[1])
             except ValueError:
                 metadata[info[0]] = info[1]

@@ -1,12 +1,12 @@
 import datetime
 
-from . import settings
-from .download import url_download, remote_file_exists
-from . import image_processing as img
-
+from .. import settings
+from ..download import url_download, remote_file_exists
+from .. import image_processing as img
+from .Scene import id_to_scene
 
 def download_amazons3(scene_id, bands=[10, 11, 'MTL']):
-    sat = parse_scene(scene_id)
+    scene = id_to_scene(scene_id)
 
     if 'MTL' not in bands:
         bands.append('MTL')
@@ -15,52 +15,30 @@ def download_amazons3(scene_id, bands=[10, 11, 'MTL']):
 
     for band in bands:
         # get url for the band
-        url = amazon_s3_url(sat, band)
+        url = amazon_s3_url(scene, band)
 
         # make sure it exist
         remote_file_exists(url)
         urls.append(url)
 
-    scene_dir = settings.LANDSAT_DIR + '/' + scene_id
+    scene.scene_dir = settings.LANDSAT_DIR + '/' + scene_id
 
     for url in urls:
-        url_download(url, scene_dir)
+        url_download(url, scene.scene_dir)
 
-    meta_file = '{0}/{1}_MTL.txt'.format(scene_dir, scene_id)
-    metadata = read_metadata(meta_file)
-    metadata['scene_dir'] = scene_dir
+    meta_file = '{0}/{1}_MTL.txt'.format(scene.scene_dir, scene_id)
+    scene.metadata = read_metadata(meta_file)
 
-    return metadata
-
-
-def parse_scene(scene_id):
-    anatomy = {
-            'path': None,
-            'row': None,
-            'sat': None,
-            'scene': scene_id
-    }
-    if isinstance(scene_id, str) and len(scene_id) == 21:
-        anatomy['path'] = scene_id[3:6]
-        anatomy['row'] = scene_id[6:9]
-        anatomy['sat'] = 'L' + scene_id[2:3]
-    elif isinstance(scene_id, str) and len(scene_id) == 40:
-        anatomy['path'] = scene_id[10:13]
-        anatomy['row'] = scene_id[13:16]
-        anatomy['sat'] = 'c{0}/L{1}'.format(scene_id[-4], scene_id[3])
-    else:
-        raise Exception('Received incorrect scene: {0}'.format(scene_id))
-
-    return anatomy
+    return scene
 
 
-def amazon_s3_url(sat, band):
+def amazon_s3_url(scene, band):
     if band != 'MTL':
-        filename = '%s_B%s.TIF' % (sat['scene'], band)
+        filename = '%s_B%s.TIF' % (scene.id, band)
     else:
-        filename = '%s_%s.txt' % (sat['scene'], band)
+        filename = '%s_%s.txt' % (scene.id, band)
 
-    return '/'.join([settings.LANDSAT_S3_URL, sat['sat'], sat['path'], sat['row'], sat['scene'], filename])
+    return '/'.join([settings.LANDSAT_S3_URL, scene.satellite, scene.path, scene.row, scene.id, filename])
 
 
 def read_metadata(filename):

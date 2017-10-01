@@ -3,18 +3,18 @@ import buoycalib
 
 
 def run_all(scene_id, buoy_id, atmo_source='merra', bands=[10, 11]):
-    metadata = buoycalib.landsat.download_amazons3(scene_id, bands)
-    print(metadata['date'], metadata['date'].hour)
+    scene = buoycalib.landsat.download_amazons3(scene_id, bands)
+    print(scene.date, scene.date.hour)
 
-    buoy_info = buoycalib.buoy.calculate_buoy_information(metadata, buoy_id)
-    print(buoy_info)
+    buoy = buoycalib.buoy.calculate_buoy_information(metadata, buoy_id)
+    print(buoy)
 
-    atmosphere, coordinates = buoycalib.atmo.process(atmo_source, metadata, buoy_info)
+    atmosphere, coordinates = buoycalib.atmo.process(atmo_source, scene, buoy)
     print('Atmopshere shape', atmosphere.shape)
 
-    modtran_out = buoycalib.modtran.process(atmosphere, buoy_info[1], buoy_info[2], metadata['date'], metadata['scene_dir'])
+    modtran_out = buoycalib.modtran.process(atmosphere, buoy.lat, buoy.lon, scene.date, scene.directory)
 
-    mod_ltoa_spectral = buoycalib.radiance.calc_ltoa_spectral(modtran_out, buoy_info[5])
+    mod_ltoa_spectral = buoycalib.radiance.calc_ltoa_spectral(modtran_out, buoy.skin_temp)
 
     if 'MTL' in bands: bands.remove('MTL')   # TODO fix stupid thing here
 

@@ -1,24 +1,5 @@
-# .pyc files
 *.pyc
-# modtran
-data/shared/modtran/tempLayers.txt
-data/shared/modtran/newHead.txt
-data/shared/modtran/newTail.txt
-# narr
-data/shared/narr/GRIB/script_HGT
-data/shared/narr/GRIB/script_SHUM
-data/shared/narr/GRIB/script_TMP
 
-# buoys
-!data/shared/buoy/station_table.txt
-!data/shared/buoy/.keep
-data/shared/buoy/*
+*.nfs
 
-# landsat images
-data/scenes/
-
-# cookies
-cookies.txt
-
-.nfs*
-bin/.nfs*
+__pycache__/

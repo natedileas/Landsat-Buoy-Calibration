@@ -1,5 +1,6 @@
 import os
 from urllib.request import urlopen
+import urllib.error
 import gzip
 import shutil
 
@@ -23,7 +24,11 @@ def url_download(url, out_dir):
     if os.path.isfile(filepath):
         return filepath
 
-    request = urlopen(url)
+    try:
+        request = urlopen(url)
+    except urllib.error.URLError as e:
+        print(url)
+        raise e
 
     with open(filepath, 'wb') as fileobj:
         while True:

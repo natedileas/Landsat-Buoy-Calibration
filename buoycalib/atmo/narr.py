@@ -44,7 +44,7 @@ def read(date, temp, height, shum, chosen_points):
     latidx = tuple(chosen_points[:, 0])
     lonidx = tuple(chosen_points[:, 1])
 
-    t1, t2 = data.closest_hours(temp.variables['time'][:], 
+    t1, t2 = data.closest_hours(temp.variables['time'][:],
                                 temp.variables['time'].units, date)
 
     p = numpy.array(temp.variables['level'][:])
@@ -65,7 +65,7 @@ def read(date, temp, height, shum, chosen_points):
     return ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressure
 
 
-def calc_profile(metadata, buoy_info):
+def calc_profile(metadata, buoy):
     """
     Choose points and retreive narr data from file.
 
@@ -85,7 +85,7 @@ def calc_profile(metadata, buoy_info):
 
     # choose points
     indices, lat, lon = data.points_in_scene(metadata, temp)
-    chosen_idxs, data_coor = data.choose_points(indices, lat, lon, buoy_info[1], buoy_info[2])
+    chosen_idxs, data_coor = data.choose_points(indices, lat, lon, buoy.lat, buoy.lon)
 
     # read in NARR data
     raw_atmo = read(metadata['date'], temp, height, shum, chosen_idxs)
@@ -96,7 +96,7 @@ def calc_profile(metadata, buoy_info):
     interp_time = data.interpolate_time(metadata, *raw_atmo)   # interplolate in time
     atmo_profiles = data.generate_profiles(interp_time, stan_atmo, raw_atmo[6])
 
-    interp_profile = data.offset_interp_space([buoy_info[1], buoy_info[2]], atmo_profiles, data_coor)
+    interp_profile = data.offset_interp_space([buoy.lat, buoy.lon], atmo_profiles, data_coor)
     interp_profile = numpy.asarray(interp_profile)
 
     """

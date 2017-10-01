@@ -65,7 +65,7 @@ def read(date, atmo_data, chosen_points):
     return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1 * 100, rh2 * 100, pressure
 
 
-def calc_profile(metadata, buoy_info):
+def calc_profile(metadata, buoy):
     """
     Choose points and retreive merra data from file.
 
@@ -82,7 +82,7 @@ def calc_profile(metadata, buoy_info):
 
     # choose points
     indices, lat, lon = data.points_in_scene(metadata, atmo_data, flat=True)
-    chosen_idxs, data_coor = data.choose_points(indices, lat, lon, buoy_info[1], buoy_info[2])
+    chosen_idxs, data_coor = data.choose_points(indices, lat, lon, buoy.lat, buoy.lat)
 
     # retrieve data
     raw_atmo = read(metadata['date'], atmo_data, chosen_idxs)
@@ -108,7 +108,7 @@ def calc_profile(metadata, buoy_info):
             new_profile = numpy.insert(profile, 0, line(i[2]))
             atmo_profiles[i[0], i[1]] = new_profile
 
-    interp_profile = data.bilinear_interp_space([buoy_info[1], buoy_info[2]], atmo_profiles, data_coor)
+    interp_profile = data.bilinear_interp_space([buoy.lat, buoy.lon], atmo_profiles, data_coor)
     interp_profile = numpy.asarray(interp_profile)
 
     return interp_profile, data_coor

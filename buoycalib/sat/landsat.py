@@ -2,7 +2,7 @@ import datetime
 
 from .. import settings
 from ..download import url_download, remote_file_exists
-from .. import image_processing as img
+from . import image_processing as img
 from .Scene import id_to_scene
 
 def download_amazons3(scene_id, bands=[10, 11, 'MTL']):
@@ -21,12 +21,12 @@ def download_amazons3(scene_id, bands=[10, 11, 'MTL']):
         remote_file_exists(url)
         urls.append(url)
 
-    scene.scene_dir = settings.LANDSAT_DIR + '/' + scene_id
+    scene.directory = settings.LANDSAT_DIR + '/' + scene_id
 
     for url in urls:
-        url_download(url, scene.scene_dir)
+        url_download(url, scene.directory)
 
-    meta_file = '{0}/{1}_MTL.txt'.format(scene.scene_dir, scene_id)
+    meta_file = '{0}/{1}_MTL.txt'.format(scene.directory, scene_id)
     scene.metadata = read_metadata(meta_file)
 
     return scene

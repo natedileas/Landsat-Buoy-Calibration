@@ -1,4 +1,5 @@
 import numpy
+from netCDF4 import num2date
 
 from . import data
 from .. import settings
@@ -10,7 +11,7 @@ def download(date):
     Download NARR Data (netCDF4 format) via ftp.
 
     Args:
-        metadata
+        scene
     """
     # TODO fix narr urls to include new format strings
 
@@ -28,7 +29,7 @@ def download(date):
 
 def read(date, temp, height, shum, chosen_points):
     """
-    Pull out chosen data and do some basic processing.
+    Pull out chosen data from netcdf4 object and interpoalte in time.
 
     Args:
         cc: CalibrationController object
@@ -47,73 +48,69 @@ def read(date, temp, height, shum, chosen_points):
     t1, t2 = data.closest_hours(temp.variables['time'][:],
                                 temp.variables['time'].units, date)
 
+    t1_dt = num2date(temp.variables['time'][t1], temp.variables['time'].units)
+    t2_dt = num2date(temp.variables['time'][t2], temp.variables['time'].units)
+
     p = numpy.array(temp.variables['level'][:])
     pressure = numpy.reshape([p]*4, (4, len(p)))
 
     # the .T on the end is a transpose
     tmp_1 = numpy.diagonal(temp.variables['air'][t1, :, latidx, lonidx], axis1=1, axis2=2).T
     tmp_2 = numpy.diagonal(temp.variables['air'][t2, :, latidx, lonidx], axis1=1, axis2=2).T
+    temp = data.interp_time(date, tmp_1, tmp_2, t1_dt, t2_dt)
 
     ght_1 = numpy.diagonal(height.variables['hgt'][t1, :, latidx, lonidx], axis1=1, axis2=2).T / 1000.0   # convert m to km
     ght_2 = numpy.diagonal(height.variables['hgt'][t2, :, latidx, lonidx], axis1=1, axis2=2).T / 1000.0
+    height = data.interp_time(date, ght_1, ght_2, t1_dt, t2_dt)
 
     shum_1 = numpy.diagonal(shum.variables['shum'][t1, :, latidx, lonidx], axis1=1, axis2=2).T
     shum_2 = numpy.diagonal(shum.variables['shum'][t2, :, latidx, lonidx], axis1=1, axis2=2).T
     rhum_1 = data.convert_sh_rh(shum_1, tmp_1, pressure)
     rhum_2 = data.convert_sh_rh(shum_2, tmp_2, pressure)
+    rel_hum = data.interp_time(date, rhum_1, rhum_2, t1_dt, t2_dt)
 
-    return ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressure
+    return height, temp, rel_hum, pressure
 
 
-def calc_profile(metadata, buoy):
+def calc_profile(scene, buoy):
     """
     Choose points and retreive narr data from file.
 
     Args:
-        cc: CalibrationController object
+        scene: Scene object
+        buoy: Buoy object
 
     Returns:
-        data: atmospheric data, shape = (7, 4, 29)
-            ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
-        narr_coor: coordinates of the atmospheric data points
+        data: atmospheric data, shape = (4, 29)
+            height, temp, relhum, pressure
+        data_coor: coordinates of the atmospheric data points
     """
-    temp_file, height_file, shum_file = download(metadata['date'])
+    temp_file, height_file, shum_file = download(scene.date)
 
-    temp = data.open_netcdf4(temp_file)
-    height = data.open_netcdf4(height_file)
-    shum = data.open_netcdf4(shum_file)
+    temp_netcdf = data.open_netcdf4(temp_file)
+    height_netcdf = data.open_netcdf4(height_file)
+    shum_netcdf = data.open_netcdf4(shum_file)
 
     # choose points
-    indices, lat, lon = data.points_in_scene(metadata, temp)
+    indices, lat, lon = data.points_in_scene(scene, temp_netcdf)
     chosen_idxs, data_coor = data.choose_points(indices, lat, lon, buoy.lat, buoy.lon)
 
-    # read in NARR data
-    raw_atmo = read(metadata['date'], temp, height, shum, chosen_idxs)
+    # read in NARR data, each is shape (4, N)
+    h, t, rh, p = read(scene.date, temp_netcdf, height_netcdf, shum_netcdf, chosen_idxs)
 
     # load standard atmosphere for mid-lat summer
+    # TODO evaluate standard atmo validity, add different ones for different TOY?
     stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
+    h, t, rh, p = data.generate_profiles((h, t, rh, p), stan_atmo)
 
-    interp_time = data.interpolate_time(metadata, *raw_atmo)   # interplolate in time
-    atmo_profiles = data.generate_profiles(interp_time, stan_atmo, raw_atmo[6])
+    # TODO add buoy stuff to bottom of atmosphere
 
-    interp_profile = data.offset_interp_space([buoy.lat, buoy.lon], atmo_profiles, data_coor)
-    interp_profile = numpy.asarray(interp_profile)
+    # interpolate in space, now they are shape (1, N)
+    # total is (4, N)
+    alpha, beta = data.calc_interp_weights(data_coor, [buoy.lat, buoy.lon])
+    height = data.use_interp_weights(h, alpha, beta)
+    temp = data.use_interp_weights(t, alpha, beta)
+    relhum = data.use_interp_weights(rh, alpha, beta)
+    press = data.use_interp_weights(p, alpha, beta)
 
-    """
-    if len(numpy.where(atmo_profiles > 32765)[0]) != 0:
-        print(numpy.where(atmo_profiles > 32765))
-        print('No data for some points. Extrapolating.')
-
-        bad_points = zip(*numpy.where(atmo_profiles > 32765))
-
-        for i in bad_points:
-            profile = numpy.delete(atmo_profiles[i[0], i[1]], i[2])
-
-            fit = numpy.polyfit(range(i[2], 5+i[2]), profile[:5], 1)   # linear extrap
-            line = numpy.poly1d(fit)
-
-            new_profile = numpy.insert(profile, 0, line(i[2]))
-            atmo_profiles[i[0], i[1]] = new_profile
-    """
-
-    return interp_profile, data_coor
+    return height, temp, relhum, press

@@ -50,10 +50,10 @@ def points_in_scene(metadata, rootgrp, flat=False):
         lon = numpy.stack([lon]*lat.shape[1], axis=1)
 
     # define corners
-    ul_lat = metadata['CORNER_UL_LAT_PRODUCT'] + 0.5
-    ul_lon = metadata['CORNER_UL_LON_PRODUCT'] - 0.5
-    lr_lat = metadata['CORNER_LR_LAT_PRODUCT'] - 0.5
-    lr_lon = metadata['CORNER_LR_LON_PRODUCT'] + 0.5
+    ul_lat = metadata.CORNER_UL_LAT_PRODUCT + 0.5
+    ul_lon = metadata.CORNER_UL_LON_PRODUCT - 0.5
+    lr_lat = metadata.CORNER_LR_LAT_PRODUCT - 0.5
+    lr_lon = metadata.CORNER_LR_LON_PRODUCT + 0.5
 
     # pull out points that lie within the corners (only works for NW quadrant)
     # TODO make better, make work for all quadrants
@@ -89,8 +89,9 @@ def choose_points(in_landsat, lat, lon, buoy_lat, buoy_lon):
         distances.append(dist)
 
     in_landsat = zip(in_landsat[0], in_landsat[1])
-    narr_dict = zip(distances, latvalues, lonvalues, numpy.asarray(in_landsat, dtype=object))
+    narr_dict = zip(distances, latvalues, lonvalues, numpy.asarray(list(in_landsat), dtype=object))
     sorted_points = sorted(narr_dict)
+    [i[0] for i in sorted(enumerate(distances), key=lambda x:x[1])]
 
     for chosen_points in itertools.combinations(sorted_points, 4):
         chosen_points = numpy.asarray(chosen_points)
@@ -201,7 +202,7 @@ def convert_geopotential_geometric(geopotential, lat):
     R_min = 6356.752    # km
 
     part1 = numpy.power((R_max ** 2) * numpy.cos(radlat), 2)
-    part2 = numpy.power((R_min ** 2) * numpy.sin(radlat), 2) 
+    part2 = numpy.power((R_min ** 2) * numpy.sin(radlat), 2)
     part3 = numpy.power(R_max * numpy.cos(radlat), 2)
     part4 = numpy.power(R_min * numpy.sin(radlat), 2)
     R_lat = numpy.sqrt((part1 + part2) / (part3 + part4))
@@ -216,7 +217,7 @@ def convert_geopotential_geometric(geopotential, lat):
 
     return numpy.asarray(geometric_height)
 
- 
+
 def distance_in_utm(e1, n1, e2, n2):
     """
     Calculate distance between 2 sets of UTM coordinates.
@@ -243,52 +244,27 @@ def distance_in_utm(e1, n1, e2, n2):
 
     return dist
 
-def interpolate_time(metadata, h1, h2, t1, t2, r1, r2, p):
-    """
-    Interpolate in time. 7 profiles -> 4 profiles.
 
+def interp_time(date, a1, a2, t1, t2):
+    """ linear interp.
     Args:
-        metadata:
-        h1, h2: height
-        t1, t2: temperature
-        r1, r2: realtive humidity
-        p: pressure
-
-    Returns:
-        height, rhum, temp: all the parts of the profile
-
-    Notes:
-        Credit: Monica Cook.
+        date: Python datetime object
+        a1, a2: 2 numpy arrays, same dimensions as each other and output
     """
-    # determine three hour-increment before and after scene center scan time
-    # TODO replace with python datetime methods
-    time = metadata['SCENE_CENTER_TIME'].replace('"', '')
-    hour = int(time[0:2])
-    minute = int(time[3:5])
-    second = int(time[6:8])
-
-    date = metadata['DATE_ACQUIRED']
-    year = int(date[0:4])
-    month = int(date[5:7])
-    day = int(date[8:10])
-
-    rem1 = hour % 3
-    rem2 = 3 - rem1
-    hour1 = hour - rem1
-    hour2 = hour + rem2
+    hour = date.hour
+    minute = date.minute
+    second = date.second
 
     # round to nearest minute
-    if second > 30: minute = minute + 100
+    if second > 30: minute = minute + 1
 
     # convert hour-min acquisition time to decimal time
     time = hour + minute / 60.0
 
     # interpolate in time
-    height = h1 + (time-hour1) * ((h2 - h1)/(hour2 - hour1))
-    rhum = r1 + (time-hour1) * ((r2 - r1)/(hour2 - hour1))
-    temp = t1 + (time-hour1) * ((t2 - t1)/(hour2 - hour1))
+    a = a1 + (time - t1.hour) * ((a2 - a1)/(t2.hour - t1.hour))
 
-    return height, rhum, temp
+    return a
 
 
 def offset_interp_space(buoy_coor, atmo_profiles, narr_coor):
@@ -334,7 +310,7 @@ def calc_interp_weights(interp_from, interp_to):
 
     Notes:
         this function is intended to be paired with use_interp_weights().
-        Source: 
+        Source:
     """
     a = -interp_from[0,0] + interp_from[2,0]
     b = -interp_from[0,0] + interp_from[1,0]
@@ -427,19 +403,18 @@ def bilinear_interpolation(x, y, points):
            ) / ((x2 - x1) * (y2 - y1) + 0.0)
 
 
-def generate_profiles(interp_atmo, stan_atmo, pressures):
+def generate_profiles(interp_atmo, stan_atmo):
     """
     Add standard atmosphere to top of NARR or MERRA atmo data.
 
     Args:
-        interp_atmo: NARR or MERRA data
+        interp_atmo: NARR or MERRA data, shapes = (4, N)
         stan_atmo: summer mid-lat MODTRAN standard atmosphere
-        pressures: pressure levels
 
     Returns:
         [hgt, p, t, rh] * 4: one list for each point
     """
-    height, rhum, temp = interp_atmo
+    height, rhum, temp, pressures = interp_atmo
     stan_height, stan_press, stan_temp, stan_rhum = stan_atmo
 
     profiles = []

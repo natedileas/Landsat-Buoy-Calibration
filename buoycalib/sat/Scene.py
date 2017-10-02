@@ -20,13 +20,13 @@ class Scene(object):
 def id_to_scene(scene_id, scene_type=''):
     if len(scene_id) == 21:
         s = Scene('L' + scene_id[2:3])
-        s.path = int(scene_id[3:6])
-        s.row = int(scene_id[6:9])
+        s.path = scene_id[3:6]
+        s.row = scene_id[6:9]
         s.id = scene_id
     elif len(scene_id) == 40:
         s = Scene('c{0}/L{1}'.format(scene_id[-4], scene_id[3]))
-        s.path = int(scene_id[10:13])
-        s.row = int( scene_id[13:16])
+        s.path = scene_id[10:13]
+        s.row = scene_id[13:16]
         s.id = scene_id
     else:
         raise Exception('Received incorrect scene: {0}'.format(scene_id))

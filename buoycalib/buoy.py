@@ -151,7 +151,7 @@ class Buoy(object):
         return skin_temp
 
 
-def calculate_buoy_information(metadata, buoy_id=''):
+def calculate_buoy_information(scene, buoy_id=''):
     """
     Pick buoy dataset, download, and calculate skin_temp.
 
@@ -159,21 +159,21 @@ def calculate_buoy_information(metadata, buoy_id=''):
 
     Returns: None
     """
-    ur_lat = metadata['CORNER_UR_LAT_PRODUCT']
-    ur_lon = metadata['CORNER_UR_LON_PRODUCT']
-    ll_lat = metadata['CORNER_LL_LAT_PRODUCT']
-    ll_lon = metadata['CORNER_LL_LON_PRODUCT']
+    ur_lat = scene.CORNER_UR_LAT_PRODUCT
+    ur_lon = scene.CORNER_UR_LON_PRODUCT
+    ll_lat = scene.CORNER_LL_LAT_PRODUCT
+    ll_lon = scene.CORNER_LL_LON_PRODUCT
     corners = ur_lat, ll_lat, ur_lon, ll_lon
 
     datasets = datasets_in_corners(corners)
     try:
         if buoy_id and buoy_id in datasets:
             buoy = datasets[buoy_id]
-            buoy.calc_info(metadata['date'])
+            buoy.calc_info(scene.date)
             return buoy
 
         for ds in datasets:
-            datasets[ds].calc_info(metadata['date'])
+            datasets[ds].calc_info(scene.date)
             return datasets[ds]
 
     except RemoteFileException as e:

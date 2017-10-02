@@ -4,13 +4,10 @@ import buoycalib
 
 def run_all(scene_id, buoy_id, atmo_source='merra', bands=[10, 11]):
     scene = buoycalib.landsat.download_amazons3(scene_id, bands)
-    print(scene.date, scene.date.hour)
 
-    buoy = buoycalib.buoy.calculate_buoy_information(metadata, buoy_id)
-    print(buoy)
+    buoy = buoycalib.buoy.calculate_buoy_information(scene, buoy_id)
 
-    atmosphere, coordinates = buoycalib.atmo.process(atmo_source, scene, buoy)
-    print('Atmopshere shape', atmosphere.shape)
+    atmosphere = buoycalib.atmo.process(atmo_source, scene, buoy)
 
     modtran_out = buoycalib.modtran.process(atmosphere, buoy.lat, buoy.lon, scene.date, scene.directory)
 

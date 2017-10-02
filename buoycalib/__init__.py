@@ -5,4 +5,4 @@ from . import radiance
 from . import settings
 from . import wrs2
 from . import display
-from . import sat
+from .sat import *

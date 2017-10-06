@@ -77,7 +77,7 @@ def read_metadata(filename):
     return metadata
 
 
-def calc_ltoa(metadata, lat, lon, band):
+def calc_ltoa(scene, lat, lon, band):
     """
     Calculate image radiance from metadata
 
@@ -90,15 +90,14 @@ def calc_ltoa(metadata, lat, lon, band):
     Returns:
         radiance: L [W m-2 sr-1 um-1] of the image at the buoy location
     """
-    # TODO fix this
-    img_file = metadata['scene_dir'] + '/' + metadata['FILE_NAME_BAND_' + str(band)]
-    poi = img.find_roi(img_file, lat, lon, metadata['UTM_ZONE'])
+    img_file = scene.directory + '/' + scene.metadata['FILE_NAME_BAND_' + str(band)]
+    poi = img.find_roi(img_file, lat, lon, scene.metadata['UTM_ZONE'])
 
     # calculate digital count average of 3x3 area around poi
     dc_avg = img.calc_dc_avg(img_file, poi)
 
-    add = metadata['RADIANCE_ADD_BAND_' + str(band)]
-    mult = metadata['RADIANCE_MULT_BAND_' + str(band)]
+    add = scene.metadata['RADIANCE_ADD_BAND_' + str(band)]
+    mult = scene.metadata['RADIANCE_MULT_BAND_' + str(band)]
 
     radiance = dc_avg * mult + add
 

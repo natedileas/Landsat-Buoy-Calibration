@@ -21,7 +21,7 @@ def calc_ltoa_spectral(modtran_data, skin_temp, water_file=settings.WATER_TXT):
     upwell, downwell, wavelengths, tau, gnd_ref = modtran_data
 
     # calculate temperature array (output units: [W m-2 sr-1 um-1])
-    temp_radiance = calc_temperature_array(wavelengths / 1e6, skin_temp) / 1e6
+    temp_radiance = bb_radiance(wavelengths / 1e6, skin_temp) / 1e6
 
     # Load Emissivity / Reflectivity
     spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
@@ -64,45 +64,24 @@ def calc_ltoa(wavelengths, ltoa, rsr_file):
     return radiance
 
 
-def calc_temperature_array(wavelengths, temperature):
-    """
-    Calculate spectral radiance array based on blackbody temperature.
-
-    Args:
-        wavelengths: wavelengths to calculate at [meters]
-        temperature: temp to use in blackbody calculation [Kelvin]
-
-    Returns:
-        Lt: spectral radiance array [W m-2 sr-1 m-1]
-    """
-    # TODO make numpy function instead of pure python
-    radiance = []
-
-    for d_lambda in wavelengths:
-        x = bb_radiance(d_lambda, temperature)
-        radiance.append(x)
-
-    return numpy.asarray(radiance)
-
-
 def bb_radiance(wvlen, temp):
     """
     Calculate spectral blackbody radiance.
 
     Args:
-        wvlen: wavelength to calculate blackbody at [meters]
+        wvlen: wavelengths to calculate blackbody at [meters]
         temp: temperature to calculate blackbody at [Kelvin]
 
     Returns:
         rad: [W m-2 sr-1 m-1]
     """
     # define constants
-    c = 3e8   # speed of light, m s-1
-    h = 6.626e-34   # J*s = kg m2 s-1
-    k = 1.38064852e-23   # m2 kg s-2 K-1, boltzmann
+    c = 3e8   # speed of light, [m s-1]
+    h = 6.626e-34   # [J*s = kg m2 s-1], planck's constant
+    k = 1.38064852e-23   # [m2 kg s-2 K-1], boltzmann's constant
 
-    c1 = 2 * (c * c) * h   # units = kg m4 s-3
-    c2 = (h * c) / k    # (h * c) / k, units = m K
+    c1 = 2 * (c * c) * h   # units = [kg m4 s-3]
+    c2 = (h * c) / k    # (h * c) / k, units = [m K]
 
     rad = c1 / ((wvlen**5) * (math.e**((c2 / (temp * wvlen))) - 1))
 

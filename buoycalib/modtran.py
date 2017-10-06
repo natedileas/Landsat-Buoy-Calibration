@@ -59,6 +59,12 @@ def make_tape5s(profile, lat, lon, date, directory):
     head = head.replace('gdalt', '%1.3f' % float(height[0]))   # GrounD ALTitude
     head = head.replace('tmp____', '%3.3f' % float(temp[0]))   # TeMPerature
 
+    atmosphere = ''
+    for i, h in enumerate(height):
+        atmosphere += '%10.3f%10.2E%10.2E%10.2E%10s%10s%15s\n' % \
+                        (height[k], press[k], temp[k], relhum[k], \
+                        '0.000E+00', '0.000E+00', 'AAH2222222222 2')
+
     with open(settings.TAIL_FILE_TEMP, 'r') as f:
         tail = f.read()
     tail = tail.replace('longit', lon)
@@ -70,13 +76,7 @@ def make_tape5s(profile, lat, lon, date, directory):
 
     with open(os.path.join(directory, 'tape5'), 'w') as f:
         f.write(head)
-
-        for k in range(numpy.shape(height)[0]):
-            line = '%10.3f%10.2E%10.2E%10.2E%10s%10s%15s\n' % \
-            (height[k], press[k], temp[k], relhum[k], '0.000E+00', '0.000E+00', 'AAH2222222222 2')
-
-            f.write(line)
-
+        f.write(atmosphere)
         f.write(tail)
 
 

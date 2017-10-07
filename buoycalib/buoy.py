@@ -45,7 +45,7 @@ class Buoy(object):
 
         data, headers = self.load(date)
 
-        skin_temp = self.find_skin_temp(date.hour, data, headers)
+        self.skin_temp = self.find_skin_temp(date.hour, data, headers)
 
         try:
             self.surf_press = data[date.hour, headers['BAR']]

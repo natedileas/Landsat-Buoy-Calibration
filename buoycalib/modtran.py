@@ -62,7 +62,7 @@ def make_tape5s(profile, lat, lon, date, directory):
     atmosphere = ''
     for i, h in enumerate(height):
         atmosphere += '%10.3f%10.2E%10.2E%10.2E%10s%10s%15s\n' % \
-                        (height[k], press[k], temp[k], relhum[k], \
+                        (height[i], press[i], temp[i], relhum[i], \
                         '0.000E+00', '0.000E+00', 'AAH2222222222 2')
 
     with open(settings.TAIL_FILE_TEMP, 'r') as f:

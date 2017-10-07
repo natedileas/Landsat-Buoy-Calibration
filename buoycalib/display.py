@@ -101,6 +101,7 @@ def plot_atmo(cc, atmo):
 
 
 def draw_latlon(image_file, corners, text=[], loc=[], r=5, color=(255, 0, 0), size=(300,300)):
+    print(image_file)
     if validators.url(image_file):
         image_file = io.BytesIO(urllib.request.urlopen(image_file).read())
     image = Image.open(image_file)

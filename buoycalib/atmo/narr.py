@@ -51,20 +51,23 @@ def read(date, temp, height, shum, chosen_points):
     t1_dt = num2date(temp.variables['time'][t1], temp.variables['time'].units)
     t2_dt = num2date(temp.variables['time'][t2], temp.variables['time'].units)
 
+    index1 = (t1, slice(None), latidx, lonidx)
+    index2 = (t2, slice(None), latidx, lonidx)
+
     p = numpy.array(temp.variables['level'][:])
     pressure = numpy.reshape([p]*4, (4, len(p)))
 
     # the .T on the end is a transpose
-    tmp_1 = numpy.diagonal(temp.variables['air'][t1, :, latidx, lonidx], axis1=1, axis2=2).T
-    tmp_2 = numpy.diagonal(temp.variables['air'][t2, :, latidx, lonidx], axis1=1, axis2=2).T
+    tmp_1 = numpy.diagonal(temp.variables['air'][index1], axis1=1, axis2=2).T
+    tmp_2 = numpy.diagonal(temp.variables['air'][index2], axis1=1, axis2=2).T
     temp = data.interp_time(date, tmp_1, tmp_2, t1_dt, t2_dt)
 
-    ght_1 = numpy.diagonal(height.variables['hgt'][t1, :, latidx, lonidx], axis1=1, axis2=2).T / 1000.0   # convert m to km
-    ght_2 = numpy.diagonal(height.variables['hgt'][t2, :, latidx, lonidx], axis1=1, axis2=2).T / 1000.0
+    ght_1 = numpy.diagonal(height.variables['hgt'][index1], axis1=1, axis2=2).T / 1000.0   # convert m to km
+    ght_2 = numpy.diagonal(height.variables['hgt'][index2], axis1=1, axis2=2).T / 1000.0
     height = data.interp_time(date, ght_1, ght_2, t1_dt, t2_dt)
 
-    shum_1 = numpy.diagonal(shum.variables['shum'][t1, :, latidx, lonidx], axis1=1, axis2=2).T
-    shum_2 = numpy.diagonal(shum.variables['shum'][t2, :, latidx, lonidx], axis1=1, axis2=2).T
+    shum_1 = numpy.diagonal(shum.variables['shum'][index1], axis1=1, axis2=2).T
+    shum_2 = numpy.diagonal(shum.variables['shum'][index2], axis1=1, axis2=2).T
     rhum_1 = data.convert_sh_rh(shum_1, tmp_1, pressure)
     rhum_2 = data.convert_sh_rh(shum_2, tmp_2, pressure)
     rel_hum = data.interp_time(date, rhum_1, rhum_2, t1_dt, t2_dt)
@@ -81,8 +84,9 @@ def calc_profile(scene, buoy):
         buoy: Buoy object
 
     Returns:
-        data: atmospheric data, shape = (4, 29)
+        data: atmospheric data, shape = (4, N)
             height, temp, relhum, pressure
+            [km], [kelvin], [%], [kPa]
         data_coor: coordinates of the atmospheric data points
     """
     temp_file, height_file, shum_file = download(scene.date)
@@ -98,13 +102,6 @@ def calc_profile(scene, buoy):
     # read in NARR data, each is shape (4, N)
     h, t, rh, p = read(scene.date, temp_netcdf, height_netcdf, shum_netcdf, chosen_idxs)
 
-    # load standard atmosphere for mid-lat summer
-    # TODO evaluate standard atmo validity, add different ones for different TOY?
-    stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
-    h, t, rh, p = data.generate_profiles((h, t, rh, p), stan_atmo)
-
-    # TODO add buoy stuff to bottom of atmosphere
-
     # interpolate in space, now they are shape (1, N)
     # total is (4, N)
     alpha, beta = data.calc_interp_weights(data_coor, [buoy.lat, buoy.lon])
@@ -113,4 +110,17 @@ def calc_profile(scene, buoy):
     relhum = data.use_interp_weights(rh, alpha, beta)
     press = data.use_interp_weights(p, alpha, beta)
 
-    return height, temp, relhum, press
+    # load standard atmosphere for mid-lat summer
+    # TODO evaluate standard atmo validity, add different ones for different TOY?
+    stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
+    stan_height, stan_press, stan_temp, stan_relhum = stan_atmo
+    # add standard atmo above cutoff index
+    cutoff_idx = numpy.abs(stan_press - press[-1]).argmin()
+    height = numpy.append(height, stan_height[cutoff_idx:])
+    press = numpy.append(press, stan_press[cutoff_idx:])
+    temp = numpy.append(temp, stan_temp[cutoff_idx:])
+    relhum = numpy.append(relhum, stan_relhum[cutoff_idx:])
+
+    # TODO add buoy stuff to bottom of atmosphere
+
+    return height, press, temp, relhum

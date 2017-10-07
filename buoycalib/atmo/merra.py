@@ -1,5 +1,5 @@
 import numpy
-import utm
+from netCDF4 import num2date
 
 from . import data
 from .. import settings
@@ -45,6 +45,8 @@ def read(date, atmo_data, chosen_points):
 
     t1, t2 = data.closest_hours(atmo_data.variables['time'][:].data,
                                 atmo_data.variables['time'].units, date)
+    t1_dt = num2date(atmo_data.variables['time'][t1], atmo_data.variables['time'].units)
+    t2_dt = num2date(atmo_data.variables['time'][t2], atmo_data.variables['time'].units)
 
     index1 = (t1, slice(None), latidx, lonidx)
     index2 = (t2, slice(None), latidx, lonidx)
@@ -55,17 +57,22 @@ def read(date, atmo_data, chosen_points):
     # the .T on the end is a transpose
     temp1 = numpy.diagonal(atmo_data.variables['T'][index1], axis1=1, axis2=2).T
     temp2 = numpy.diagonal(atmo_data.variables['T'][index2], axis1=1, axis2=2).T
+    temp = data.interp_time(date, temp1, temp2, t1_dt, t2_dt)
 
     rh1 = numpy.diagonal(atmo_data.variables['RH'][index1], axis1=1, axis2=2).T   # relative humidity
     rh2 = numpy.diagonal(atmo_data.variables['RH'][index2], axis1=1, axis2=2).T
+    rel_hum = data.interp_time(date, rh1, rh2, t1_dt, t2_dt)
 
     height1 = numpy.diagonal(atmo_data.variables['H'][index1], axis1=1, axis2=2).T   # height
     height2 = numpy.diagonal(atmo_data.variables['H'][index2], axis1=1, axis2=2).T
+    height = data.interp_time(date, height1, height2, t1_dt, t2_dt)
 
-    return height1 / 1000.0, height2 / 1000.0, temp1, temp2, rh1 * 100, rh2 * 100, pressure
+    cutoff = height[numpy.isnan(height)].shape[0]
+
+    return height[cutoff:] / 1000.0, temp[cutoff:], rel_hum[cutoff:], pressure[cutoff:]
 
 
-def calc_profile(metadata, buoy):
+def calc_profile(scene, buoy):
     """
     Choose points and retreive merra data from file.
 
@@ -77,20 +84,20 @@ def calc_profile(metadata, buoy):
             ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
         chosen_points_lat_lon: coordinates of the atmospheric data points
     """
-    filename = download(metadata['date'])
+    filename = download(scene.date)
     atmo_data = data.open_netcdf4(filename)
 
     # choose points
-    indices, lat, lon = data.points_in_scene(metadata, atmo_data, flat=True)
+    indices, lat, lon = data.points_in_scene(scene, atmo_data, flat=True)
     chosen_idxs, data_coor = data.choose_points(indices, lat, lon, buoy.lat, buoy.lat)
 
     # retrieve data
-    raw_atmo = read(metadata['date'], atmo_data, chosen_idxs)
+    raw_atmo = read(scene.date, atmo_data, chosen_idxs)
 
     # load standard atmosphere for mid-lat summer
     stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
 
-    interp_time = data.interpolate_time(metadata, *raw_atmo)   # interplolate in time
+    interp_time = data.interpolate_time(scene, *raw_atmo)   # interplolate in time
     atmo_profiles = data.generate_profiles(interp_time, stan_atmo, raw_atmo[6])
     atmo_profiles = numpy.asarray(atmo_profiles)
 

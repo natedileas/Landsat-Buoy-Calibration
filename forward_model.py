@@ -17,7 +17,7 @@ def run_all(scene_id, buoy_id, atmo_source='merra', bands=[10, 11]):
 
     for b in bands:
         mod_ltoa = buoycalib.radiance.calc_ltoa(modtran_out[2], mod_ltoa_spectral, buoycalib.settings.RSR_L8[b])
-        img_ltoa = buoycalib.landsat.calc_ltoa(metadata, buoy_info[1], buoy_info[2], b)
+        img_ltoa = buoycalib.landsat.calc_ltoa(scene, buoy.lat, buoy.lon, b)
 
         print('band: {0} ltoa: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))
 

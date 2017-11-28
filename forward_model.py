@@ -3,14 +3,20 @@ import buoycalib
 
 
 def run_all(scene_id, buoy_id, atmo_source='merra', bands=[10, 11]):
+    print('Downloading Scene: {0} Bands: {1}'.format(scene_id, bands))
     scene = buoycalib.landsat.download_amazons3(scene_id, bands)
 
+    print('Downloading Buoy: {0} '.format(buoy_id))
     buoy = buoycalib.buoy.calculate_buoy_information(scene, buoy_id)
+    print(buoy)
 
+    print('Processing Atmosphere:')
     atmosphere = buoycalib.atmo.process(atmo_source, scene, buoy)
 
+    print('Running MODTRAN:')
     modtran_out = buoycalib.modtran.process(atmosphere, buoy.lat, buoy.lon, scene.date, scene.directory)
 
+    print('Ltoa Spectral Calculations:')
     mod_ltoa_spectral = buoycalib.radiance.calc_ltoa_spectral(modtran_out, buoy.skin_temp)
 
     if 'MTL' in bands: bands.remove('MTL')   # TODO fix stupid thing here
@@ -19,7 +25,7 @@ def run_all(scene_id, buoy_id, atmo_source='merra', bands=[10, 11]):
         mod_ltoa = buoycalib.radiance.calc_ltoa(modtran_out[2], mod_ltoa_spectral, buoycalib.settings.RSR_L8[b])
         img_ltoa = buoycalib.landsat.calc_ltoa(scene, buoy.lat, buoy.lon, b)
 
-        print('band: {0} ltoa: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))
+        print('Radiance Calculation Band {0}: modeled: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))
 
 
 if __name__ == '__main__':

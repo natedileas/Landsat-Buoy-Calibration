@@ -28,6 +28,12 @@ class Buoy(object):
          self.url = url
          self.filename = filename
 
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return 'Buoy ID: {0} Lat: {1} Lon: {2}'.format(self.id, self.lat, self.lon)
+
     def calc_info(self, date):
         """
         Args:

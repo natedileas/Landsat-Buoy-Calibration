@@ -1,4 +1,4 @@
-from PIL import Image
+import skimage.data
 from osgeo import gdal, osr
 import ogr
 import utm
@@ -72,36 +72,11 @@ def convert_utm_zones(x, y, zone_from, zone_to):
     return point.GetX(), point.GetY()
 
 
-def calc_dc_avg(filename, poi):
-    """
-    Calculate the digital count average of the region of interest.
+def dc_avg(filename, poi):
+    image = skimage.data.load(filename)
 
-    Args:
-        filename: path/file of the image to operate on
-        poi: pixel around which to calculate the average [x, y]
+    c, r = poi
 
-    Returns:
-        dc_avg: digital count average of the 3x3 region around poi
-    """
+    roi = image[r-1:r+2, c-1:c+2]
 
-    img = Image.open(filename)
-
-    w, h = img.size
-    if not 0 < poi[0] < w or not 0 < poi[1] < h:
-        raise OutOfRangeError('POI out of range.')
-
-    img_loaded = img.load()
-
-
-    # ROI gives top left pixel location
-    # POI gives center tap location
-    roi = poi[0] - 1, poi[1] + 1
-
-    dc_sum = 0
-    for i in range(3):
-        for j in range(3):
-            dc_sum += img_loaded[roi[0] + i, roi[1] + j]
-
-    dc_avg = dc_sum / 9.0   # calculate dc_avg
-
-    return dc_avg
+    return roi.mean()

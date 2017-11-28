@@ -94,7 +94,7 @@ def calc_ltoa(scene, lat, lon, band):
     poi = img.find_roi(img_file, lat, lon, scene.metadata['UTM_ZONE'])
 
     # calculate digital count average of 3x3 area around poi
-    dc_avg = img.calc_dc_avg(img_file, poi)
+    dc_avg = img.dc_avg(img_file, poi)
 
     add = scene.metadata['RADIANCE_ADD_BAND_' + str(band)]
     mult = scene.metadata['RADIANCE_MULT_BAND_' + str(band)]

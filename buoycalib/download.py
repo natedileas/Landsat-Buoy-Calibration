@@ -13,8 +13,8 @@ class RemoteFileException(Exception):
     pass
 
 
-def url_download(url, out_dir):
-    """ download a file (ftp or http) """
+def url_download(url, out_dir, auth=None):
+    """ download a file (ftp or http), optional auth in (user, pass) format """
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
@@ -24,18 +24,31 @@ def url_download(url, out_dir):
     if os.path.isfile(filepath):
         return filepath
 
-    try:
-        request = urlopen(url)
-    except urllib.error.URLError as e:
-        print(url)
-        raise e
+    if url[0:3] == 'ftp':
+        try:
+            request = urlopen(url)
+        except urllib.error.URLError as e:
+            print(url)
+            raise e
 
-    with open(filepath, 'wb') as fileobj:
-        while True:
-            chunk = request.read(CHUNK)
-            if not chunk:
-                break
-            fileobj.write(chunk)
+        with open(filepath, 'wb') as fileobj:
+            while True:
+                chunk = request.read(CHUNK)
+                if not chunk:
+                    break
+                fileobj.write(chunk)
+
+    else:
+        with requests.Session() as session:
+
+            r1 = session.request('get', url)
+            if auth:
+                r = session.get(r1.url, auth=auth)
+            else:
+                r = session.get(r1.url)
+
+            with open(filepath, 'wb') as f:
+                f.write(r.content)
 
     return filepath
 

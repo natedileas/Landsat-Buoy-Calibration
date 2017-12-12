@@ -1,1 +1,1 @@
-from . import landsat
+from . import (landsat, modis)

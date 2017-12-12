@@ -9,6 +9,7 @@ MERRA_DIR = join(DATA_BASE, 'merra')
 NARR_DIR = join(DATA_BASE, 'narr')
 NOAA_DIR = join(DATA_BASE, 'noaa')
 LANDSAT_DIR = join(DATA_BASE, 'landsat_scenes')
+MODIS_DIR = join(DATA_BASE, 'modis')
 
 MODTRAN_DATA = '/dirs/pkg/Mod4v3r1/DATA'
 MODTRAN_EXE = '/dirs/pkg/Mod4v3r1/Mod4v3r1.exe'
@@ -30,7 +31,7 @@ NARR_URLS = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc',
 NOAA_URLS = ['http://www.ndbc.noaa.gov/data/historical/stdmet/%sh%s.txt.gz',
              'http://www.ndbc.noaa.gov/data/stdmet/%s%s%s2015.txt.gz']
 LANDSAT_S3_URL = 'https://landsat-pds.s3.amazonaws.com'
-MODIS_S3_URL = 'https://modis-pds.s3.amazonaws.com'
+MODIS_URL = 'ftp://ladsweb.nascom.nasa.gov/allData/6/'
 
 # relative spectral responses
 

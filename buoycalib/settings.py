@@ -42,3 +42,4 @@ RSR_L8 = {
 }
 
 WRS2 = join(STATIC, 'wrs2', 'wrs2_descending.shp')
+MODIS_TILE = join('static', 'sn_bound_10deg.txt')

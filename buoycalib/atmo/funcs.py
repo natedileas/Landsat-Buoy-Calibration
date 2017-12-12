@@ -1,4 +1,27 @@
 import numpy
+import utm
+    
+def choose_points(lat, lon, buoy_lat, buoy_lon, flat=False):
+    """
+    Choose the four closest NARR or MERRA points to a lat/lon position.
+
+    Args:
+        lat, lon: numpy arrays, 2d
+        buoy_lat, buoy_lon: these is the point to get close to
+
+    Returns:
+        chosen indices, coordinates of the 4 closest points (euclidean)
+    """
+
+    distances = (lat - buoy_lat)**2 + (lon - buoy_lon)**2
+    dist_args_sorted = numpy.argsort(distances.flatten())
+
+    chosen_idxs = dist_args_sorted[0:4]
+    chosen_idxs = numpy.unravel_index(chosen_idxs, lat.shape)
+
+    coordinates = list(zip(lat[chosen_idxs], lon[chosen_idxs]))
+
+    return chosen_idxs, coordinates
 
 
 def is_square_test(points):

@@ -40,8 +40,8 @@ def read(date, atmo_data, chosen_points):
     """
     chosen_points = numpy.array(list(chosen_points))
 
-    latidx = tuple(chosen_points[:, 0])
-    lonidx = tuple(chosen_points[:, 1])
+    latidx = tuple(chosen_points[0])
+    lonidx = tuple(chosen_points[1])
 
     t1, t2 = data.closest_hours(atmo_data.variables['time'][:].data,
                                 atmo_data.variables['time'].units, date)

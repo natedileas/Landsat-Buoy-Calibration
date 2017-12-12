@@ -1,4 +1,5 @@
 import numpy
+from netCDF4 import num2date
 
 from . import (narr, merra, data, funcs)
 from .. import (settings, interp)
@@ -23,32 +24,31 @@ def process(source, date, buoy, verbose=False):
 
         chosen_idxs, data_coor = funcs.choose_points(lat, lon, buoy.lat, buoy.lon)
 
-        chosen_points = numpy.array(list(chosen_points))
-        latidx = tuple(chosen_points[0])
-        lonidx = tuple(chosen_points[1])
+        latidx = tuple(chosen_idxs[0])
+        lonidx = tuple(chosen_idxs[1])
 
-        t1, t2 = data.closest_hours(temp.variables['time'][:],
-                                    temp.variables['time'].units, date)
+        t1, t2 = data.closest_hours(temp_netcdf.variables['time'][:],
+                                    temp_netcdf.variables['time'].units, date)
 
-        t1_dt = num2date(temp.variables['time'][t1], temp.variables['time'].units)
-        t2_dt = num2date(temp.variables['time'][t2], temp.variables['time'].units)
+        t1_dt = num2date(temp_netcdf.variables['time'][t1], temp_netcdf.variables['time'].units)
+        t2_dt = num2date(temp_netcdf.variables['time'][t2], temp_netcdf.variables['time'].units)
 
         index1 = (t1, slice(None), latidx, lonidx)
         index2 = (t2, slice(None), latidx, lonidx)
 
-        press = numpy.array(temp.variables['level'][:])
+        press = numpy.array(temp_netcdf.variables['level'][:])
 
         # the .T on the end is a transpose
-        temp1 = numpy.diagonal(temp.variables['air'][index1], axis1=1, axis2=2).T
-        temp2 = numpy.diagonal(temp.variables['air'][index2], axis1=1, axis2=2).T
+        temp1 = numpy.diagonal(temp_netcdf.variables['air'][index1], axis1=1, axis2=2).T
+        temp2 = numpy.diagonal(temp_netcdf.variables['air'][index2], axis1=1, axis2=2).T
 
-        height1 = numpy.diagonal(height.variables['hgt'][index1], axis1=1, axis2=2).T / 1000.0   # convert m to km
-        height2 = numpy.diagonal(height.variables['hgt'][index2], axis1=1, axis2=2).T / 1000.0
+        height1 = numpy.diagonal(height_netcdf.variables['hgt'][index1], axis1=1, axis2=2).T / 1000.0   # convert m to km
+        height2 = numpy.diagonal(height_netcdf.variables['hgt'][index2], axis1=1, axis2=2).T / 1000.0
 
-        shum_1 = numpy.diagonal(shum.variables['shum'][index1], axis1=1, axis2=2).T
-        shum_2 = numpy.diagonal(shum.variables['shum'][index2], axis1=1, axis2=2).T
-        rhum1 = data.convert_sh_rh(shum_1, tmp_1, pressure)
-        rhum2 = data.convert_sh_rh(shum_2, tmp_2, pressure)
+        shum_1 = numpy.diagonal(shum_netcdf.variables['shum'][index1], axis1=1, axis2=2).T
+        shum_2 = numpy.diagonal(shum_netcdf.variables['shum'][index2], axis1=1, axis2=2).T
+        rhum1 = data.convert_sh_rh(shum_1, temp1, press)
+        rhum2 = data.convert_sh_rh(shum_2, temp2, press)
 
     elif source == 'merra':
         filename = files
@@ -61,10 +61,8 @@ def process(source, date, buoy, verbose=False):
         lon = numpy.stack([lon]*lat.shape[1], axis=1)
         chosen_idxs, data_coor = funcs.choose_points(lat, lon, buoy.lat, buoy.lon)
 
-        chosen_points = numpy.array(list(chosen_points))
-
-        latidx = tuple(chosen_points[0])
-        lonidx = tuple(chosen_points[1])
+        latidx = tuple(chosen_idxs[0])
+        lonidx = tuple(chosen_idxs[1])
 
         t1, t2 = data.closest_hours(atmo_data.variables['time'][:].data,
                                     atmo_data.variables['time'].units, date)
@@ -86,20 +84,22 @@ def process(source, date, buoy, verbose=False):
         height1 = numpy.diagonal(atmo_data.variables['H'][index1], axis1=1, axis2=2).T / 1000.0   # height
         height2 = numpy.diagonal(atmo_data.variables['H'][index2], axis1=1, axis2=2).T / 1000.0
 
-        cutoff = height[numpy.isnan(height)].shape[0]
-
     else:
         raise ValueError('Source must be one of (\'narr\' or \'merra\'): {0}'.format(source))
 
     # interpolate in time, now they are shape (4, N)
-    temp = interp.interp_time(date, temp1, temp2, t1_dt, t2_dt)
-    height = interp.interp_time(date, height1, height2, t1_dt, t2_dt)
-    rel_hum = interp.interp_time(date, rhum1, rhum2, t1_dt, t2_dt)
+    t = interp.interp_time(date, temp1, temp2, t1_dt, t2_dt)
+    h = interp.interp_time(date, height1, height2, t1_dt, t2_dt)
+    rh = interp.interp_time(date, rhum1, rhum2, t1_dt, t2_dt)
     
     # interpolate in space, now they are shape (1, N)
     height = interp.idw(h, data_coor, [buoy.lat, buoy.lon])
     temp = interp.idw(t, data_coor, [buoy.lat, buoy.lon])
     relhum = interp.idw(rh, data_coor, [buoy.lat, buoy.lon])
+
+    # get rid of nans 
+    # TODO is this still necesary?
+    #cutoff = height[numpy.isnan(height)].shape[0]
 
     # load standard atmosphere for mid-lat summer
     # TODO evaluate standard atmo validity, add different ones for different TOY?

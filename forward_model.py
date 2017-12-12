@@ -2,7 +2,7 @@
 import buoycalib
 
 
-def run_all(scene_id, buoy_id, atmo_source='merra', bands=[10, 11]):
+def run_all(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11]):
     print('Downloading Scene: {0} Bands: {1}'.format(scene_id, bands))
     scene = buoycalib.landsat.download_amazons3(scene_id, bands)
 
@@ -11,7 +11,7 @@ def run_all(scene_id, buoy_id, atmo_source='merra', bands=[10, 11]):
     print(buoy)
 
     print('Processing Atmosphere:')
-    atmosphere = buoycalib.atmo.process(atmo_source, scene, buoy)
+    atmosphere = buoycalib.atmo.process(atmo_source, scene.date, buoy, verbose)
 
     print('Running MODTRAN:')
     modtran_out = buoycalib.modtran.process(atmosphere, buoy.lat, buoy.lon, scene.date, scene.directory)
@@ -40,8 +40,9 @@ if __name__ == '__main__':
     parser.add_argument('scene_id', help='LANDSAT scene ID. Examples: LC80330412013145LGN00, LE70160382012348EDC00, LT50410372011144PAC01', nargs='+')
     parser.add_argument('-b', '--buoy_id', help='NOAA Buoy ID. Example: 44009', default='')
     parser.add_argument('-a', '--atmo', default='merra', choices=['merra', 'narr'], help='Choose atmospheric data source, choices:[narr, merra].')
+    parser.add_argument('-v', '--verbose', default=False, action='store_true')
 
     args = parser.parse_args()
 
     for LID in args.scene_id:
-        run_all(LID, args.buoy_id, args.atmo)
+        run_all(LID, args.buoy_id, args.atmo, args.verbose)

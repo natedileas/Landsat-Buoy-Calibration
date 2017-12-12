@@ -3,7 +3,7 @@ import numpy
 from . import (narr, merra, data, funcs, idw)
 from .. import settings
 
-def process(source, date, buoy):
+def process(source, date, buoy, verbose=False):
     """
     process atmospheric data, yield an atmosphere
     """
@@ -34,7 +34,7 @@ def process(source, date, buoy):
         lon = atmo_data.variables['lon'][:]
         lat = numpy.stack([lat]*lon.shape[0], axis=0)
         lon = numpy.stack([lon]*lat.shape[1], axis=1)
-        chosen_idxs, data_coor = funcs.choose_points(lat, lon, buoy.lat, buoy.lat)
+        chosen_idxs, data_coor = funcs.choose_points(lat, lon, buoy.lat, buoy.lon)
 
         h, t, rh, p = mod.read(date, atmo_data, chosen_idxs)
 
@@ -43,22 +43,11 @@ def process(source, date, buoy):
 
     # interpolate in space, now they are shape (1, N)
     # total is (4, N)
-
     height = idw.idw(h, data_coor, [buoy.lat, buoy.lon])
     temp = idw.idw(t, data_coor, [buoy.lat, buoy.lon])
     relhum = idw.idw(rh, data_coor, [buoy.lat, buoy.lon])
     press = idw.idw(p, data_coor, [buoy.lat, buoy.lon])
 
-    """alpha, beta = data.calc_interp_weights(data_coor, [buoy.lat, buoy.lon])
-                if numpy.isinf(alpha) or numpy.isinf(beta):
-                    height, temp, helhum, press = data.bilinear_interp_space([buoy.lat, buoy.lon], (h, t, rh, p), data_coor)
-                else:
-                    height = data.use_interp_weights(h, alpha, beta)
-                    temp = data.use_interp_weights(t, alpha, beta)
-                    relhum = data.use_interp_weights(rh, alpha, beta)
-                    press = data.use_interp_weights(p, alpha, beta)"""
-
-    #print(data_coor, [buoy.lat, buoy.lon])
     # load standard atmosphere for mid-lat summer
     # TODO evaluate standard atmo validity, add different ones for different TOY?
     stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
@@ -71,5 +60,12 @@ def process(source, date, buoy):
     relhum = numpy.append(relhum, stan_relhum[cutoff_idx:])
 
     # TODO add buoy stuff to bottom of atmosphere
+
+    if verbose:
+        # send out plots and stuff
+        stuff = numpy.asarray([height, press, temp, relhum]).T
+        h = 'Height [km], Pressure[kPa], Temperature[k], Relative_Humidity[0-100]' + '\nCoordinates: {0} Buoy:{1}'.format(data_coor, buoy)
+        
+        numpy.savetxt('atmosphere_{0}_{1}_{2}.txt'.format(source, date.strftime('%Y%m%d'), buoy.id), stuff, fmt='%7.2f, %7.2f, %7.2f, %7.2f', header=h)
 
     return height, press, temp, relhum

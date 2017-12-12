@@ -14,13 +14,14 @@ class BuoyDataException(Exception):
 class Buoy(object):
     def __init__(self, _id, lat, lon, thermometer_depth, height, skin_temp=None,
                  surf_press=None, surf_airtemp=None, surf_rh=None, url=None,
-                 filename=None):
+                 filename=None, bulk_temp=None):
          self.id = _id
          self.lat = lat
          self.lon = lon
          self.thermometer_depth = thermometer_depth
          self.height = height
          self.skin_temp = skin_temp
+         self.bulk_temp = bulk_temp
          self.surf_press = surf_press
          self.surf_airtemp = surf_airtemp
          self.surf_rh = surf_rh
@@ -51,7 +52,7 @@ class Buoy(object):
 
         data, headers = self.load(date)
 
-        self.skin_temp = self.find_skin_temp(date.hour, data, headers)
+        self.skin_temp, self.bulk_temp = find_skin_temp(date.hour, data, headers, self.thermometer_depth)
 
         try:
             self.surf_press = data[date.hour, headers['BAR']]
@@ -111,50 +112,52 @@ class Buoy(object):
         return data, headers
 
 
-    def find_skin_temp(self, hour, data, headers):
-        """
-        Convert bulk temp -> skin temperature.
+def find_skin_temp(hour, data, headers, depth):
+    """
+    Convert bulk temp -> skin temperature.
 
-        Args:
-            cc: calibrationcontroller object, for data and time information
-            data: data from buoy file
-            depth: depth of thermometer on buoy
+    Args:
+        cc: calibrationcontroller object, for data and time information
+        data: data from buoy file
+        depth: depth of thermometer on buoy
 
-        Returns:
-            skin_temp [Kelvin]
+    Returns:
+        skin_temp [Kelvin]
 
-        Raises:
-            Exception: if no data, date range wrong, etc.
+    Raises:
+        Exception: if no data, date range wrong, etc.
 
-        Notes:
-            source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
-        """
-        # compute 24hr wind speed and temperature
-        avg_wspd = data[:, headers['WSPD']].mean()   # [m s-1]
-        avg_wtmp = data[:, headers['WTMP']].mean()   # [C]
+    Notes:
+        source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
+    """
+    # compute 24hr wind speed and temperature
+    avg_wspd = data[:, headers['WSPD']].mean()   # [m s-1]
+    avg_wtmp = data[:, headers['WTMP']].mean()   # [C]
 
-        # calculate skin temperature
-        # part 1
-        a = 0.05 - (0.6 / avg_wspd) + (0.03 * math.log(avg_wspd))
-        z = self.thermometer_depth   # depth in meters
+    bulk_temp = avg_wtmp + 273.15   # [C -> K]
 
-        avg_skin_temp = avg_wtmp - (a * z) - 0.17
+    # calculate skin temperature
+    # part 1
+    a = 0.05 - (0.6 / avg_wspd) + (0.03 * math.log(avg_wspd))
+    z = depth   # depth in meters
 
-        # part 2
-        b = 0.35 + (0.018 * math.exp(0.4 * avg_wspd))
-        c = 1.32 - (0.64 * math.log(avg_wspd))
+    avg_skin_temp = avg_wtmp - (a * z) - 0.17
 
-        t = int(hour - (c * z))
-        T_zt = float(data[t, headers['WTMP']])    # temperature data from closest hour
-        f_cz = (T_zt - avg_skin_temp) / numpy.exp(b*z)
+    # part 2
+    b = 0.35 + (0.018 * math.exp(0.4 * avg_wspd))
+    c = 1.32 - (0.64 * math.log(avg_wspd))
 
-        # combine
-        skin_temp = avg_skin_temp + f_cz + 273.15   # [K]
+    t = int(hour - (c * z))
+    T_zt = float(data[t, headers['WTMP']])    # temperature data from closest hour
+    f_cz = (T_zt - avg_skin_temp) / numpy.exp(b*z)
 
-        if skin_temp >= 600:
-            raise BuoyDataException('No water temp data for selected date range in the data set')
+    # combine
+    skin_temp = avg_skin_temp + f_cz + 273.15   # [K]
 
-        return skin_temp
+    if skin_temp >= 600:
+        raise BuoyDataException('No water temp data for selected date range in the data set')
+
+    return skin_temp, bulk_temp
 
 
 def calculate_buoy_information(scene, buoy_id=''):

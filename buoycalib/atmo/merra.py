@@ -2,7 +2,7 @@ import numpy
 from netCDF4 import num2date
 
 from . import data
-from .. import settings
+from .. import (settings, interp)
 from ..download import url_download
 
 
@@ -57,15 +57,15 @@ def read(date, atmo_data, chosen_points):
     # the .T on the end is a transpose
     temp1 = numpy.diagonal(atmo_data.variables['T'][index1], axis1=1, axis2=2).T
     temp2 = numpy.diagonal(atmo_data.variables['T'][index2], axis1=1, axis2=2).T
-    temp = data.interp_time(date, temp1, temp2, t1_dt, t2_dt)
+    temp = interp.interp_time(date, temp1, temp2, t1_dt, t2_dt)
 
     rh1 = numpy.diagonal(atmo_data.variables['RH'][index1], axis1=1, axis2=2).T   # relative humidity
     rh2 = numpy.diagonal(atmo_data.variables['RH'][index2], axis1=1, axis2=2).T
-    rel_hum = data.interp_time(date, rh1, rh2, t1_dt, t2_dt)
+    rel_hum = interp.interp_time(date, rh1, rh2, t1_dt, t2_dt)
 
     height1 = numpy.diagonal(atmo_data.variables['H'][index1], axis1=1, axis2=2).T   # height
     height2 = numpy.diagonal(atmo_data.variables['H'][index2], axis1=1, axis2=2).T
-    height = data.interp_time(date, height1, height2, t1_dt, t2_dt)
+    height = interp.interp_time(date, height1, height2, t1_dt, t2_dt)
 
     cutoff = height[numpy.isnan(height)].shape[0]
 

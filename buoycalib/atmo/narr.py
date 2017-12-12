@@ -2,7 +2,7 @@ import numpy
 from netCDF4 import num2date
 
 from . import data
-from .. import settings
+from .. import (settings, interp)
 from ..download import url_download
 
 
@@ -60,17 +60,17 @@ def read(date, temp, height, shum, chosen_points):
     # the .T on the end is a transpose
     tmp_1 = numpy.diagonal(temp.variables['air'][index1], axis1=1, axis2=2).T
     tmp_2 = numpy.diagonal(temp.variables['air'][index2], axis1=1, axis2=2).T
-    temp = data.interp_time(date, tmp_1, tmp_2, t1_dt, t2_dt)
+    temp = interp.interp_time(date, tmp_1, tmp_2, t1_dt, t2_dt)
 
     ght_1 = numpy.diagonal(height.variables['hgt'][index1], axis1=1, axis2=2).T / 1000.0   # convert m to km
     ght_2 = numpy.diagonal(height.variables['hgt'][index2], axis1=1, axis2=2).T / 1000.0
-    height = data.interp_time(date, ght_1, ght_2, t1_dt, t2_dt)
+    height = interp.interp_time(date, ght_1, ght_2, t1_dt, t2_dt)
 
     shum_1 = numpy.diagonal(shum.variables['shum'][index1], axis1=1, axis2=2).T
     shum_2 = numpy.diagonal(shum.variables['shum'][index2], axis1=1, axis2=2).T
     rhum_1 = data.convert_sh_rh(shum_1, tmp_1, pressure)
     rhum_2 = data.convert_sh_rh(shum_2, tmp_2, pressure)
-    rel_hum = data.interp_time(date, rhum_1, rhum_2, t1_dt, t2_dt)
+    rel_hum = interp.interp_time(date, rhum_1, rhum_2, t1_dt, t2_dt)
 
     return height, temp, rel_hum, pressure
 

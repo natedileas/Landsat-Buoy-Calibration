@@ -4,8 +4,8 @@ import os
 import numpy
 
 from . import settings
-from .download import url_download, remote_file_exists, ungzip, RemoteFileException
 from . import atmo
+from .download import (url_download, ungzip)
 
 
 class BuoyDataException(Exception):
@@ -303,7 +303,7 @@ def skin_temp(file, date, thermometer_depth):
     return skin_temp, bulk_temp
 
 
-def info(file, date):
+def info(id, file, date):
     data, headers = load(file, date)
 
     try:
@@ -315,7 +315,9 @@ def info(file, date):
     surf_dewpnt = data[date.hour, headers['DEWP']]
     surf_rh = atmo.data.calc_rh(surf_airtemp, surf_dewpnt)
 
-    return lat, lon, depth, [surf_press, surf_airtemp, surf_dewpnt, surf_rh]
+    b = all_datasets()[id]
+
+    return b.lat, b.lon, b.thermometer_depth, [surf_press, surf_airtemp, surf_dewpnt, surf_rh]
 
 
 def load(filename, date):

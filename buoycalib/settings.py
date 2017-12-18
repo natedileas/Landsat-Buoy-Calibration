@@ -35,8 +35,8 @@ MODIS_URL = 'ftp://ladsweb.nascom.nasa.gov/allData/6/'
 
 # relative spectral responses
 RSR_L8 = {
-    10: join(STATIC, 'landat', 'L8_B10.rsp'),
-    11: join(STATIC, 'landat', 'L8_B11.rsp'),
+    10: join(STATIC, 'landsat', 'L8_B10.rsp'),
+    11: join(STATIC, 'landsat', 'L8_B11.rsp'),
 }
 RSR_MODIS = {i:join(STATIC, 'modis', 'rsr.{0}.inb.final'.format(i)) for i in range(36)}
 

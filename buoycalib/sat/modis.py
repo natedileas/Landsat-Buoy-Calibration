@@ -5,7 +5,7 @@ import gdal
 import numpy
 
 from .. import settings
-from ..download import url_download, remote_file_exists
+from ..download import url_download
 from . import image_processing as img
 from .modis_tile import latlon_to_tile
 from .Scene import Scene

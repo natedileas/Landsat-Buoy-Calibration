@@ -1,29 +1,24 @@
 import datetime
 
+from osgeo import gdal, osr
+import ogr
+import utm
+
 from .. import settings
-from ..download import url_download, remote_file_exists
+from ..download import url_download
 from . import image_processing as img
 from .Scene import id_to_scene
 
 def download_amazons3(scene_id, bands=[10, 11, 'MTL']):
     scene = id_to_scene(scene_id)
+    scene.directory = settings.LANDSAT_DIR + '/' + scene_id
 
     if 'MTL' not in bands:
         bands.append('MTL')
 
-    urls = []
-
     for band in bands:
         # get url for the band
         url = amazon_s3_url(scene, band)
-
-        # make sure it exist
-        remote_file_exists(url)
-        urls.append(url)
-
-    scene.directory = settings.LANDSAT_DIR + '/' + scene_id
-
-    for url in urls:
         url_download(url, scene.directory)
 
     meta_file = '{0}/{1}_MTL.txt'.format(scene.directory, scene_id)

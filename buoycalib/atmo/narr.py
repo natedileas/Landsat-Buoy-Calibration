@@ -1,7 +1,7 @@
 import numpy
 from netCDF4 import num2date
 
-from . import data
+from . import (data, funcs)
 from .. import (settings, interp)
 from ..download import url_download
 
@@ -26,89 +26,62 @@ def download(date):
 
     return narr_files
 
-
-def read(date, temp, height, shum, chosen_points):
+def process(source, date, buoy, verbose=False):
     """
-    Pull out chosen data from netcdf4 object and interpoalte in time.
-
-    Args:
-        cc: CalibrationController object
-        temp, height, shum: netcdf4 objects
-        chosen_points: idices to 4 chosen points
-
-    Returns:
-        data: shape=(7, 4, 29), units=[km, K, %, torr]
-            ght_1, ght_2, tmp_1, tmp_2, rhum_1, rhum_2, pressures
+    process atmospheric data, yield an atmosphere
     """
+    files = download(date)
 
-    chosen_points = numpy.array(list(chosen_points))
-    latidx = tuple(chosen_points[0])
-    lonidx = tuple(chosen_points[1])
-
-    t1, t2 = data.closest_hours(temp.variables['time'][:],
-                                temp.variables['time'].units, date)
-
-    t1_dt = num2date(temp.variables['time'][t1], temp.variables['time'].units)
-    t2_dt = num2date(temp.variables['time'][t2], temp.variables['time'].units)
-
-    index1 = (t1, slice(None), latidx, lonidx)
-    index2 = (t2, slice(None), latidx, lonidx)
-
-    p = numpy.array(temp.variables['level'][:])
-    pressure = numpy.reshape([p]*4, (4, len(p)))
-
-    # the .T on the end is a transpose
-    tmp_1 = numpy.diagonal(temp.variables['air'][index1], axis1=1, axis2=2).T
-    tmp_2 = numpy.diagonal(temp.variables['air'][index2], axis1=1, axis2=2).T
-    temp = interp.interp_time(date, tmp_1, tmp_2, t1_dt, t2_dt)
-
-    ght_1 = numpy.diagonal(height.variables['hgt'][index1], axis1=1, axis2=2).T / 1000.0   # convert m to km
-    ght_2 = numpy.diagonal(height.variables['hgt'][index2], axis1=1, axis2=2).T / 1000.0
-    height = interp.interp_time(date, ght_1, ght_2, t1_dt, t2_dt)
-
-    shum_1 = numpy.diagonal(shum.variables['shum'][index1], axis1=1, axis2=2).T
-    shum_2 = numpy.diagonal(shum.variables['shum'][index2], axis1=1, axis2=2).T
-    rhum_1 = data.convert_sh_rh(shum_1, tmp_1, pressure)
-    rhum_2 = data.convert_sh_rh(shum_2, tmp_2, pressure)
-    rel_hum = interp.interp_time(date, rhum_1, rhum_2, t1_dt, t2_dt)
-
-    return height, temp, rel_hum, pressure
-
-
-def calc_profile(scene, buoy):
-    """
-    Choose points and retreive narr data from file.
-
-    Args:
-        scene: Scene object
-        buoy: Buoy object
-
-    Returns:
-        data: atmospheric data, shape = (4, N)
-            height, temp, relhum, pressure
-            [km], [kelvin], [%], [kPa]
-        data_coor: coordinates of the atmospheric data points
-    """
-    temp_file, height_file, shum_file = download(scene.date)
-
+    temp_file, height_file, shum_file = files
     temp_netcdf = data.open_netcdf4(temp_file)
     height_netcdf = data.open_netcdf4(height_file)
     shum_netcdf = data.open_netcdf4(shum_file)
 
     # choose points
-    indices, lat, lon = data.points_in_scene(scene, temp_netcdf)
-    chosen_idxs, data_coor = data.choose_points(indices, lat, lon, buoy.lat, buoy.lon)
+    lat = temp_netcdf.variables['lat'][:]
+    lon = temp_netcdf.variables['lon'][:]
 
-    # read in NARR data, each is shape (4, N)
-    h, t, rh, p = read(scene.date, temp_netcdf, height_netcdf, shum_netcdf, chosen_idxs)
+    chosen_idxs, data_coor = funcs.choose_points(lat, lon, buoy.lat, buoy.lon)
 
+    latidx = tuple(chosen_idxs[0])
+    lonidx = tuple(chosen_idxs[1])
+
+    t1, t2 = data.closest_hours(temp_netcdf.variables['time'][:],
+                                temp_netcdf.variables['time'].units, date)
+
+    t1_dt = num2date(temp_netcdf.variables['time'][t1], temp_netcdf.variables['time'].units)
+    t2_dt = num2date(temp_netcdf.variables['time'][t2], temp_netcdf.variables['time'].units)
+
+    index1 = (t1, slice(None), latidx, lonidx)
+    index2 = (t2, slice(None), latidx, lonidx)
+
+    press = numpy.array(temp_netcdf.variables['level'][:])
+
+    # the .T on the end is a transpose
+    temp1 = numpy.diagonal(temp_netcdf.variables['air'][index1], axis1=1, axis2=2).T
+    temp2 = numpy.diagonal(temp_netcdf.variables['air'][index2], axis1=1, axis2=2).T
+
+    height1 = numpy.diagonal(height_netcdf.variables['hgt'][index1], axis1=1, axis2=2).T / 1000.0   # convert m to km
+    height2 = numpy.diagonal(height_netcdf.variables['hgt'][index2], axis1=1, axis2=2).T / 1000.0
+
+    shum_1 = numpy.diagonal(shum_netcdf.variables['shum'][index1], axis1=1, axis2=2).T
+    shum_2 = numpy.diagonal(shum_netcdf.variables['shum'][index2], axis1=1, axis2=2).T
+    rhum1 = data.convert_sh_rh(shum_1, temp1, press)
+    rhum2 = data.convert_sh_rh(shum_2, temp2, press)
+
+    # interpolate in time, now they are shape (4, N)
+    t = interp.interp_time(date, temp1, temp2, t1_dt, t2_dt)
+    h = interp.interp_time(date, height1, height2, t1_dt, t2_dt)
+    rh = interp.interp_time(date, rhum1, rhum2, t1_dt, t2_dt)
+    
     # interpolate in space, now they are shape (1, N)
-    # total is (4, N)
-    alpha, beta = data.calc_interp_weights(data_coor, [buoy.lat, buoy.lon])
-    height = data.use_interp_weights(h, alpha, beta)
-    temp = data.use_interp_weights(t, alpha, beta)
-    relhum = data.use_interp_weights(rh, alpha, beta)
-    press = data.use_interp_weights(p, alpha, beta)
+    height = interp.idw(h, data_coor, [buoy.lat, buoy.lon])
+    temp = interp.idw(t, data_coor, [buoy.lat, buoy.lon])
+    relhum = interp.idw(rh, data_coor, [buoy.lat, buoy.lon])
+
+    # get rid of nans 
+    # TODO is this still necesary?
+    #cutoff = height[numpy.isnan(height)].shape[0]
 
     # load standard atmosphere for mid-lat summer
     # TODO evaluate standard atmo validity, add different ones for different TOY?
@@ -122,5 +95,12 @@ def calc_profile(scene, buoy):
     relhum = numpy.append(relhum, stan_relhum[cutoff_idx:])
 
     # TODO add buoy stuff to bottom of atmosphere
+
+    if verbose:
+        # send out plots and stuff
+        stuff = numpy.asarray([height, press, temp, relhum]).T
+        h = 'Height [km], Pressure[kPa], Temperature[k], Relative_Humidity[0-100]' + '\nCoordinates: {0} Buoy:{1}'.format(data_coor, buoy)
+        
+        numpy.savetxt('atmosphere_{0}_{1}_{2}.txt'.format(source, date.strftime('%Y%m%d'), buoy.id), stuff, fmt='%7.2f, %7.2f, %7.2f, %7.2f', header=h)
 
     return height, press, temp, relhum

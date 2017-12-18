@@ -1,6 +1,3 @@
-import os
-import math
-
 import numpy
 
 from . import settings
@@ -20,7 +17,7 @@ def calc_ltoa_spectral(modtran_data, skin_temp, water_file=settings.WATER_TXT):
     """
     upwell, downwell, wavelengths, tau, gnd_ref = modtran_data
 
-    # calculate temperature array (output units: [W m-2 sr-1 um-1])
+    # calculate temperature array (input units: [m], [K] output units: [W m-2 sr-1 um-1])
     temp_radiance = bb_radiance(wavelengths / 1e6, skin_temp) / 1e6
 
     # Load Emissivity / Reflectivity
@@ -28,12 +25,12 @@ def calc_ltoa_spectral(modtran_data, skin_temp, water_file=settings.WATER_TXT):
     spec_ref = numpy.interp(wavelengths, spec_r_wvlens, spec_r)
     spec_emis = 1 - spec_ref   # calculate emissivity
 
-    # calculate top of atmosphere radiance (spectral)
+    # calculate spectral top of atmosphere radiance
     # Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
     # units: [W m-2 sr-1 um-1]
-    toa_radiance = (upwell * 1e4 + (temp_radiance * spec_emis * tau) + (spec_ref * gnd_ref * 1e4))
+    ltoa_spectral = (upwell * 1e4 + (temp_radiance * spec_emis * tau) + (spec_ref * gnd_ref * 1e4))
 
-    return toa_radiance
+    return ltoa_spectral
 
 
 def calc_ltoa(wavelengths, ltoa, rsr_file):
@@ -59,6 +56,7 @@ def calc_ltoa(wavelengths, ltoa, rsr_file):
     RSR = numpy.interp(wvlens, RSR_wavelengths, RSR)
 
     # calculate observed radiance [ W m-2 sr-1 um-1 ]
+    # trapz is a trapezoidal sum
     radiance = numpy.trapz(ltoa_trimmed * RSR, wvlens) / numpy.trapz(RSR, wvlens)
 
     return radiance
@@ -83,6 +81,5 @@ def bb_radiance(wvlen, temp):
     c1 = 2 * (c * c) * h   # units = [kg m4 s-3]
     c2 = (h * c) / k    # (h * c) / k, units = [m K]
 
-    rad = c1 / ((wvlen**5) * (math.e**((c2 / (temp * wvlen))) - 1))
 
     return rad

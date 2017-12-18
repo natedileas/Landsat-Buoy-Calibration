@@ -8,7 +8,6 @@ from .. import settings
 from ..download import url_download
 from . import image_processing as img
 from .modis_tile import latlon_to_tile
-from .Scene import Scene
 
 def download(granule_id, directory_=settings.MODIS_DIR):
     """ download a MODIS scene by granule ID. """

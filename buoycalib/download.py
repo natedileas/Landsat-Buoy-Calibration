@@ -15,6 +15,9 @@ class RemoteFileException(Exception):
 
 def url_download(url, out_dir, auth=None):
     """ download a file (ftp or http), optional auth in (user, pass) format """
+    if not _remote_file_exists(url):
+        raise ValueError('url: {0} does not exist'.format(url))
+
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
@@ -62,7 +65,7 @@ def ungzip(filepath):
     return new_filepath
 
 
-def remote_file_exists(url):
+def _remote_file_exists(url):
     status = requests.head(url).status_code
 
     if status != 200:

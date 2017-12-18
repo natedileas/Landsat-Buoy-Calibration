@@ -4,35 +4,36 @@ from buoycalib import (sat, buoy, atmo, radiance, modtran, settings)
 
 def run_all(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11]):
     
-    # satelite
+    # satelite download
     if scene_id[0:3] == 'LC8':   # Landsat 8
-        scene = sat.landsat.download_amazons3(scene_id, bands[:])
+        # [:] thing is to shorthand to make a shallow copy
+        overpass_date, directory, metadata = sat.landsat.download(scene_id, bands[:])
         rsrs = {b:settings.RSR_L8[b] for b in bands}
 
     elif scene_id[0:3] == 'MOD':   # Modis
-        scene = sat.modis.download(scene_id)
+        overpass_date, directory, metadata, files = sat.modis.download(scene_id)
         rsrs = {b:settings.RSR_MODIS[b] for b in bands}
 
     else:
         raise ValueError('Scene ID is not a valid format for (landsat8, modis)')
 
     # Buoy Stuff
-    buoy_file = buoy.download(buoy_id, scene.date)
-    buoy_lat, buoy_lon, buoy_depth, lower_atmo = buoy.info(buoy_id, buoy_file, scene.date)
-    skin_temp, bulk_temp = buoy.skin_temp(buoy_file, scene.date, buoy_depth)
+    buoy_file = buoy.download(buoy_id, overpass_date)
+    buoy_lat, buoy_lon, buoy_depth, lower_atmo = buoy.info(buoy_id, buoy_file, overpass_date)
+    skin_temp, bulk_temp = buoy.skin_temp(buoy_file, overpass_date, buoy_depth)
     print('Buoy {0}: skin_temp: {1} lat: {2} lon:{3}'.format(buoy_id, skin_temp, buoy_lat, buoy_lon))
 
     # Atmosphere
     if atmo_source == 'merra':
-        atmosphere = atmo.merra.process(scene.date, buoy_lat, buoy_lon, verbose)
+        atmosphere = atmo.merra.process(overpass_date, buoy_lat, buoy_lon, verbose)
     elif atmo_source == 'narr':
-        atmosphere = atmo.narr.process(scene.date, buoy_lat, buoy_lon, verbose)
+        atmosphere = atmo.narr.process(overpass_date, buoy_lat, buoy_lon, verbose)
     else:
         raise ValueError('atmo_source is not one of (narr, merra)')
 
     # MODTRAN
     print('Running MODTRAN:')
-    modtran_out = modtran.process(atmosphere, buoy_lat, buoy_lon, scene.date, scene.directory)
+    modtran_out = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, directory)
 
     # LTOA calcs
     print('Ltoa Spectral Calculations:')
@@ -42,7 +43,7 @@ def run_all(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11
 
     for b in bands:
         mod_ltoa = radiance.calc_ltoa(modtran_out[2], mod_ltoa_spectral, rsrs[b])
-        img_ltoa = sat.landsat.calc_ltoa(scene, buoy_lat, buoy_lon, b)
+        img_ltoa = sat.landsat.calc_ltoa(directory, metadata, buoy_lat, buoy_lon, b)
 
         print('Radiance Calculation Band {0}: modeled: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))
 

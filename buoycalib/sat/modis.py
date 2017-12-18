@@ -12,22 +12,21 @@ from .Scene import Scene
 
 def download(granule_id, directory_=settings.MODIS_DIR):
     """ download a MODIS scene by granule ID. """
-    scene = Scene('MODIS')
-    scene.directory = directory_ + '/' + granule_id
+    directory = directory_ + '/' + granule_id
 
     url = modis_url(granule_id)
-    granule_filepath = url_download(url, scene.directory)
+    granule_filepath = url_download(url, directory)
 
     # parse metadata
     ds = gdal.Open(granule_filepath)
-    scene.metadata = ds.GetMetadata()
+    metadata = ds.GetMetadata()
 
     # also download georeference MOD03
-    geo_reference_MOD03 = scene.metadata['ANCILLARYINPUTPOINTER.1']
+    geo_reference_MOD03 = metadata['ANCILLARYINPUTPOINTER.1']
     url = modis_url(geo_reference_MOD03)
-    geo_ref_filepath = url_download(url, scene.directory)
+    geo_ref_filepath = url_download(url, directory)
 
-    return scene, granule_filepath, geo_ref_filepath
+    return date, directory, metadata, [granule_filepath, geo_ref_filepath]
 
 
 def modis_url(granule_id):

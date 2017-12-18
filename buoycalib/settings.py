@@ -18,7 +18,7 @@ MISC_FILES = join(STATIC, 'modtran')
 HEAD_FILE_TEMP = join(MISC_FILES, 'head.txt')  # tape5 templates
 TAIL_FILE_TEMP = join(MISC_FILES, 'tail.txt')
 STAN_ATMO = join(MISC_FILES, 'stanAtm.txt')
-WATER_TXT = join(MISC_FILES, 'water.txt')
+WATER_TXT = join(MISC_FILES, 'water_emis.txt')
 
 BUOY_TXT = join(STATIC, 'noaa', 'buoy_height.txt')
 STATION_TXT = join(STATIC, 'noaa', 'station_table.txt')
@@ -29,18 +29,17 @@ NARR_URLS = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc',
              'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/hgt.%s.nc',
              'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/shum.%s.nc']
 NOAA_URLS = ['http://www.ndbc.noaa.gov/data/historical/stdmet/%sh%s.txt.gz',
-             'http://www.ndbc.noaa.gov/data/stdmet/%s%s%s2015.txt.gz']
+             'http://www.ndbc.noaa.gov/data/stdmet/%s%s%s2017.txt.gz']
 LANDSAT_S3_URL = 'https://landsat-pds.s3.amazonaws.com'
 MODIS_URL = 'ftp://ladsweb.nascom.nasa.gov/allData/6/'
 
 # relative spectral responses
-
-RSR_L8_B10 = join(MISC_FILES, 'L8_B10.rsp')
-RSR_L8_B11 = join(MISC_FILES, 'L8_B11.rsp')
 RSR_L8 = {
-    10: RSR_L8_B10,
-    11: RSR_L8_B11,
+    10: join(STATIC, 'landat', 'L8_B10.rsp'),
+    11: join(STATIC, 'landat', 'L8_B11.rsp'),
 }
+RSR_MODIS = {i:join(STATIC, 'modis', 'rsr.{0}.inb.final'.format(i)) for i in range(36)}
 
+# shapefile-like things
 WRS2 = join(STATIC, 'wrs2', 'wrs2_descending.shp')
-MODIS_TILE = join('static', 'sn_bound_10deg.txt')
+MODIS_TILE = join(STATIC, 'modis', 'sn_bound_10deg.txt')

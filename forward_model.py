@@ -1,29 +1,43 @@
 
-import buoycalib
+from buoycalib import (sat, buoy, atmo, radiance, modtran, settings)
 
 
 def run_all(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11]):
-    print('Downloading Scene: {0} Bands: {1}'.format(scene_id, bands))
-    scene = buoycalib.landsat.download_amazons3(scene_id, bands)
+    
+    if scene_id[0:3] == 'LC8':   # Landsat 8
+        scene = sat.landsat.download_amazons3(scene_id, bands)
+        rsrs = {b:settings.RSR_L8[b] for b in bands}
 
-    print('Downloading Buoy: {0} '.format(buoy_id))
-    buoy = buoycalib.buoy.calculate_buoy_information(scene, buoy_id)
-    print(buoy)
+    elif scene_id[0:3] == 'MOD':   # Modis
+        scene = sat.modis.download(scene_id)
+        rsrs = {b:settings.RSR_MODIS[b] for b in bands}
 
-    print('Processing Atmosphere:')
-    atmosphere = buoycalib.atmo.process(atmo_source, scene.date, buoy, verbose)
+    else:
+        raise ValueError('Scene ID is not a valid format for (landsat8, modis)')
+
+    buoy_file = buoy.download(buoy_id)
+    buoy_lat, buoy_lon, buoy_depth, lower_atmo = buoy.info(buoy_file, date)
+    skin_temp, bulk_temp = buoy.skin_temp(buoy_file, date, buoy_depth)
+    print('Buoy {0}: skin_temp: {1} lat: {2} lon:{3}'.format(buoy_id, skin_temp, buoy_lat, buoy_lon))
+
+    if atmo_source == 'merra':
+        atmosphere = atmo.merra.process(scene.date, buoy, verbose)
+    elif atmo_source == 'narr':
+        atmosphere = atmo.narr.process(scene.date, buoy, verbose)
+    else:
+        raise ValueError('atmo_source is not one of (narr, merra)')
 
     print('Running MODTRAN:')
-    modtran_out = buoycalib.modtran.process(atmosphere, buoy.lat, buoy.lon, scene.date, scene.directory)
+    modtran_out = modtran.process(atmosphere, buoy.lat, buoy.lon, scene.date, scene.directory)
 
     print('Ltoa Spectral Calculations:')
-    mod_ltoa_spectral = buoycalib.radiance.calc_ltoa_spectral(modtran_out, buoy.skin_temp)
+    mod_ltoa_spectral = radiance.calc_ltoa_spectral(modtran_out, buoy.skin_temp)
 
     if 'MTL' in bands: bands.remove('MTL')   # TODO fix stupid thing here
 
     for b in bands:
-        mod_ltoa = buoycalib.radiance.calc_ltoa(modtran_out[2], mod_ltoa_spectral, buoycalib.settings.RSR_L8[b])
-        img_ltoa = buoycalib.landsat.calc_ltoa(scene, buoy.lat, buoy.lon, b)
+        mod_ltoa = radiance.calc_ltoa(modtran_out[2], mod_ltoa_spectral, rsrs[b])
+        img_ltoa = landsat.calc_ltoa(scene, buoy.lat, buoy.lon, b)
 
         print('Radiance Calculation Band {0}: modeled: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))
 

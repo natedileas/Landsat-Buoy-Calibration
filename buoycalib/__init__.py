@@ -1,8 +1,1 @@
-from . import atmo
-from . import buoy
-from . import modtran
-from . import radiance
-from . import settings
-from . import wrs2
-from . import display
-from .sat import *
+from . import (atmo, buoy, modtran, radiance, settings, sat)

@@ -270,3 +270,84 @@ def all_datasets():
             buoy_stations[sid] = Buoy(sid, lat, lon, depth, buoy_heights.get(sid, 0))
 
     return buoy_stations
+
+
+def download(id, date, directory=settings.NOAA_DIR):
+    """
+    Download and unzip appripriate buoy data from url.
+
+    Args:
+        url: url to download data from
+    """
+    if date.year < 2017:
+        url = settings.NOAA_URLS[0] % (id, date.year)
+    else:
+        url = settings.NOAA_URLS[1] % (date.strftime('%b'), id, date.strftime('%m'))
+
+    filename = url_download(url, directory)
+
+    if '.gz' in filename:
+        filename = ungzip(filename)
+
+    return filename
+
+
+def skin_temp(file, date, thermometer_depth):
+    """
+    Args:
+    """
+    data, headers = load(file, date)
+
+    skin_temp, bulk_temp = find_skin_temp(date.hour, data, headers, thermometer_depth)
+
+    return skin_temp, bulk_temp
+
+
+def info(file, date):
+    data, headers = load(file, date)
+
+    try:
+        surf_press = data[date.hour, headers['BAR']]
+    except KeyError:
+        surf_press = data[date.hour, headers['PRES']]
+
+    surf_airtemp = data[date.hour, headers['ATMP']]
+    surf_dewpnt = data[date.hour, headers['DEWP']]
+    surf_rh = atmo.data.calc_rh(surf_airtemp, surf_dewpnt)
+
+    return lat, lon, depth, [surf_press, surf_airtemp, surf_dewpnt, surf_rh]
+
+
+def load(filename, date):
+    """
+    Open a downloaded buoy data file and extract data from it.
+
+    Args:
+        date: datetime object
+        filename: buoy file to open
+
+    Returns:
+        data: from file, trimmed to date
+
+    Raises:
+        Exception: if no data is found in file
+    """
+    date = date.strftime('%Y %m %d')
+    date_short_year = date[2:]
+    data = []
+
+    with open(filename, 'r') as f:
+        header = f.readline()
+
+        for line in f:
+            if date in line or date_short_year in line:
+                data.append(line.strip('\n').split())
+
+    if data == []:
+        raise BuoyDataException('No matching date in file? {0} {1}.'.format(date, filename))
+
+    data = numpy.asarray(data, dtype=float)
+
+    headers = dict(zip(header.split(), range(len(data[:, 0]))))
+
+    return data, headers

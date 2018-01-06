@@ -19,6 +19,7 @@ def download(granule_id, directory_=settings.MODIS_DIR):
     # parse metadata
     ds = gdal.Open(granule_filepath)
     metadata = ds.GetMetadata()
+    date = datetime.datetime.strptime(granule_id[9:22], 'A%Y%j.%H%M')
 
     # also download georeference MOD03
     geo_reference_MOD03 = metadata['ANCILLARYINPUTPOINTER.1']

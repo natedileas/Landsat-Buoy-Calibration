@@ -26,10 +26,11 @@ def process(atmosphere, lat, lon, date, directory):
     make_tape5s(atmosphere, lat, lon, date, directory)
 
     run(directory)
+    tape6_filename = os.path.join(directory, 'tape6')
 
-    upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect = parse_tape6(directory)
+    wavelengths, upwell_rad, gnd_reflect, total, transmission = parse_tape6(tape6_filename)
 
-    return upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
+    return wavelengths, upwell_rad, gnd_reflect, transmission
 
 
 def make_tape5s(profile, lat, lon, date, directory):
@@ -130,7 +131,7 @@ def parse_tape7scn(directory):
     return upwell_rad, downwell_rad, wvlen, trans, gnd_ref
 
 
-def parse_tape6(directory):
+def parse_tape6(tape6_filename):
     """
     Parse modtran output file into needed quantities.
 
@@ -138,13 +139,14 @@ def parse_tape6(directory):
         directory: where the file is located
 
     Returns:
-        upwell_rad, downwell_rad, wvlen, trans, gnd_ref:
-        Needed info for radiance calculation
-        Units: [W cm-2 sr-1 um-1]
+        wavelengths: [um]
+        path_thermal: upwelling radiance [W cm-2 sr-1 um-1]
+        ground_refl: reflected downwelling radiance [W cm-2 sr-1 um-1] 
+        total: total radiance [W cm-2 sr-1 um-1]
+        trans: atmospheric transmission [0-1, unitless]
     """
-    filename = os.path.join(directory, 'tape6')
 
-    with open(filename, 'r') as f:
+    with open(tape6_filename, 'r') as f:
         data = f.read()
 
     d = data.split('\n')
@@ -164,6 +166,6 @@ def parse_tape6(directory):
     data = numpy.array(a, dtype=numpy.float64)
     data = data[:, (1, 3, 9, 12, 14)]
 
-    wvlen, upwell_rad, gnd_ref, total, trans = data.T
+    wvlen, path_thermal, ground_refl, total, trans = data.T
 
-    return upwell_rad[::-1], None, wvlen[::-1], trans[::-1], gnd_ref[::-1]
+    return wvlen[::-1], path_thermal[::-1], ground_refl[::-1], total[::-1], trans[::-1]

@@ -33,16 +33,16 @@ def run_all(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11
 
     # MODTRAN
     print('Running MODTRAN:')
-    modtran_out = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, directory)
+    wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, directory)
 
     # LTOA calcs
     print('Ltoa Spectral Calculations:')
-    mod_ltoa_spectral = radiance.calc_ltoa_spectral(modtran_out, skin_temp)
+    mod_ltoa_spectral = radiance.calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_temp)
 
     if 'MTL' in bands: bands.remove('MTL')   # TODO fix stupid thing here
 
     for b in bands:
-        mod_ltoa = radiance.calc_ltoa(modtran_out[2], mod_ltoa_spectral, rsrs[b])
+        mod_ltoa = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, rsrs[b])
         img_ltoa = sat.landsat.calc_ltoa(directory, metadata, buoy_lat, buoy_lon, b)
 
         print('Radiance Calculation Band {0}: modeled: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))

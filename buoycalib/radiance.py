@@ -3,7 +3,7 @@ import numpy
 from . import settings
 
 
-def calc_ltoa_spectral(modtran_data, skin_temp, water_file=settings.WATER_TXT):
+def calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_temp, water_file=settings.WATER_TXT):
     """
     Calculate modeled radiance for band 10 and 11.
 
@@ -15,10 +15,8 @@ def calc_ltoa_spectral(modtran_data, skin_temp, water_file=settings.WATER_TXT):
     Returns:
         spectral top of atmosphere radiance: Ltoa(lambda) [W m-2 sr-1 um-1]
     """
-    upwell, downwell, wavelengths, tau, gnd_ref = modtran_data
-
     # calculate temperature array (input units: [m], [K] output units: [W m-2 sr-1 um-1])
-    temp_radiance = bb_radiance(wavelengths / 1e6, skin_temp) / 1e6
+    bb_rad = bb_radiance(wavelengths / 1e6, skin_temp) / 1e6
 
     # Load Emissivity / Reflectivity
     spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
@@ -28,7 +26,7 @@ def calc_ltoa_spectral(modtran_data, skin_temp, water_file=settings.WATER_TXT):
     # calculate spectral top of atmosphere radiance
     # Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
     # units: [W m-2 sr-1 um-1]
-    ltoa_spectral = (upwell * 1e4 + (temp_radiance * spec_emis * tau) + (spec_ref * gnd_ref * 1e4))
+    ltoa_spectral = (upwell_rad * 1e4) + (bb_rad * spec_emis * transmission) + (spec_ref * gnd_reflect * 1e4)
 
     return ltoa_spectral
 
@@ -81,5 +79,6 @@ def bb_radiance(wvlen, temp):
     c1 = 2 * (c * c) * h   # units = [kg m4 s-3]
     c2 = (h * c) / k    # (h * c) / k, units = [m K]
 
+    rad = c1 / ((wvlen**5) * (numpy.e**((c2 / (temp * wvlen))) - 1))
 
     return rad

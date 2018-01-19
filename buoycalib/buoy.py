@@ -279,7 +279,7 @@ def download(id, date, directory=settings.NOAA_DIR):
     Args:
         url: url to download data from
     """
-    if date.year < 2017:
+    if date.year < 2018:
         url = settings.NOAA_URLS[0] % (id, date.year)
     else:
         url = settings.NOAA_URLS[1] % (date.strftime('%b'), id, date.strftime('%m'))

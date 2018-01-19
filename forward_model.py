@@ -1,6 +1,6 @@
 
 from buoycalib import (sat, buoy, atmo, radiance, modtran, settings)
-
+import numpy
 
 def run_all(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11]):
     
@@ -11,7 +11,7 @@ def run_all(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11
         rsrs = {b:settings.RSR_L8[b] for b in bands}
 
     elif scene_id[0:3] == 'MOD':   # Modis
-        overpass_date, directory, metadata, files = sat.modis.download(scene_id)
+        overpass_date, directory, metadata, [granule_filepath, geo_ref_filepath] = sat.modis.download(scene_id)
         rsrs = {b:settings.RSR_MODIS[b] for b in bands}
 
     else:
@@ -39,11 +39,18 @@ def run_all(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11
     print('Ltoa Spectral Calculations:')
     mod_ltoa_spectral = radiance.calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_temp)
 
-    if 'MTL' in bands: bands.remove('MTL')   # TODO fix stupid thing here
-
     for b in bands:
-        mod_ltoa = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, rsrs[b])
-        img_ltoa = sat.landsat.calc_ltoa(directory, metadata, buoy_lat, buoy_lon, b)
+        
+        if scene_id[0:3] == 'MOD':
+            RSR_wavelengths, RSR = sat.modis.load_rsr(rsrs[b])
+            img_ltoa = sat.modis.calc_ltoa(granule_filepath, geo_ref_filepath, buoy_lat, buoy_lon, [b])
+
+        else:
+            RSR_wavelengths, RSR = numpy.loadtxt(rsrs[b], unpack=True)
+            img_ltoa = sat.landsat.calc_ltoa(directory, metadata, buoy_lat, buoy_lon, b)
+
+
+        mod_ltoa = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, RSR_wavelengths, RSR)
 
         print('Radiance Calculation Band {0}: modeled: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))
 
@@ -65,4 +72,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     for LID in args.scene_id:
-        run_all(LID, args.buoy_id, args.atmo, args.verbose)
+        run_all(LID, args.buoy_id, args.atmo, args.verbose, bands=[31, 32])

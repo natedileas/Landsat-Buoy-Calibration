@@ -71,9 +71,12 @@ def ungzip(filepath):
     """ un-gzip a fiile (equivalent of `gzip -d filepath`) """
     new_filepath = filepath.replace('.gz', '')
     with open(new_filepath, 'wb') as f_out, gzip.open(filepath, 'rb') as f_in:
-        shutil.copyfileobj(f_in, f_out)
+        try:
+           shutil.copyfileobj(f_in, f_out)
+        except OSError:
+            pass
 
-    return new_filepath
+    return filepath
 
 
 def _remote_file_exists(url):

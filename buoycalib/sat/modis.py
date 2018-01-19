@@ -84,7 +84,7 @@ def modis_from_landsat(date, lat, lon):
     return possible
 
 
-def modis_calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=[31, 32]):
+def calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=[31, 32]):
     ds = gdal.Open(emmissivities_MOD21KM)
     
     emissive_bands = gdal.Open(ds.GetSubDatasets()[2][0])
@@ -119,12 +119,12 @@ def modis_calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, 
     radiance = {}
     for b in bands:
         b -= 20
-        radiance[b+20] = emissive_data[b, poi_r, poi_c] * radiance_scales[b] + radiance_offsets[b]
-        print(b+20, emissive_data[b, poi_r, poi_c])
+        radiance[b+20] = radiance_scales[b] * (emissive_data[b, poi_r, poi_c] - radiance_offsets[b])
+        print('band: ', b+20, emissive_data[b, poi_r, poi_c], radiance_scales[b], radiance_offsets[b])
 
     return radiance, radiance_units
 
 
 # function to load in an RSR from the MODIS format
 # formatted like this because it's a 1 line function
-load_rsr = lambda fname: numpy.genfromtxt(fname, skip_header=9, use_cols=(2, 3))
+load_rsr = lambda fname: numpy.genfromtxt(fname, skip_header=9, usecols=(2, 3), unpack=True)

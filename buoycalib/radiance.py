@@ -31,7 +31,7 @@ def calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_
     return ltoa_spectral
 
 
-def calc_ltoa(wavelengths, ltoa, rsr_file):
+def calc_ltoa(wavelengths, ltoa, RSR_wavelengths, RSR):
     """
     Calculate radiance from spectral radiance and response curve of a sensor.
 
@@ -43,7 +43,6 @@ def calc_ltoa(wavelengths, ltoa, rsr_file):
     Returns:
         radiance: L [W m-2 sr-1 um-1]
     """
-    RSR_wavelengths, RSR = numpy.loadtxt(rsr_file, unpack=True)
 
     w = (wavelengths > RSR_wavelengths.min()) & (wavelengths < RSR_wavelengths.max())
 

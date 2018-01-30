@@ -3,11 +3,15 @@ from ftplib import FTP
 
 import gdal
 import numpy
+import glob
+import skimage.data
+import utm
 
 from .. import settings
 from ..download import url_download
 from . import image_processing as img
 from .modis_tile import latlon_to_tile
+from . import mrt_swath 
 
 def download(granule_id, directory_=settings.MODIS_DIR):
     """ download a MODIS scene by granule ID. """
@@ -84,10 +88,16 @@ def modis_from_landsat(date, lat, lon):
     return possible
 
 
-def calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=[31, 32]):
+def calc_ltoa_direct(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=[31, 32]):
+
+    print(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi)
     ds = gdal.Open(emmissivities_MOD21KM)
     
-    emissive_bands = gdal.Open(ds.GetSubDatasets()[2][0])
+    emissive_bands = gdal.Open(ds.GetSubDatasets()[23][0])
+    
+    import pprint
+    print('\n'.join([d[1] for d in ds.GetSubDatasets()]))
+
 
     radiance_scales = emissive_bands.GetMetadata()['radiance_scales']
     radiance_scales = [float(f) for f in radiance_scales.split(', ')]
@@ -99,6 +109,7 @@ def calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=
 
     # read data in to numpy array form
     emissive_data = emissive_bands.ReadAsArray()
+    print(emissive_data.dtype)
 
     # geo reference file (matching MOD03 product)       
     geo_reference_ds = gdal.Open(geo_reference_MOD03)
@@ -109,6 +120,8 @@ def calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=
 
     lat = lat_ds.ReadAsArray()
     lon = lon_ds.ReadAsArray()
+
+    print('Shapes: ', lat.shape, lon.shape, emissive_data.shape)
 
     # find closest point
     distances = (lat - lat_oi)**2 + (lon - lon_oi)**2
@@ -128,3 +141,41 @@ def calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=
 # function to load in an RSR from the MODIS format
 # formatted like this because it's a 1 line function
 load_rsr = lambda fname: numpy.genfromtxt(fname, skip_header=9, usecols=(2, 3), unpack=True)
+
+
+def calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=[31, 32]):
+    
+    # make a parameter file to use with mrt_swath
+    directory = '/'.join(emmissivities_MOD21KM.split('/')[:-1])
+    prm_out = mrt_swath.make_param_file(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, directory + '/swath.prm')
+
+    # run swath2grid
+    directory = mrt_swath.run_swath2grid(prm_out)
+
+    # then read it out of the geotiff
+    # and offset and scale it
+    ds = gdal.Open(emmissivities_MOD21KM)
+    
+    emissive_bands = gdal.Open(ds.GetSubDatasets()[2][0])
+    
+    bands = emissive_bands.GetMetadata()['band_names'].split(',')
+    radiance_scales = emissive_bands.GetMetadata()['radiance_scales']
+    radiance_scales = {float(bands[i]):float(f) for i, f in enumerate(radiance_scales.split(', '))}
+    radiance_offsets = emissive_bands.GetMetadata()['radiance_offsets']
+    radiance_offsets = {float(bands[i]):float(f) for i, f in enumerate(radiance_offsets.split(', '))}
+    radiance_units = emissive_bands.GetMetadata()['radiance_units']
+
+    __, __, zone, __ = utm.from_latlon(lat_oi, lon_oi)
+
+    radiance = {}
+    for b in bands:
+        b = int(b)
+        filename = glob.glob(directory+'/blah*{0}*.tif'.format(b-20))[0]
+        poi_r, poi_c = img.find_roi(filename, lat_oi, lon_oi, zone)
+
+        image = skimage.data.load(filename)
+
+        radiance[b] = radiance_scales[b] * (image[poi_r, poi_c] - radiance_offsets[b])
+        print('band: ', b, image[poi_r, poi_c], radiance_scales[b], radiance_offsets[b], radiance[b])
+
+    return radiance, radiance_units

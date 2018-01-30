@@ -64,12 +64,13 @@ if __name__ == '__main__':
      it will take between 5-7 minutes for NARR, and 2-3 for MERRA. If nothing need to be downloaded,\
      it will usually take less than 30 seconds for a single scene.')
 
-    parser.add_argument('scene_id', help='LANDSAT scene ID. Examples: LC80330412013145LGN00, LE70160382012348EDC00, LT50410372011144PAC01', nargs='+')
+    parser.add_argument('scene_id', help='LANDSAT scene ID. Examples: LC80330412013145LGN00, LE70160382012348EDC00, LT50410372011144PAC01')
     parser.add_argument('buoy_id', help='NOAA Buoy ID. Example: 44009')
     parser.add_argument('-a', '--atmo', default='merra', choices=['merra', 'narr'], help='Choose atmospheric data source, choices:[narr, merra].')
     parser.add_argument('-v', '--verbose', default=False, action='store_true')
+    parser.add_argument('-b', '--bands', default=[10, 11], nargs='+')
 
     args = parser.parse_args()
+    args.bands = [int(b) for b in args.bands]
 
-    for LID in args.scene_id:
-        run_all(LID, args.buoy_id, args.atmo, args.verbose, bands=[31, 32])
+    run_all(args.scene_id, args.buoy_id, args.atmo, args.verbose, args.bands)

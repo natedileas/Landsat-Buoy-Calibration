@@ -43,3 +43,4 @@ RSR_MODIS = {i:join(STATIC, 'modis', 'rsr.{0}.inb.final'.format(i)) for i in ran
 # shapefile-like things
 WRS2 = join(STATIC, 'wrs2', 'wrs2_descending.shp')
 MODIS_TILE = join(STATIC, 'modis', 'sn_bound_10deg.txt')
+SWATH2GRID_PRM = join(STATIC, 'modis', 'swath2grid_template.prm')

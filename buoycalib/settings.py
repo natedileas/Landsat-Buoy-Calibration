@@ -24,7 +24,7 @@ BUOY_TXT = join(STATIC, 'noaa', 'buoy_height.txt')
 STATION_TXT = join(STATIC, 'noaa', 'station_table.txt')
 
 # urls
-MERRA_URL = 'https://goldsmr5.sci.gsfc.nasa.gov/data/s4pa/MERRA2/M2I3NPASM.5.12.4/%s/%s/MERRA2_400.inst3_3d_asm_Np.%s.nc4'
+MERRA_URL = 'https://goldsmr5.sci.gsfc.nasa.gov/data/s4pa/MERRA2/M2I3NPASM.5.12.4/%s/%s/MERRA2_300.inst3_3d_asm_Np.%s.nc4'
 NARR_URLS = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc',
              'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/hgt.%s.nc',
              'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/shum.%s.nc']

@@ -2,6 +2,7 @@ import math
 import os
 
 import numpy
+import datetime
 
 from . import settings
 from . import atmo
@@ -35,82 +36,6 @@ class Buoy(object):
     def __str__(self):
         return 'Buoy ID: {0} Lat: {1} Lon: {2}'.format(self.id, self.lat, self.lon)
 
-    def calc_info(self, date):
-        """
-        Args:
-            date: python datetime object
-        """
-
-        if not self.url:
-            if date.year < 2017:
-                self.url = settings.NOAA_URLS[0] % (self.id, date.year)
-            else:
-                self.url = settings.NOAA_URLS[1] % (date.strftime('%b'), self.id, date.strftime('%m'))
-
-        if not self.filename or not os.path.isfile(self.filename):
-            self.download()
-
-        data, headers = self.load(date)
-
-        self.skin_temp, self.bulk_temp = find_skin_temp(date.hour, data, headers, self.thermometer_depth)
-
-        try:
-            self.surf_press = data[date.hour, headers['BAR']]
-        except KeyError:
-            self.surf_press = data[date.hour, headers['PRES']]
-
-        self.surf_airtemp = data[date.hour, headers['ATMP']]
-        self.surf_dewpnt = data[date.hour, headers['DEWP']]
-        self.surf_rh = atmo.data.calc_rh(self.surf_airtemp, self.surf_dewpnt)
-
-    def download(self):
-        """
-        Download and unzip appripriate buoy data from url.
-
-        Args:
-            url: url to download data from
-        """
-        remote_file_exists(self.url)
-
-        self.filename = url_download(self.url, settings.NOAA_DIR)
-
-        if '.gz' in self.filename:
-            self.filename = ungzip(self.filename)
-
-    def load(self, date):
-        """
-        Open a downloaded buoy data file and extract data from it.
-
-        Args:
-            date: datetime object
-            filename: buoy file to open
-
-        Returns:
-            data: from file, trimmed to date
-
-        Raises:
-            Exception: if no data is found in file
-        """
-        date = date.strftime('%Y %m %d')
-        date_short_year = date[2:]
-        data = []
-
-        with open(self.filename, 'r') as f:
-            header = f.readline()
-
-            for line in f:
-                if date in line or date_short_year in line:
-                    data.append(line.strip('\n').split())
-
-        if data == []:
-            raise BuoyDataException('No matching date in file? {0} {1}.'.format(date, filename))
-
-        data = numpy.asarray(data, dtype=float)
-
-        headers = dict(zip(header.split(), range(len(data[:, 0]))))
-
-        return data, headers
-
 
 def find_skin_temp(hour, data, headers, depth):
     """
@@ -131,7 +56,7 @@ def find_skin_temp(hour, data, headers, depth):
         source: https://www.cis.rit.edu/~cnspci/references/theses/masters/miller2010.pdf
     """
     # compute 24hr wind speed and temperature
-    avg_wspd = data[:, headers['WSPD']].mean()   # [m s-1]
+    avg_wspd = data[:, headers['WSPD']].mean()   # [m/s]
     avg_wtmp = data[:, headers['WTMP']].mean()   # [C]
 
     bulk_temp = avg_wtmp + 273.15   # [C -> K]
@@ -229,8 +154,8 @@ def all_datasets():
         [[Buoy_ID, lat, lon, thermometer_depth, height], [ ... ]]
 
     """
-    buoys, heights = numpy.genfromtxt(settings.BUOY_TXT, skip_header=7,
-                                      usecols=(0, 1), unpack=True)
+    buoys, heights, anemometer_height = numpy.genfromtxt(settings.BUOY_TXT, skip_header=7,
+                                      usecols=(0, 1, 3), unpack=True)
     buoy_heights = dict(zip(buoys, heights))
 
     buoy_stations = {}
@@ -303,24 +228,40 @@ def skin_temp(file, date, thermometer_depth):
     return skin_temp, bulk_temp
 
 
-def info(id, file, date):
-    data, headers = load(file, date)
+def info(buoy_id, file, overpass_date):
+    buoy_file = download(buoy_id, overpass_date)
+    data, headers, dates, units = load(buoy_file)
+    b = all_datasets()[buoy_id]
+    buoy_depth = b.thermometer_depth
+
+    #data, headers = load(file)
+    dt_slice = [i for i, d in enumerate(dates) if abs(d - overpass_date) < datetime.timedelta(hours=24)]
+    closest_dt = min([(i, abs(overpass_date - d)) for i, d in enumerate(dates)], key=lambda i: i[1])
+
+    w_temp = data[dt_slice, headers.index('WTMP')]
+    wind_spd = data[dt_slice, headers.index('WSPD')]
 
     try:
-        surf_press = data[date.hour, headers['BAR']]
-    except KeyError:
-        surf_press = data[date.hour, headers['PRES']]
+        surf_airtemp = data[closest_dt[0], headers.index('ATMP')]
+    except IndexError:
+        raise BuoyDataException('out of range, no data available')
 
-    surf_airtemp = data[date.hour, headers['ATMP']]
-    surf_dewpnt = data[date.hour, headers['DEWP']]
+    try:
+        surf_press = data[closest_dt[0], headers.index('BAR')]
+    except ValueError:
+        surf_press = data[closest_dt[0], headers.index('PRES')]
+
+    surf_dewpnt = data[closest_dt[0], headers.index('DEWP')]
     surf_rh = atmo.data.calc_rh(surf_airtemp, surf_dewpnt)
 
-    b = all_datasets()[id]
+    bulk_temp = data[closest_dt[0], headers.index('WTMP')]
 
-    return b.lat, b.lon, b.thermometer_depth, [surf_press, surf_airtemp, surf_dewpnt, surf_rh]
+    skin_temp = calc_skin_temp(data, dates, headers, overpass_date, buoy_depth)
+
+    return b.lat, b.lon, b.thermometer_depth, bulk_temp, skin_temp, [surf_press, surf_airtemp, surf_dewpnt, surf_rh]
 
 
-def load(filename, date):
+def load(filename):
     """
     Open a downloaded buoy data file and extract data from it.
 
@@ -334,22 +275,93 @@ def load(filename, date):
     Raises:
         Exception: if no data is found in file
     """
-    date = date.strftime('%Y %m %d')
-    date_short_year = date[2:]
-    data = []
+    def _filter(iter):
+        # NOAA NDBC uses 99.0 and 999.0 as a placeholder for no data
+        new = []
+        for item in iter:
+            i = float(item)
+            if i == 99 or i == 999:
+                new.append(numpy.nan)
+            else:
+                new.append(i)
+        return new
 
+    dates = []
+    lines = []
     with open(filename, 'r') as f:
         header = f.readline()
+        unit = f.readline()
 
         for line in f:
-            if date in line or date_short_year in line:
-                data.append(line.strip('\n').split())
+            date_str = ' '.join(line.split()[:5])
 
-    if data == []:
-        raise BuoyDataException('No matching date in file? {0} {1}.'.format(date, filename))
+            if len(line.split()[0]) == 4:
+                date_dt = datetime.datetime.strptime(date_str, '%Y %m %d %H %M')
+            elif len(line.split()[0]) == 2:
+                date_dt = datetime.datetime.strptime(date_str, '%y %m %d %H %M')
 
-    data = numpy.asarray(data, dtype=float)
+            data = _filter(line.split()[5:])
+            lines.append(data)
+            dates.append(date_dt)
 
-    headers = dict(zip(header.split(), range(len(data[:, 0]))))
+    headers = header.split()[5:]
+    units = unit.split()[5:]
+    lines = numpy.asarray(lines)
 
-    return data, headers
+    return lines, headers, dates, units
+
+
+def calc_skin_temp(data, dates, headers, overpass_date, buoy_depth):
+    dt = [(i, d) for i, d in enumerate(dates) if abs(d - overpass_date) < datetime.timedelta(hours=12)]
+    dt_slice, dt_times = zip(*dt)
+    w_temp = data[dt_slice, headers.index('WTMP')]
+    wind_spd = data[dt_slice, headers.index('WSPD')]
+    closest_dt = min([(i, abs(overpass_date - d)) for i, d in enumerate(dates)], key=lambda i: i[1])
+    T_zt = data[closest_dt[0], headers.index('WSPD')]
+
+
+    # 24 hour average wind Speed at 10 meters (measured at 5 meters) 
+    u_m = wind_speed_height_correction(numpy.nanmean(wind_spd), 5, 10)
+    
+    avg_wtmp = numpy.nanmean(w_temp)
+
+    a = 0.05 - (0.6 / u_m) + (0.03 * numpy.log(u_m))   # thermal gradient
+    z = buoy_depth   # depth in meters
+
+    avg_skin_temp = avg_wtmp - (a * z) - 0.17
+
+    # part 2
+    b = 0.35 + (0.018 * numpy.exp(0.4 * u_m))
+    c = 1.32 - (0.64 * numpy.log(u_m))
+
+
+    f_cz = (w_temp - avg_skin_temp) / numpy.exp(b*z)
+    cz = datetime.timedelta(hours=c*z)
+    t_cz = [dt_to_dec_hour(dt + cz) for dt in dt_times]
+    t = [dt_to_dec_hour(dt) for dt in dt_times]
+    
+    f = numpy.interp(t_cz, t, f_cz)
+
+    # combine
+    skin_temp = avg_skin_temp +  + 273.15   # [K]
+
+    # check for validity
+    if not (1.5 < u_m < 7.6):
+        if (1.1 < a*z < 0) and (1 < numpy.exp(b*z) < 6) and (0 < c*z < 4):
+            pass
+        else:
+            raise BuoyDataException('Wind Speed out of range')
+
+    #if (-1.1 < a*z < 0) and (1 < numpy.exp(b*z) < 6) and (0 < c*z < 4):
+    #    pass
+    #else:
+    #    print(a*z, numpy.exp(b*z), c*z)
+
+    return skin_temp
+
+def wind_speed_height_correction(wspd, h1, h2, n=0.1):
+    # equation 2.9 in padula, simpolified wind speed correction
+    return wspd * (h2 / h1) ** n
+
+def dt_to_dec_hour(dt):
+    return dt.hour + dt.minute / 60

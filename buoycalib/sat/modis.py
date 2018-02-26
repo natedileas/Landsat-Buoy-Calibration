@@ -80,12 +80,13 @@ def modis_from_landsat(date, lat, lon):
 
     list_of_files = ftp.nlst()
     # search through possibles for match
+    matches = []
     for possible in list_of_files:
         if partial in possible:  # must be exact sub_string match
-            break
+            matches.append(possible)
     ftp.quit()
 
-    return possible
+    return matches
 
 
 def calc_ltoa_direct(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=[31, 32]):
@@ -105,11 +106,17 @@ def calc_ltoa_direct(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi,
     radiance_offsets = {int(band_names[i]):float(f) for i, f in enumerate(radiance_offsets.split(', '))}
     radiance_units = emissive_bands.GetMetadata()['radiance_units']
 
+    # map from band number to index in the emissive_bands numpy array
+    band2idx_map = {int(b):i for i, b in enumerate(band_names)}
+
     #print(radiance_scales, radiance_offsets)
+    #print(radiance_scales)
+    #print(radiance_offsets)
+    #print(band2idx_map)
 
     # read data in to numpy array form
     emissive_data = emissive_bands.ReadAsArray()
-    #print(emissive_data.dtype)
+    ##print(emissive_data.dtype)
 
     # geo reference file (matching MOD03 product)       
     geo_reference_ds = gdal.Open(geo_reference_MOD03)
@@ -121,17 +128,17 @@ def calc_ltoa_direct(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi,
     lat = lat_ds.ReadAsArray()
     lon = lon_ds.ReadAsArray()
 
-    #print('Shapes: ', lat.shape, lon.shape, emissive_data.shape)
+    ##print('Shapes: ', lat.shape, lon.shape, emissive_data.shape)
 
     # find closest point
     distances = (lat - lat_oi)**2 + (lon - lon_oi)**2
     poi_r, poi_c = numpy.unravel_index(numpy.argmin(distances), lat.shape)
 
-    #print('poi: ', poi_r, poi_c)
+    ##print('poi: ', poi_r, poi_c)
 
     radiance = {}
     for b in bands:
-        radiance[b] = radiance_scales[b] * (emissive_data[b-21, poi_r, poi_c] - radiance_offsets[b])
+        radiance[b] = radiance_scales[b] * (emissive_data[band2idx_map[b], poi_r, poi_c] - radiance_offsets[b])
         #print('band: ', b, emissive_data[b-21, poi_r, poi_c], radiance_scales[b], radiance_offsets[b], radiance[b])
 
     return radiance, radiance_units

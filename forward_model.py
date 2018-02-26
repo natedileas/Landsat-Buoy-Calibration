@@ -8,8 +8,7 @@ def modis(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[31, 32])
     rsrs = {b:settings.RSR_MODIS[b] for b in bands}
 
     buoy_file = buoy.download(buoy_id, overpass_date)
-    buoy_lat, buoy_lon, buoy_depth, lower_atmo = buoy.info(buoy_id, buoy_file, overpass_date)
-    skin_temp, bulk_temp = buoy.skin_temp(buoy_file, overpass_date, buoy_depth)
+    buoy_lat, buoy_lon, buoy_depth, bulk_temp, skin_temp, lower_atmo = buoy.info(buoy_id, buoy_file, overpass_date)
     #print('Buoy {0}: skin_temp: {1} lat: {2} lon:{3}'.format(buoy_id, skin_temp, buoy_lat, buoy_lon))
     
     # Atmosphere

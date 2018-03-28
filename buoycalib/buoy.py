@@ -313,6 +313,8 @@ def load(filename):
 
 def calc_skin_temp(data, dates, headers, overpass_date, buoy_depth):
     dt = [(i, d) for i, d in enumerate(dates) if abs(d - overpass_date) < datetime.timedelta(hours=12)]
+    if len(dt) == 0:
+        raise BuoyDataException('No Buoy Data')
     dt_slice, dt_times = zip(*dt)
     w_temp = data[dt_slice, headers.index('WTMP')]
     wind_spd = data[dt_slice, headers.index('WSPD')]

@@ -5,10 +5,11 @@ import ogr
 import utm
 
 from .. import settings
-from ..download import url_download
+from ..download import url_download, RemoteFileException, ungzip
 from . import image_processing as img
 
-def download(scene_id, bands=[10, 11, 'MTL'], directory_=settings.LANDSAT_DIR):
+
+def download(scene_id, bands, directory_=settings.LANDSAT_DIR):
     directory = directory_ + '/' + scene_id
 
     if 'MTL' not in bands:
@@ -16,13 +17,33 @@ def download(scene_id, bands=[10, 11, 'MTL'], directory_=settings.LANDSAT_DIR):
 
     for band in bands:
         # get url for the band
-        url = amazon_s3_url(scene_id, band)
-        url_download(url, directory)
+        try:   # amazon s3 only has stuff from 2017 on
+            url = amazon_s3_url(scene_id, band)
+            fp = url_download(url, directory)
+
+        except RemoteFileException:   # try to use EarthExplorer
+            scene_id = product2entityid(scene_id)
+            url = earthexplorer_url(scene_id)
+            fp = url_download(url, directory, _filename=scene_id+'.gz', auth=settings.EARTH_EXPLORER_LOGIN)
+            fp = ungzip(fp)
 
     meta_file = '{0}/{1}_MTL.txt'.format(directory, scene_id)
     metadata = read_metadata(meta_file)
 
     return metadata['date'], directory, metadata
+
+
+def product2entityid(product_id):
+    if len(product_id) == 21:
+        return product_id
+
+    sat = 'c{0}/L{1}'.format(product_id[-4], product_id[3])
+    path = product_id[10:13]
+    row = product_id[13:16]
+
+    date = datetime.datetime.strptime(product_id[17:25], '%Y%m%d')
+
+    return 'LC8{path}{row}{date}LGN{vers}'.format(path=path, row=row, date=date.strftime('%Y%j'), vers='01')
 
 
 def amazon_s3_url(scene_id, band):
@@ -36,6 +57,11 @@ def amazon_s3_url(scene_id, band):
     return '/'.join([settings.LANDSAT_S3_URL, info['sat'], info['path'], info['row'], info['id'], filename])
 
 
+def earthexplorer_url(scene_id):
+
+    return settings.LANDSAT_EE_URL.format(scene_id)
+
+
 def parse_L8(scene_id):
     parsed = {}
 
@@ -45,7 +71,7 @@ def parse_L8(scene_id):
         parsed['row'] = scene_id[6:9]
         parsed['id'] = scene_id
     elif len(scene_id) == 40:
-        parsed['s'] = 'c{0}/L{1}'.format(scene_id[-4], scene_id[3])
+        parsed['sat'] = 'c{0}/L{1}'.format(scene_id[-4], scene_id[3])
         parsed['path'] = scene_id[10:13]
         parsed['row'] = scene_id[13:16]
         parsed['id'] = scene_id
@@ -112,20 +138,24 @@ def calc_ltoa(directory, metadata, lat, lon, band):
     l_x, l_y, l_zone, l_zone_let = utm.from_latlon(lat, lon)
 
     if metadata['UTM_ZONE'] != l_zone:
-        l_x, l_y = convert_utm_zones(l_x, l_y, l_zone, metadata['UTM_ZONE'])
+        l_x, l_y = img.convert_utm_zones(l_x, l_y, l_zone, metadata['UTM_ZONE'])
 
     # calculate pixel locations: http://www.gdal.org/gdal_datamodel.html
     x = int((l_x - geotransform[0]) / geotransform[1])   # latitude
     y = int((l_y - geotransform[3]) / geotransform[5])   # longitude
 
+    # TODO check if x, y are within bounds
+
     # calculate digital count average of 3x3 area around poi
     # TODO add ROI width parameter
     image_data = dataset.ReadAsArray()
+    #print(image_data, image_data.shape, image_data.mean(), y, x)
     dc_avg = image_data[y-1:y+2, x-1:x+2].mean()
 
     add = metadata['RADIANCE_ADD_BAND_' + str(band)]
     mult = metadata['RADIANCE_MULT_BAND_' + str(band)]
 
     radiance = dc_avg * mult + add
+    #print(dc_avg, mult, add)
 
     return radiance

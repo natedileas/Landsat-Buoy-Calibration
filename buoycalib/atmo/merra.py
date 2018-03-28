@@ -21,7 +21,7 @@ def download(date):
     url = settings.MERRA_URL % (date.strftime('%Y'), date.strftime('%m'),
                                 date.strftime('%Y%m%d'))
 
-    filename = url_download(url, settings.MERRA_DIR, auth=('nid4986', 'Anamorph1c'))
+    filename = url_download(url, settings.MERRA_DIR, auth=settings.MERRA_LOGIN)
     return filename
 
 

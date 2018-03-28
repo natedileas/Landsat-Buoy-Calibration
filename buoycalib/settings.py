@@ -24,14 +24,16 @@ BUOY_TXT = join(STATIC, 'noaa', 'buoy_height.txt')
 STATION_TXT = join(STATIC, 'noaa', 'station_table.txt')
 
 # urls
-MERRA_URL = 'https://goldsmr5.sci.gsfc.nasa.gov/data/s4pa/MERRA2/M2I3NPASM.5.12.4/%s/%s/MERRA2_300.inst3_3d_asm_Np.%s.nc4'
+MERRA_URL = 'https://goldsmr5.sci.gsfc.nasa.gov/data/s4pa/MERRA2/M2I3NPASM.5.12.4/%s/%s/MERRA2_400.inst3_3d_asm_Np.%s.nc4'
 NARR_URLS = ['ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/air.%s.nc',
              'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/hgt.%s.nc',
              'ftp://ftp.cdc.noaa.gov/Datasets/NARR/pressure/shum.%s.nc']
 NOAA_URLS = ['http://www.ndbc.noaa.gov/data/historical/stdmet/%sh%s.txt.gz',
              'http://www.ndbc.noaa.gov/data/stdmet/%s%s%s2017.txt.gz']
 LANDSAT_S3_URL = 'https://landsat-pds.s3.amazonaws.com'
+LANDSAT_EE_URL = 'https://earthexplorer.usgs.gov/download/12864/{0}/STANDARD/EE'
 MODIS_URL = 'ftp://ladsweb.nascom.nasa.gov/allData/6/'
+
 
 # relative spectral responses
 RSR_L8 = {
@@ -44,3 +46,8 @@ RSR_MODIS = {i:join(STATIC, 'modis', 'rsr.{0}.inb.final'.format(i)) for i in ran
 WRS2 = join(STATIC, 'wrs2', 'wrs2_descending.shp')
 MODIS_TILE = join(STATIC, 'modis', 'sn_bound_10deg.txt')
 SWATH2GRID_PRM = join(STATIC, 'modis', 'swath2grid_template.prm')
+
+# authorizations / logins
+# username, password
+EARTH_EXPLORER_LOGIN = ('nid4986', 'Carlson89')
+MERRA_LOGIN = ('nid4986', 'Anamorph1c')

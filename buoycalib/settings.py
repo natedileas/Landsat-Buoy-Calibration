@@ -3,7 +3,7 @@ from os.path import join, abspath
 # directories and files
 PACKAGE_BASE = abspath(join(__file__, '..'))
 STATIC = join(PACKAGE_BASE, 'data')
-DATA_BASE = '/dirs/home/ugrad/nid4986/landsat_data/'
+DATA_BASE = 'downloaded_data'
 
 MERRA_DIR = join(DATA_BASE, 'merra')
 NARR_DIR = join(DATA_BASE, 'narr')
@@ -50,4 +50,4 @@ SWATH2GRID_PRM = join(STATIC, 'modis', 'swath2grid_template.prm')
 # authorizations / logins
 # username, password
 EARTH_EXPLORER_LOGIN = ('nid4986', 'Carlson89')
-MERRA_LOGIN = ('nid4986', 'Anamorph1c')
+MERRA_LOGIN = ('nid4986', 'Carlson89')

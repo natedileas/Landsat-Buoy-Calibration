@@ -8,9 +8,10 @@ DATA_BASE = 'downloaded_data'
 MERRA_DIR = join(DATA_BASE, 'merra')
 NARR_DIR = join(DATA_BASE, 'narr')
 NOAA_DIR = join(DATA_BASE, 'noaa')
-LANDSAT_DIR = join(DATA_BASE, 'landsat_scenes')
+LANDSAT_DIR = join(DATA_BASE, 'landsat')
 MODIS_DIR = join(DATA_BASE, 'modis')
 
+MODTRAN_DIR = join(DATA_BASE, 'modtran')
 MODTRAN_DATA = '/dirs/pkg/Mod4v3r1/DATA'
 MODTRAN_EXE = '/dirs/pkg/Mod4v3r1/Mod4v3r1.exe'
 

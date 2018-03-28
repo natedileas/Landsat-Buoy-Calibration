@@ -1,0 +1,50 @@
+# Nathan Dileas (nid4986@rit.edu) 2018
+# First, be on armstrong or another RIT CIS server
+
+
+# INSTALLING
+# make a directory
+mkdir buoy_calib
+cd buoy_calib
+
+# get the code
+git clone https://github.com/natedileas/Landsat-Buoy-Calibration.git
+
+# set up python virtual environment (could take a minute or two)
+virtualenv buoy_env
+source buoy_env/bin/activate
+
+# install the requirements into the virtual environment (may take a little while, ~5 minutes)
+pip install gdal==2.1.3 --global-option=build_ext --global-option="-I/usr/include/gdal/"
+pip install -r Landsat-Buoy-Calibration/requirements.txt
+
+
+# USING
+# now try it
+cd Landsat-Buoy-Calibration
+
+# calculate the modeled and image top of atmosphere radiance 
+# for help:
+python forward_model.py -h
+
+# landsat test scene
+python forward_model.py LC08_L1TP_017030_20170703_20170715_01_T1 45012
+
+# modis test scene
+python forward_model.py MOD021KM.A2011154.1650.006.2014224075807.hdf 45012
+
+
+# NOTES
+# all the downloaded data will be in a directory 
+# buoy_calib/Landsat-Buoy-Calibration/downloaded_data/
+
+# the settings and paths can be changed in 
+# buoy_calib/Landsat-Buoy-Calibration/buoycalib/settings.py
+
+# to find your own scenes / buoys
+# these websites will help you search
+# for buoys: http://www.ndbc.noaa.gov/
+# for landsat scenes: https://earthexplorer.usgs.gov/
+# look for Landsat -  Collection 1 Level 1 - Landsat 8 OLI/TIRS C1 Level 1
+# for modis scenes: https://ladsweb.modaps.eosdis.nasa.gov/search/
+# look for Terra-MODIS, then MOD021KM

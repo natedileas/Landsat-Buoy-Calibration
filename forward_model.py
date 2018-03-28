@@ -21,7 +21,8 @@ def modis(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[31, 32])
 
     # MODTRAN
     #print('Running MODTRAN:')
-    wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, directory)
+    modtran_directory = '{0}/{1}_{2}'.format(settings.MODTRAN_DIR, scene_id, buoy_id)
+    wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, modtran_directory)
 
     # LTOA calcs
     #print('Ltoa Spectral Calculations:')
@@ -63,7 +64,8 @@ def landsat8(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 1
 
     # MODTRAN
     #print('Running MODTRAN:')
-    wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, directory)
+    modtran_directory = '{0}/{1}_{2}'.format(settings.MODTRAN_DIR, scene_id, buoy_id)
+    wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, modtran_directory)
 
     # LTOA calcs
     #print('Ltoa Spectral Calculations:')
@@ -87,13 +89,10 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Compute and compare the radiance values of \
-     a landsat image to the propogated radiance of a NOAA buoy, using atmospheric data and MODTRAN. \
-    \nIf atmospheric data or landsat images need to be downloaded,\
-     it will take between 5-7 minutes for NARR, and 2-3 for MERRA. If nothing need to be downloaded,\
-     it will usually take less than 30 seconds for a single scene.')
+     a landsat image to the propogated radiance of a NOAA buoy, using atmospheric data and MODTRAN. ')
 
-    parser.add_argument('scene_id', help='LANDSAT scene ID. Examples: LC80330412013145LGN00, LE70160382012348EDC00, LT50410372011144PAC01')
-    parser.add_argument('buoy_id', help='NOAA Buoy ID. Example: 44009')
+    parser.add_argument('scene_id', help='LANDSAT or MODIS scene ID. Examples: LC08_L1TP_017030_20170703_20170715_01_T1, MOD021KM.A2011154.1650.006.2014224075807.hdf')
+    parser.add_argument('buoy_id', help='NOAA Buoy ID. Example: 45012')
     parser.add_argument('-a', '--atmo', default='merra', choices=['merra', 'narr'], help='Choose atmospheric data source, choices:[narr, merra].')
     parser.add_argument('-v', '--verbose', default=False, action='store_true')
     parser.add_argument('-b', '--bands', nargs='+')

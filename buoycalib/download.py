@@ -1,12 +1,11 @@
-import os
-from urllib.request import urlopen
-import urllib.error
-import urllib.request
-import urllib.parse
-import re
-import tarfile
 import gzip
+import os
+import re
 import shutil
+import tarfile
+import urllib.error
+import urllib.parse
+import urllib.request
 import warnings
 
 import requests
@@ -39,7 +38,7 @@ def url_download(url, out_dir, _filename=None, auth=None):
 
 
 def download_http(url, filepath, auth=None):
-
+    """ download a http or https resource using requests. """
     with requests.Session() as session:
         req = session.request('get', url)
 
@@ -61,8 +60,9 @@ def download_http(url, filepath, auth=None):
 
 
 def download_ftp(url, filepath):
+    """ download an FTP resource. """
     try:
-        request = urlopen(url)
+        request = urllib.request.urlopen(url)
     except urllib.error.URLError as e:
         print(url)
         raise RemoteFileException('url: {0} does not exist'.format(url))
@@ -78,7 +78,7 @@ def download_ftp(url, filepath):
 
 
 def ungzip(filepath):
-    """ un-gzip a fiile (equivalent of `gzip -d filepath`) """
+    """ un-gzip a fiile (equivalent `gzip -d filepath`) """
     new_filepath = filepath.replace('.gz', '')
 
     with open(new_filepath, 'wb') as f_out, gzip.open(filepath, 'rb') as f_in:
@@ -87,10 +87,11 @@ def ungzip(filepath):
         except OSError as e:
             warnings.warn(str(e) + filepath, RuntimeWarning)
 
-    return filepath
+    return new_filepath
 
 
 def untar(filepath, directory):
+    """ extract all files from a tar archive (equivalent `tar -xvf filepath directory`)"""
     with tarfile.open(filepath, 'r') as tf:
         tf.extractall(directory)
 
@@ -98,7 +99,7 @@ def untar(filepath, directory):
 
 
 def _remote_file_exists(url, auth=None):
-
+    """ Check if remote resource exists. does not work for FTP. """
     if auth:
         resp = requests.get(url, auth=auth)
         status = resp.status_code
@@ -112,8 +113,8 @@ def _remote_file_exists(url, auth=None):
 
 
 def connect_earthexplorer_no_proxy(username, password):
+    """ connect to earthexplorer without a proxy server. """
     # inspired by: https://github.com/olivierhagolle/LANDSAT-Download
-    # mkmitchel (https://github.com/mkmitchell) solved the token issue
     cookies = urllib.request.HTTPCookieProcessor()
     opener = urllib.request.build_opener(cookies)
     urllib.request.install_opener(opener)
@@ -124,8 +125,7 @@ def connect_earthexplorer_no_proxy(username, password):
     if m:
         token = m.group(1)
     else:
-        print("Error : CSRF_Token not found")
-        sys.exit(-3)
+        raise RemoteFileException("EarthExplorer authentication CSRF_Token not found")
         
     params = urllib.parse.urlencode(dict(username=username, password=password, csrf_token=token)).encode('utf-8')
     request = urllib.request.Request("https://ers.cr.usgs.gov/login", params, headers={})
@@ -134,15 +134,15 @@ def connect_earthexplorer_no_proxy(username, password):
     data = f.read()
     f.close()
     if data.decode('utf-8').find('You must sign in as a registered user to download data or place orders for USGS EROS products')>0:
-        # auth failed, TODO raise warning
+        warnings.warn('EarthExplorer Authentication Failed. Check username, password, and if the site is up (https://earthexplorer.usgs.gov/).')
         return False
 
     return True
 
 
-def download_earthexplorer(url, out_file):
+def download_earthexplorer(url, filepath):
     """ 
-    Slightly lower level implemenation that handles earthexplorer's redirection.
+    Slightly lower level downloading implemenation that handles earthexplorer's redirection.
     inspired by: https://github.com/olivierhagolle/LANDSAT-Download
     """ 
     try:
@@ -160,7 +160,7 @@ def download_earthexplorer(url, out_file):
         #download
         CHUNK = 1024 * 1024 *8
 
-        with open(out_file, 'wb') as fp:
+        with open(filepath, 'wb') as fp:
             while True:
                 chunk = req.read(CHUNK)
                 if not chunk: break
@@ -175,4 +175,4 @@ def download_earthexplorer(url, out_file):
     except urllib.error.URLError as e:
         raise RemoteFileException("URL Error: {1} url: {0}".format(url, e.reason))
 
-    return out_file
+    return filepath

@@ -5,11 +5,17 @@ import ogr
 import utm
 
 from .. import settings
-from ..download import url_download, RemoteFileException, ungzip, untar, connect_earthexplorer_no_proxy, download_earthexplorer
+from ..download import *
 from . import image_processing as img
 
 
 def download(scene_id, bands, directory_=settings.LANDSAT_DIR):
+    """ Download a landsat image and load its metadata.
+
+    Amazon S3 is faster but only has images from 2017 - present
+    Website: https://aws.amazon.com/public-datasets/landsat/
+    EarthExplorer is slower: https://earthexplorer.usgs.gov/
+    """
     directory = directory_ + '/' + scene_id
 
     if 'MTL' not in bands:
@@ -24,10 +30,13 @@ def download(scene_id, bands, directory_=settings.LANDSAT_DIR):
     except RemoteFileException:   # try to use EarthExplorer
         entity_id = product2entityid(scene_id)
         url = earthexplorer_url(entity_id)
-        connect_earthexplorer_no_proxy(*settings.EARTH_EXPLORER_LOGIN)
-        targzfile = download_earthexplorer(url, directory+'/'+entity_id+'.tar.gz')
-        tarfile = ungzip(targzfile)
-        directory = untar(tarfile, directory)
+        if connect_earthexplorer_no_proxy(*settings.EARTH_EXPLORER_LOGIN):
+            targzfile = download_earthexplorer(url, directory+'/'+entity_id+'.tar.gz')
+            tarfile = ungzip(targzfile)
+            directory = untar(tarfile, directory)
+        else:
+            raise RuntimeError('EarthExplorer Authentication Failed. Check username, \
+                password, and if the site is up (https://earthexplorer.usgs.gov/).')
 
     meta_file = '{0}/{1}_MTL.txt'.format(directory, scene_id)
     metadata = read_metadata(meta_file)
@@ -36,6 +45,12 @@ def download(scene_id, bands, directory_=settings.LANDSAT_DIR):
 
 
 def product2entityid(product_id):
+    """ convert product landsat ID to entity ID
+
+    Ex:
+    LC08_L1TP_017030_20131129_20170307_01_T1 ->
+    LC80170302013333LGN01
+    """
     if len(product_id) == 21:
         return product_id
 
@@ -49,6 +64,7 @@ def product2entityid(product_id):
 
 
 def amazon_s3_url(scene_id, band):
+    """ Format a url to download an image from Amazon S3 Landsat. """
     info = parse_L8(scene_id)
 
     if band != 'MTL':
@@ -60,19 +76,19 @@ def amazon_s3_url(scene_id, band):
 
 
 def earthexplorer_url(scene_id):
-
+    """Format a url to download an image from EarthExplorer. """
     return settings.LANDSAT_EE_URL.format(scene_id)
 
 
 def parse_L8(scene_id):
     parsed = {}
 
-    if len(scene_id) == 21:
+    if len(scene_id) == 21:   # entity ID
         parsed['sat'] = 'L' + scene_id[2:3]
         parsed['path'] = scene_id[3:6]
         parsed['row'] = scene_id[6:9]
         parsed['id'] = scene_id
-    elif len(scene_id) == 40:
+    elif len(scene_id) == 40:   # product ID
         parsed['sat'] = 'c{0}/L{1}'.format(scene_id[-4], scene_id[3])
         parsed['path'] = scene_id[10:13]
         parsed['row'] = scene_id[13:16]

@@ -90,15 +90,11 @@ def modis_from_landsat(date, lat, lon):
 
 
 def calc_ltoa_direct(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=[31, 32]):
-
-    #print(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi)
+    """ Calculate the toa radiance from the MOD21KM product directly. """
     ds = gdal.Open(emmissivities_MOD21KM)
     
     emissive_bands = gdal.Open(ds.GetSubDatasets()[2][0])
     
-    #import pprint
-    #print('\n'.join([d[1] for d in ds.GetSubDatasets()]))
-
     band_names = emissive_bands.GetMetadata()['band_names'].split(',')
     radiance_scales = emissive_bands.GetMetadata()['radiance_scales']
     radiance_scales = {int(band_names[i]):float(f) for i, f in enumerate(radiance_scales.split(', '))}
@@ -109,47 +105,37 @@ def calc_ltoa_direct(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi,
     # map from band number to index in the emissive_bands numpy array
     band2idx_map = {int(b):i for i, b in enumerate(band_names)}
 
-    #print(radiance_scales, radiance_offsets)
-    #print(radiance_scales)
-    #print(radiance_offsets)
-    #print(band2idx_map)
-
     # read data in to numpy array form
     emissive_data = emissive_bands.ReadAsArray()
-    ##print(emissive_data.dtype)
 
     # geo reference file (matching MOD03 product)       
     geo_reference_ds = gdal.Open(geo_reference_MOD03)
     geo_reference_sds = geo_reference_ds.GetSubDatasets()
 
+    # these are the latitude and longitude sub data sets
     lat_ds = gdal.Open(geo_reference_sds[12][0])
     lon_ds = gdal.Open(geo_reference_sds[13][0])
-
     lat = lat_ds.ReadAsArray()
     lon = lon_ds.ReadAsArray()
-
-    ##print('Shapes: ', lat.shape, lon.shape, emissive_data.shape)
 
     # find closest point
     distances = (lat - lat_oi)**2 + (lon - lon_oi)**2
     poi_r, poi_c = numpy.unravel_index(numpy.argmin(distances), lat.shape)
 
-    ##print('poi: ', poi_r, poi_c)
-
     radiance = {}
     for b in bands:
         radiance[b] = radiance_scales[b] * (emissive_data[band2idx_map[b], poi_r, poi_c] - radiance_offsets[b])
-        #print('band: ', b, emissive_data[b-21, poi_r, poi_c], radiance_scales[b], radiance_offsets[b], radiance[b])
 
     return radiance, radiance_units
 
 
-# function to load in an RSR from the MODIS format
-# formatted like this because it's a 1 line function
-load_rsr = lambda fname: numpy.genfromtxt(fname, skip_header=9, usecols=(2, 3), unpack=True)
+def load_rsr(fname): 
+    """ function to load in an RSR from the MODIS format """
+    return numpy.genfromtxt(fname, skip_header=9, usecols=(2, 3), unpack=True)
 
 
 def calc_ltoa(emmissivities_MOD21KM, geo_reference_MOD03, lat_oi, lon_oi, bands=[31, 32]):
+    """ convert modis image to a GeoTiff then calc the Ltoa from that image. """
     
     # make a parameter file to use with mrt_swath
     directory = '/'.join(emmissivities_MOD21KM.split('/')[:-1])

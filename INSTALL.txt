@@ -1,38 +1,23 @@
 # Nathan Dileas (nid4986@rit.edu) 2018
 # First, be on armstrong or another RIT CIS server
 
-
 # INSTALLING
-# make a directory
-mkdir buoy_calib
-cd buoy_calib
-
 # get the code
 git clone https://github.com/natedileas/Landsat-Buoy-Calibration.git
-
-# set up python virtual environment (could take a minute or two)
-virtualenv buoy_env
-source buoy_env/bin/activate
-
-# install the requirements into the virtual environment (may take a little while, ~5 minutes)
-pip install gdal==2.1.3 --global-option=build_ext --global-option="-I/usr/include/gdal/"
-pip install -r Landsat-Buoy-Calibration/requirements.txt
-
 
 # USING
 # now try it
 cd Landsat-Buoy-Calibration
 
 # calculate the modeled and image top of atmosphere radiance 
-# for help:
-python forward_model.py -h
-
 # landsat test scene
-python forward_model.py LC08_L1TP_017030_20170703_20170715_01_T1 45012
+python3 forward_model.py LC08_L1TP_017030_20170703_20170715_01_T1 45012
 
 # modis test scene
-python forward_model.py MOD021KM.A2011154.1650.006.2014224075807.hdf 45012
+python3 forward_model.py MOD021KM.A2011154.1650.006.2014224075807.hdf 45012
 
+# for help:
+python3 forward_model.py -h
 
 # NOTES
 # all the downloaded data will be in a directory 

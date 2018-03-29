@@ -1,6 +1,10 @@
 import os
 from urllib.request import urlopen
 import urllib.error
+import urllib.request
+import urllib.parse
+import re
+import tarfile
 import gzip
 import shutil
 import warnings
@@ -86,8 +90,11 @@ def ungzip(filepath):
     return filepath
 
 
-def untar(filepath):
-    pass
+def untar(filepath, directory):
+    with tarfile.open(filepath, 'r') as tf:
+        tf.extractall(directory)
+
+    return directory
 
 
 def _remote_file_exists(url, auth=None):
@@ -102,3 +109,70 @@ def _remote_file_exists(url, auth=None):
         return False
 
     return True
+
+
+def connect_earthexplorer_no_proxy(username, password):
+    # inspired by: https://github.com/olivierhagolle/LANDSAT-Download
+    # mkmitchel (https://github.com/mkmitchell) solved the token issue
+    cookies = urllib.request.HTTPCookieProcessor()
+    opener = urllib.request.build_opener(cookies)
+    urllib.request.install_opener(opener)
+    
+    data = urllib.request.urlopen("https://ers.cr.usgs.gov").read()
+    data = data.decode('utf-8')
+    m = re.search(r'<input .*?name="csrf_token".*?value="(.*?)"', data)
+    if m:
+        token = m.group(1)
+    else:
+        print("Error : CSRF_Token not found")
+        sys.exit(-3)
+        
+    params = urllib.parse.urlencode(dict(username=username, password=password, csrf_token=token)).encode('utf-8')
+    request = urllib.request.Request("https://ers.cr.usgs.gov/login", params, headers={})
+    f = urllib.request.urlopen(request)
+
+    data = f.read()
+    f.close()
+    if data.decode('utf-8').find('You must sign in as a registered user to download data or place orders for USGS EROS products')>0:
+        # auth failed, TODO raise warning
+        return False
+
+    return True
+
+
+def download_earthexplorer(url, out_file):
+    """ 
+    Slightly lower level implemenation that handles earthexplorer's redirection.
+    inspired by: https://github.com/olivierhagolle/LANDSAT-Download
+    """ 
+    try:
+        req = urllib.request.urlopen(url)
+    
+        #if downloaded file is html
+        if (req.info().get_content_type()=='text/html'):
+            raise RemoteFileException("error : file is in html and not an expected binary file, url: {0}".format(url))
+
+        #if file too small           
+        total_size = int(req.getheader('Content-Length').strip())
+        if (total_size<50000):
+           raise RemoteFileException("Error: The file is too small to be a Landsat Image, url: {0}".format(url))
+
+        #download
+        CHUNK = 1024 * 1024 *8
+
+        with open(out_file, 'wb') as fp:
+            while True:
+                chunk = req.read(CHUNK)
+                if not chunk: break
+                fp.write(chunk)
+
+    except urllib.error.HTTPError as e:
+        if e.code == 500:
+            raise RemoteFileException("File doesn't exist url: {0}".format(url))
+        else:
+            raise RemoteFileException("HTTP Error:" + e.code + url)
+    
+    except urllib.error.URLError as e:
+        raise RemoteFileException("URL Error: {1} url: {0}".format(url, e.reason))
+
+    return out_file

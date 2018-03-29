@@ -5,7 +5,7 @@ import ogr
 import utm
 
 from .. import settings
-from ..download import url_download, RemoteFileException, ungzip
+from ..download import url_download, RemoteFileException, ungzip, untar, connect_earthexplorer_no_proxy, download_earthexplorer
 from . import image_processing as img
 
 
@@ -15,17 +15,19 @@ def download(scene_id, bands, directory_=settings.LANDSAT_DIR):
     if 'MTL' not in bands:
         bands.append('MTL')
 
-    for band in bands:
-        # get url for the band
-        try:   # amazon s3 only has stuff from 2017 on
-            url = amazon_s3_url(scene_id, band)
+    try:   
+        for band in bands:
+            # get url for the band
+            url = amazon_s3_url(scene_id, band)   # amazon s3 only has stuff from 2017 on
             fp = url_download(url, directory)
 
-        except RemoteFileException:   # try to use EarthExplorer
-            scene_id = product2entityid(scene_id)
-            url = earthexplorer_url(scene_id)
-            fp = url_download(url, directory, _filename=scene_id+'.gz', auth=settings.EARTH_EXPLORER_LOGIN)
-            fp = ungzip(fp)
+    except RemoteFileException:   # try to use EarthExplorer
+        entity_id = product2entityid(scene_id)
+        url = earthexplorer_url(entity_id)
+        connect_earthexplorer_no_proxy(*settings.EARTH_EXPLORER_LOGIN)
+        targzfile = download_earthexplorer(url, directory+'/'+entity_id+'.tar.gz')
+        tarfile = ungzip(targzfile)
+        directory = untar(tarfile, directory)
 
     meta_file = '{0}/{1}_MTL.txt'.format(directory, scene_id)
     metadata = read_metadata(meta_file)

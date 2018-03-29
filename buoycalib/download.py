@@ -86,6 +86,7 @@ def ungzip(filepath):
            shutil.copyfileobj(f_in, f_out)
         except OSError as e:
             warnings.warn(str(e) + filepath, RuntimeWarning)
+            return filepath
 
     return new_filepath
 

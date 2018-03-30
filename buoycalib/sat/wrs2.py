@@ -1,8 +1,8 @@
 from osgeo import ogr
-import shapely.geometry
-import shapely.wkt
+#import shapely.geometry
+#import shapely.wkt
 
-from . import settings
+from .. import settings
 
 # credit to here: 
 # https://earthdatascience.org/tutorials/convert-landsat-path-row-to-lat-lon/

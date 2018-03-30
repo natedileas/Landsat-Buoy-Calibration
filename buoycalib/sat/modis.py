@@ -4,14 +4,14 @@ from ftplib import FTP
 import gdal
 import numpy
 import glob
-import skimage.data
+#import skimage.data
 import utm
 
 from .. import settings
 from ..download import url_download
 from . import image_processing as img
 from .modis_tile import latlon_to_tile
-from . import mrt_swath 
+from . import mrt_swath
 
 def download(granule_id, directory_=settings.MODIS_DIR):
     """ download a MODIS scene by granule ID. """

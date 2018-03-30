@@ -1,4 +1,3 @@
-import skimage.data
 from osgeo import gdal, osr
 import ogr
 import utm
@@ -73,7 +72,8 @@ def convert_utm_zones(x, y, zone_from, zone_to):
 
 
 def dc_avg(filename, poi):
-    image = skimage.data.load(filename)
+    dataset = gdal.Open(filename)   # open image
+    image = dataset.ReadAsArray()
 
     c, r = poi
 

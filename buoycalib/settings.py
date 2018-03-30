@@ -11,6 +11,7 @@ TAIL_FILE_TEMP = join(MISC_FILES, 'tail.txt')
 STAN_ATMO = join(MISC_FILES, 'stanAtm.txt')
 WATER_TXT = join(MISC_FILES, 'water_emis.txt')
 
+MERRA_PTS = join(STATIC, 'merra_points.npz')
 BUOY_TXT = join(STATIC, 'noaa', 'buoy_height.txt')
 STATION_TXT = join(STATIC, 'noaa', 'station_table.txt')
 

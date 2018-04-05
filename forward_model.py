@@ -49,7 +49,7 @@ def landsat8(scene_id, atmo_source='merra', verbose=False, bands=[10, 11]):
     image = display.landsat_preview(args.scene_id, args.buoy_id)
     
     cv2.imshow('Landsat Preview', image)
-    cv2.waitKey(0)
+    cv2.waitKey(50)
     
     # satelite download
     # [:] thing is to shorthand to make a shallow copy
@@ -94,7 +94,7 @@ def landsat8(scene_id, atmo_source='merra', verbose=False, bands=[10, 11]):
             img_ltoa[b] = sat.landsat.calc_ltoa(directory, metadata, buoy_lat, buoy_lon, b)
             mod_ltoa[b] = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, RSR_wavelengths, RSR)
 
-        data[buoy_id] = (mod_ltoa, img_ltoa, buoy_id, skin_temp, buoy_lat, buoy_lon)
+        data[buoy_id] = (buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa)
 
     return data
 
@@ -109,6 +109,7 @@ if __name__ == '__main__':
     parser.add_argument('buoy_id', help='NOAA Buoy ID. Example: 45012')
     parser.add_argument('-a', '--atmo', default='merra', choices=['merra', 'narr'], help='Choose atmospheric data source, choices:[narr, merra].')
     parser.add_argument('-v', '--verbose', default=False, action='store_true')
+    parser.add_argument('-s', '--save', default=True, action='store_false')
     parser.add_argument('-b', '--bands', nargs='+')
 
     args = parser.parse_args()
@@ -124,4 +125,14 @@ if __name__ == '__main__':
     else:
         raise ValueError('Scene ID is not a valid format for (landsat8, modis)')
 
-    print(ret)
+    print('Scene_ID, Buoy_ID, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa')
+    for key in ret.keys():
+        buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa = ret[key]
+        print(args.scene_id, buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa)
+
+    if args.save:
+        with open('results.txt', 'w') as f:
+            print('# Scene_ID, Buoy_ID, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa', file=f, sep=', ')
+            for key in ret.keys():
+                buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa = ret[key]
+                print(args.scene_id, buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, file=f, sep=', ')

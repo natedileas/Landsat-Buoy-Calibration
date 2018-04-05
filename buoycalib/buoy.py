@@ -130,19 +130,32 @@ def datasets_in_corners(corners):
 
     """
     stations = all_datasets()
-
-    ur_lat, ll_lat, ur_lon, ll_lon = corners
-
     inside = {}
 
     # keep buoy stations and coordinates that fall within the corners
     for stat in stations:
         # check for latitude and longitude
-        if stations[stat].lat > ll_lat and stations[stat].lat < ur_lat:
-            if stations[stat].lon > ll_lon and stations[stat].lon < ur_lon:
-                inside[stat] = stations[stat]
+        if point_in_corners(corners, (stations[stat].lat, stations[stat].lon)):
+            inside[stat] = stations[stat]
 
     return inside
+
+
+def point_in_corners(corners, point):
+    ur_lat, ll_lat, ur_lon, ll_lon = corners
+    lat, lon = point
+
+    if ur_lat > 0 and not (ll_lat < lat < ur_lat):
+        return False
+    elif ur_lat <= 0 and not (ll_lat > lat > ur_lat):
+        return False
+
+    if ur_lon > 0 and not (ll_lon > lon > ur_lon):
+        return False
+    elif ur_lon <= 0 and not (ll_lon < lon < ur_lon):
+        return False
+
+    return True
 
 
 def all_datasets():

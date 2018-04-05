@@ -134,6 +134,12 @@ def read_metadata(filename):
     return metadata
 
 
+def corners(metadata):
+    """" ur_lat, ll_lat, ur_lon, ll_lon """
+    return metadata['CORNER_UR_LAT_PRODUCT'], metadata['CORNER_LL_LAT_PRODUCT'], \
+           metadata['CORNER_UR_LON_PRODUCT'], metadata['CORNER_LL_LON_PRODUCT']
+
+
 def calc_ltoa(directory, metadata, lat, lon, band):
     """
     Calculate image radiance from metadata

@@ -1,6 +1,9 @@
+import warnings
 
-from buoycalib import (sat, buoy, atmo, radiance, modtran, settings)
+from buoycalib import (sat, buoy, atmo, radiance, modtran, settings, download, display)
+
 import numpy
+import cv2
 
 
 def modis(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[31, 32]):
@@ -42,47 +45,58 @@ def modis(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[31, 32])
     return mod_ltoa, img_ltoa, buoy_id, skin_temp, buoy_lat, buoy_lon
 
 
-def landsat8(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[10, 11]):
+def landsat8(scene_id, atmo_source='merra', verbose=False, bands=[10, 11]):
+    image = display.landsat_preview(args.scene_id, args.buoy_id)
+    
+    cv2.imshow('Landsat Preview', image)
+    cv2.waitKey(0)
     
     # satelite download
     # [:] thing is to shorthand to make a shallow copy
     overpass_date, directory, metadata = sat.landsat.download(scene_id, bands[:])
     rsrs = {b:settings.RSR_L8[b] for b in bands}
 
-    # Buoy Stuff
-    buoy_file = buoy.download(buoy_id, overpass_date)
-    buoy_lat, buoy_lon, buoy_depth, bulk_temp, skin_temp, lower_atmo = buoy.info(buoy_id, buoy_file, overpass_date)
-    #print('Buoy {0}: skin_temp: {1} lat: {2} lon:{3}'.format(buoy_id, skin_temp, buoy_lat, buoy_lon))
+    corners = sat.landsat.corners(metadata)
+    buoys = buoy.datasets_in_corners(corners)
 
-    # Atmosphere
-    if atmo_source == 'merra':
-        atmosphere = atmo.merra.process(overpass_date, buoy_lat, buoy_lon, verbose)
-    elif atmo_source == 'narr':
-        atmosphere = atmo.narr.process(overpass_date, buoy_lat, buoy_lon, verbose)
-    else:
-        raise ValueError('atmo_source is not one of (narr, merra)')
+    if not buoys:
+        raise buoy.BuoyDataException('no buoys in scene')
 
-    # MODTRAN
-    #print('Running MODTRAN:')
-    modtran_directory = '{0}/{1}_{2}'.format(settings.MODTRAN_DIR, scene_id, buoy_id)
-    wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, modtran_directory)
+    data = {}
 
-    # LTOA calcs
-    #print('Ltoa Spectral Calculations:')
-    mod_ltoa_spectral = radiance.calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_temp)
+    for buoy_id in buoys:
+        try:
+            buoy_file = buoy.download(buoy_id, overpass_date)
+        except download.RemoteFileException:
+            warnings.warn('Buoy {0} does not have data for this date.'.format(buoy_id), RuntimeWarning)
+            continue
+        buoy_lat, buoy_lon, buoy_depth, bulk_temp, skin_temp, lower_atmo = buoy.info(buoy_id, buoy_file, overpass_date)
 
-    #print(rsrs)
+        # Atmosphere
+        if atmo_source == 'merra':
+            atmosphere = atmo.merra.process(overpass_date, buoy_lat, buoy_lon, verbose)
+        elif atmo_source == 'narr':
+            atmosphere = atmo.narr.process(overpass_date, buoy_lat, buoy_lon, verbose)
+        else:
+            raise ValueError('atmo_source is not one of (narr, merra)')
 
-    img_ltoa = {}
-    mod_ltoa = {}
-    for b in bands:
-        RSR_wavelengths, RSR = numpy.loadtxt(rsrs[b], unpack=True)
-        img_ltoa[b] = sat.landsat.calc_ltoa(directory, metadata, buoy_lat, buoy_lon, b)
-        mod_ltoa[b] = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, RSR_wavelengths, RSR)
+        # MODTRAN
+        modtran_directory = '{0}/{1}_{2}'.format(settings.MODTRAN_DIR, scene_id, buoy_id)
+        wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, modtran_directory)
 
-    #print('RADIANCE modeled: {1} img: {2}'.format(b, mod_ltoa, img_ltoa))
+        # LTOA calcs
+        mod_ltoa_spectral = radiance.calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_temp)
 
-    return mod_ltoa, img_ltoa, buoy_id, skin_temp, buoy_lat, buoy_lon
+        img_ltoa = {}
+        mod_ltoa = {}
+        for b in bands:
+            RSR_wavelengths, RSR = numpy.loadtxt(rsrs[b], unpack=True)
+            img_ltoa[b] = sat.landsat.calc_ltoa(directory, metadata, buoy_lat, buoy_lon, b)
+            mod_ltoa[b] = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, RSR_wavelengths, RSR)
+
+        data[buoy_id] = (mod_ltoa, img_ltoa, buoy_id, skin_temp, buoy_lat, buoy_lon)
+
+    return data
 
 
 if __name__ == '__main__':
@@ -101,7 +115,7 @@ if __name__ == '__main__':
 
     if args.scene_id[0:3] in ('LC8', 'LC0'):   # Landsat 8
         bands = [int(b) for b in args.bands] if args.bands is not None else [10, 11]
-        ret = landsat8(args.scene_id, args.buoy_id, args.atmo, args.verbose, bands)
+        ret = landsat8(args.scene_id, args.atmo, args.verbose, bands)
 
     elif args.scene_id[0:3] == 'MOD':   # Modis
         bands = [int(b) for b in args.bands] if args.bands is not None else [31, 32]

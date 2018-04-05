@@ -43,6 +43,7 @@ def landsat_preview(scene_id, buoy_id, source='merra', preview_file='landsat_pre
     corners = sat.wrs2.wrs2_to_corners(int(path), int(row))
     points_to_draw = [p for p in loc if point_in_corners(corners, p)]
     buoys = buoy.datasets_in_corners(corners)
+    #print(corners, buoys)
     #ds = buoy.all_datasets()[buoy_id]
 
     dataset = gdal.Open(image_file)
@@ -53,6 +54,8 @@ def landsat_preview(scene_id, buoy_id, source='merra', preview_file='landsat_pre
     buoy_pixels = [latlon_to_pizel(geotransform, buoy.all_datasets()[ds].lat, buoy.all_datasets()[ds].lon, metadata['UTM_ZONE']) for ds in buoys]
     buoy_ids = [ds for ds in buoys]
     image = cv2.imread(image_file, 0)
+    image[image==0] = image[image!=0].mean()
+    image = cv2.equalizeHist(image)
     image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
     image = draw_points(image, [None]*len(merra_pixels), merra_pixels)
     image = draw_points(image, buoy_ids, buoy_pixels, color=(0,0,255))

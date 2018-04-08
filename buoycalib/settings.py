@@ -49,7 +49,8 @@ NOAA_URLS = ['http://www.ndbc.noaa.gov/data/historical/stdmet/%sh%s.txt.gz',
              'http://www.ndbc.noaa.gov/data/stdmet/%s%s%s2017.txt.gz']
 LANDSAT_S3_URL = 'https://landsat-pds.s3.amazonaws.com'
 LANDSAT_EE_URL = 'https://earthexplorer.usgs.gov/download/12864/{0}/STANDARD/EE'
-MODIS_URL = 'ftp://ladsweb.nascom.nasa.gov/allData/6/'
+MODIS_URL = 'ftp://ladsweb.nascom.nasa.gov/allData/6'
+MODIS_URL = 'https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/6'
 
 # authorizations / logins
 # username, password

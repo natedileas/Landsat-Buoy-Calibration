@@ -41,15 +41,16 @@ def modis(scene_id, buoy_id, atmo_source='merra', verbose=False, bands=[31, 32])
         mod_ltoa[b] = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, RSR_wavelengths, RSR)
 
     #print('RADIANCE \nmodeled: {1} \nimg: {2}'.format(b, mod_ltoa, img_ltoa))
-
-    return mod_ltoa, img_ltoa, buoy_id, skin_temp, buoy_lat, buoy_lon
+    data = {buoy_id: (buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa)}
+    return data
 
 
 def landsat8(scene_id, atmo_source='merra', verbose=False, bands=[10, 11]):
-    image = display.landsat_preview(args.scene_id, args.buoy_id)
+    image = display.landsat_preview(scene_id, '')
     
     cv2.imshow('Landsat Preview', image)
     cv2.waitKey(50)
+    cv2.imwrite('preview_{0}.jpg'.format(scene_id), image)
     
     # satelite download
     # [:] thing is to shorthand to make a shallow copy

@@ -328,6 +328,7 @@ def calc_skin_temp(data, dates, headers, overpass_date, buoy_depth):
     dt = [(i, d) for i, d in enumerate(dates) if abs(d - overpass_date) < datetime.timedelta(hours=12)]
     if len(dt) == 0:
         raise BuoyDataException('No Buoy Data')
+
     dt_slice, dt_times = zip(*dt)
     w_temp = data[dt_slice, headers.index('WTMP')]
     wind_spd = data[dt_slice, headers.index('WSPD')]
@@ -348,6 +349,9 @@ def calc_skin_temp(data, dates, headers, overpass_date, buoy_depth):
     # part 2
     b = 0.35 + (0.018 * numpy.exp(0.4 * u_m))
     c = 1.32 - (0.64 * numpy.log(u_m))
+
+    if numpy.isnan(c):
+        raise BuoyDataException('no wind speed data')
 
 
     f_cz = (w_temp - avg_skin_temp) / numpy.exp(b*z)

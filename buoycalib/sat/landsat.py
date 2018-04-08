@@ -60,7 +60,7 @@ def product2entityid(product_id):
 
     date = datetime.datetime.strptime(product_id[17:25], '%Y%m%d')
 
-    return 'LC8{path}{row}{date}LGN{vers}'.format(path=path, row=row, date=date.strftime('%Y%j'), vers='01')
+    return 'LC8{path}{row}{date}LGN{vers}'.format(path=path, row=row, date=date.strftime('%Y%j'), vers='00')
 
 
 def amazon_s3_url(scene_id, band):

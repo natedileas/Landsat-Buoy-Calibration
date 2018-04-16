@@ -1,4 +1,5 @@
 import datetime
+import glob
 
 from osgeo import gdal, osr
 import ogr
@@ -28,23 +29,31 @@ def download(scene_id, bands, directory_=settings.LANDSAT_DIR):
             fp = url_download(url, directory)
 
     except RemoteFileException:   # try to use EarthExplorer
-        entity_id = product2entityid(scene_id)
-        url = earthexplorer_url(entity_id)
+
         if connect_earthexplorer_no_proxy(*settings.EARTH_EXPLORER_LOGIN):
-            targzfile = download_earthexplorer(url, directory+'/'+entity_id+'.tar.gz')
-            tarfile = ungzip(targzfile)
-            directory = untar(tarfile, directory)
+            for version in ['00', '01', '02']:
+                entity_id = product2entityid(scene_id, version)
+                url = earthexplorer_url(entity_id)
+                try:
+                    targzfile = download_earthexplorer(url, directory+'/'+entity_id+'.tar.gz')
+                except RemoteFileException:
+                    continue
+                tarfile = ungzip(targzfile)
+                os.remove(targzfile)
+                directory = untar(tarfile, directory)
+                os.remove(tarfile)
+                break
         else:
             raise RuntimeError('EarthExplorer Authentication Failed. Check username, \
                 password, and if the site is up (https://earthexplorer.usgs.gov/).')
 
-    meta_file = '{0}/{1}_MTL.txt'.format(directory, scene_id)
+    meta_file = glob.glob('{0}/*_MTL.txt'.format(directory))[0]
     metadata = read_metadata(meta_file)
 
     return metadata['date'], directory, metadata
 
 
-def product2entityid(product_id):
+def product2entityid(product_id, version='00'):
     """ convert product landsat ID to entity ID
 
     Ex:
@@ -60,7 +69,7 @@ def product2entityid(product_id):
 
     date = datetime.datetime.strptime(product_id[17:25], '%Y%m%d')
 
-    return 'LC8{path}{row}{date}LGN{vers}'.format(path=path, row=row, date=date.strftime('%Y%j'), vers='00')
+    return 'LC8{path}{row}{date}LGN{vers}'.format(path=path, row=row, date=date.strftime('%Y%j'), vers=version)
 
 
 def amazon_s3_url(scene_id, band):
@@ -175,6 +184,9 @@ def calc_ltoa(directory, metadata, lat, lon, band):
     image_data = dataset.ReadAsArray()
     #print(image_data, image_data.shape, image_data.mean(), y, x)
     dc_avg = image_data[y-1:y+2, x-1:x+2].mean()
+    
+    if dc_avg == 0:
+        raise RuntimeError('buoy falls outside of image (in the corner)')
 
     add = metadata['RADIANCE_ADD_BAND_' + str(band)]
     mult = metadata['RADIANCE_MULT_BAND_' + str(band)]

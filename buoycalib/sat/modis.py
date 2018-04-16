@@ -64,6 +64,11 @@ def parse_granule(granule):
     return parsed
 
 
+def corners(metadata):
+    return float(metadata['NORTHBOUNDINGCOORDINATE']), float(metadata['SOUTHBOUNDINGCOORDINATE']), \
+           float(metadata['EASTBOUNDINGCOORDINATE']), float(metadata['WESTBOUNDINGCOORDINATE'])
+
+
 def modis_from_landsat(date, lat, lon):
     """
     parse a landsat ID and form a valid, downloadable MODIS scene out of it

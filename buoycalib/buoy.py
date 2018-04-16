@@ -313,7 +313,10 @@ def load(filename):
             elif len(line.split()[0]) == 2:
                 date_dt = datetime.datetime.strptime(date_str, '%y %m %d %H %M')
 
-            data = _filter(line.split()[5:])
+            try:
+                data = _filter(line.split()[5:])
+            except ValueError:
+                print(line)
             lines.append(data)
             dates.append(date_dt)
 
@@ -326,6 +329,7 @@ def load(filename):
 
 def calc_skin_temp(data, dates, headers, overpass_date, buoy_depth):
     dt = [(i, d) for i, d in enumerate(dates) if abs(d - overpass_date) < datetime.timedelta(hours=12)]
+    
     if len(dt) == 0:
         raise BuoyDataException('No Buoy Data')
 
@@ -340,6 +344,9 @@ def calc_skin_temp(data, dates, headers, overpass_date, buoy_depth):
     u_m = wind_speed_height_correction(numpy.nanmean(wind_spd), 5, 10)
     
     avg_wtmp = numpy.nanmean(w_temp)
+
+    if numpy.isnan(avg_wtmp):
+        raise BuoyDataException('no water temperature data')
 
     a = 0.05 - (0.6 / u_m) + (0.03 * numpy.log(u_m))   # thermal gradient
     z = buoy_depth   # depth in meters

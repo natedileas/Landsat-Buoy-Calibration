@@ -2,6 +2,7 @@ import cv2
 import io
 import urllib.request
 import base64
+import glob
 
 import numpy
 from osgeo import gdal, osr
@@ -30,7 +31,7 @@ def landsat_preview(scene_id, buoy_id, source='merra', preview_file='landsat_pre
     image_file = io.BytesIO(urllib.request.urlopen(image_file).read())
     """
     date, directory, metadata = sat.landsat.download(scene_id, ['10'])
-    image_file = './{0}/{1}_B10.TIF'.format(directory, scene_id)
+    image_file = glob.glob('{0}/*_B10.TIF'.format(directory))[0]
     #print(image_file)
 
     # TODO narr or merra

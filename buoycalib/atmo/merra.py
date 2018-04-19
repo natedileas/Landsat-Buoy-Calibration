@@ -99,3 +99,62 @@ def process(date, lat_oi, lon_oi, verbose=False):
         numpy.savetxt('atmosphere_{0}_{1}_{2}.txt'.format('merra', date.strftime('%Y%m%d'), buoy.id), stuff, fmt='%7.2f, %7.2f, %7.2f, %7.2f', header=h)
 
     return height, press, temp, relhum
+
+
+def error_bar_atmos(date, lat_oi, lon_oi, verbose=False):
+    filename = download(date)
+    atmo_data = data.open_netcdf4(filename)
+
+    # choose points
+    lat = atmo_data.variables['lat'][:]
+    lon = atmo_data.variables['lon'][:]
+    lat = numpy.stack([lat]*lon.shape[0], axis=0)
+    lon = numpy.stack([lon]*lat.shape[1], axis=1)
+    chosen_idxs, data_coor = funcs.choose_points(lat, lon, lat_oi, lon_oi)
+
+    latidx = tuple(chosen_idxs[0])
+    lonidx = tuple(chosen_idxs[1])
+
+    t1, t2 = data.closest_hours(atmo_data.variables['time'][:].data,
+                                atmo_data.variables['time'].units, date)
+    t1_dt = num2date(atmo_data.variables['time'][t1], atmo_data.variables['time'].units)
+    t2_dt = num2date(atmo_data.variables['time'][t2], atmo_data.variables['time'].units)
+
+    index1 = (t1, slice(None), latidx, lonidx)
+    index2 = (t2, slice(None), latidx, lonidx)
+
+    # shape (4, N) each except for pressure
+    press = numpy.array(atmo_data.variables['lev'][:])
+
+    # the .T on the end is a transpose
+    temp1 = numpy.diagonal(atmo_data.variables['T'][index1], axis1=1, axis2=2).T
+    temp2 = numpy.diagonal(atmo_data.variables['T'][index2], axis1=1, axis2=2).T
+
+    rhum1 = numpy.diagonal(atmo_data.variables['RH'][index1], axis1=1, axis2=2).T   # relative humidity
+    rhum2 = numpy.diagonal(atmo_data.variables['RH'][index2], axis1=1, axis2=2).T
+
+    height1 = numpy.diagonal(atmo_data.variables['H'][index1], axis1=1, axis2=2).T / 1000.0   # height
+    height2 = numpy.diagonal(atmo_data.variables['H'][index2], axis1=1, axis2=2).T / 1000.0
+
+    atmos = []
+
+    for i in range(4):
+        atmos.append(append_standard_atmo(height1[i], press, temp1[i], rhum1[i]))
+        atmos.append(append_standard_atmo(height2[i], press, temp2[i], rhum2[i]))
+
+    return atmos
+
+
+def append_standard_atmo(height, press, temp, relhum):
+    # load standard atmosphere for mid-lat summer
+    # TODO evaluate standard atmo validity, add different ones for different TOY?
+    stan_atmo = numpy.loadtxt(settings.STAN_ATMO, unpack=True)
+    stan_height, stan_press, stan_temp, stan_relhum = stan_atmo
+    # add standard atmo above cutoff index
+    cutoff_idx = numpy.abs(stan_press - press[-1]).argmin()
+    height = numpy.append(height, stan_height[cutoff_idx:])
+    press = numpy.append(press, stan_press[cutoff_idx:])
+    temp = numpy.append(temp, stan_temp[cutoff_idx:])
+    relhum = numpy.append(relhum, stan_relhum[cutoff_idx:])
+
+    return height, press, temp, relhum

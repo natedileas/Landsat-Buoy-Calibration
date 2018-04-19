@@ -11,25 +11,76 @@ import utm
 from . import (sat, atmo, buoy, settings)
 img = sat.image_processing
 
+def modis_preview(scene_id):
+    overpass_date, directory, metadata, [granule_filepath, geo_ref_filepath] = sat.modis.download(scene_id)
+
+    corners = sat.modis.corners(metadata)
+    #print(corners)
+    buoys = buoy.datasets_in_corners(corners)
+
+    ds = gdal.Open(granule_filepath)
+    
+    emissive_bands = gdal.Open(ds.GetSubDatasets()[2][0])
+    
+    band_names = emissive_bands.GetMetadata()['band_names'].split(',')
+    band2idx_map = {int(b):i for i, b in enumerate(band_names)}
+
+    # read data in to numpy array form
+    emissive_data = emissive_bands.ReadAsArray()
+
+    # geo reference file (matching MOD03 product)       
+    geo_reference_ds = gdal.Open(geo_ref_filepath)
+    geo_reference_sds = geo_reference_ds.GetSubDatasets()
+
+    # these are the latitude and longitude sub data sets
+    lat_ds = gdal.Open(geo_reference_sds[12][0])
+    lon_ds = gdal.Open(geo_reference_sds[13][0])
+    lat = lat_ds.ReadAsArray()
+    lon = lon_ds.ReadAsArray()
+
+    buoy_points = [(buoy.all_datasets()[ds].lat, buoy.all_datasets()[ds].lon) for ds in buoys]
+    buoy_pixels = modis_latlon2pixel(lat, lon, buoy_points)
+    #print(buoy_points)
+    #print(buoy_pixels)
+
+    merra_points = numpy.load(settings.MERRA_PTS)
+    merra_lat = merra_points['merra_lat']
+    merra_lon = merra_points['merra_lon']
+    lat_max, lat_min, lon_max, lon_min = corners
+
+    mask = numpy.where((lat_min < merra_lat) & (merra_lat < lat_max) & (lon_min < merra_lon) & (merra_lon < lon_max))
+    #print(merra_lat[mask].max(), merra_lat[mask].min(), merra_lon[mask].max(), merra_lon[mask].min())
+    merra_points = list(zip(merra_lat[mask].flatten(), merra_lon[mask].flatten()))
+    merra_pixels = modis_latlon2pixel(lat, lon, merra_points)
+    #print(merra_pixels[::5])
+    #print(merra_points[::5])
+
+    image = emissive_data[band2idx_map[32], :, :]
+    rr = int(max(image.shape) / 100)
+    #import pdb; pdb.set_trace()
+    image[image==0] = image[image!=0].mean()
+    image = cv2.equalizeHist((image / 256).astype(numpy.uint8))  # 16 bits to 8 bits
+    image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    image = draw_points(image, [None]*len(merra_pixels), merra_pixels, r=rr//4)
+    buoy_ids = [ds for ds in buoys]
+    image = draw_points(image, buoy_ids, buoy_pixels, color=(0,0,255), r=rr//4)
+    #image = cv2.resize(image, (512,512))
+
+    return image
+
+
+def modis_latlon2pixel(lat, lon, points):
+    pixels = []
+    for lat_oi, lon_oi in points:
+        distances = (lat - lat_oi)**2 + (lon - lon_oi)**2
+        poi_c, poi_r = numpy.unravel_index(numpy.argmin(distances), lat.shape)
+        pixels.append((poi_r, poi_c))
+    return pixels
+
+
 def landsat_preview(scene_id, buoy_id, source='merra', preview_file='landsat_preview.jpg'):
     # get scene visible image
 
-    
-    if len(scene_id) == 21:
-        path = scene_id[3:6]
-        row = scene_id[6:9]
-        year = scene_id[9:13]
-    elif len(scene_id) == 40:
-        path = scene_id[10:13]
-        row = scene_id[13:16]
-        year = scene_id[17:21]
-    """
-    image_file = 'https://earthexplorer.usgs.gov/browse/landsat_8/{year}/{path}/{row}/{0}.jpg'.format(scene_id, year=year, path=path, row=row)
-    
-    #if validators.url(image_file):
-    print(image_file)
-    image_file = io.BytesIO(urllib.request.urlopen(image_file).read())
-    """
     date, directory, metadata = sat.landsat.download(scene_id, ['10'])
     image_file = glob.glob('{0}/*_B10.TIF'.format(directory))[0]
     #print(image_file)
@@ -41,7 +92,7 @@ def landsat_preview(scene_id, buoy_id, source='merra', preview_file='landsat_pre
     lon = merra_points['merra_lon']
     loc = list(zip(lat.flatten(), lon.flatten()))
 
-    corners = sat.wrs2.wrs2_to_corners(int(path), int(row))
+    corners = sat.landsat.corners(metadata)
     points_to_draw = [p for p in loc if point_in_corners(corners, p)]
     buoys = buoy.datasets_in_corners(corners)
     #print(corners, buoys)
@@ -85,7 +136,8 @@ def draw_points(image, text=[], loc=[], r=100, color=(255, 0, 0), size=None):
         
         if text[i]:
             font = cv2.FONT_HERSHEY_SIMPLEX
-            cv2.putText(image, text[i], point, font, r/12,(255,255,255), 20, cv2.LINE_AA)
+            cv2.putText(image, text[i], point, font, int(r/24) + 1, (0,0,0), int(r/5) + 2, cv2.LINE_AA)
+            cv2.putText(image, text[i], point, font, int(r/24) + 1, (255,255,255), int(r/5) + 1, cv2.LINE_AA)
 
     return image
 

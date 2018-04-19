@@ -7,7 +7,7 @@ import numpy
 from . import settings
 
 
-def process(atmosphere, lat, lon, date, directory):
+def process(atmosphere, lat, lon, date, directory, temperature):
     """
     Make tape5, run modtran and parse tape7.scn for this instance.
 
@@ -23,7 +23,7 @@ def process(atmosphere, lat, lon, date, directory):
         Relevant Modtran Outputs: spectral, units: [W cm-2 sr-1 um-1]
             upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
     """
-    make_tape5s(atmosphere, lat, lon, date, directory)
+    make_tape5s(atmosphere, lat, lon, date, directory, temperature)
 
     run(directory)
     tape6_filename = os.path.join(directory, 'tape6')
@@ -33,7 +33,7 @@ def process(atmosphere, lat, lon, date, directory):
     return wavelengths, upwell_rad, gnd_reflect, transmission
 
 
-def make_tape5s(profile, lat, lon, date, directory):
+def make_tape5s(profile, lat, lon, date, directory, temperature):
     """
     Write the profile to a tape5 file.
 
@@ -58,7 +58,7 @@ def make_tape5s(profile, lat, lon, date, directory):
         head = f.read()
     head = head.replace('nml', str(numpy.shape(height)[0]))   # NuMber of Layers
     head = head.replace('gdalt', '%1.3f' % float(height[0]))   # GrounD ALTitude
-    head = head.replace('tmp____', '%3.3f' % float(temp[0]))   # TeMPerature
+    head = head.replace('tmp____', '%3.3f' % float(temperature))   # TeMPerature
 
     atmosphere = ''
     for i, h in enumerate(height):

@@ -1,12 +1,18 @@
 import warnings
 
-from buoycalib import (sat, buoy, atmo, radiance, modtran, settings, download, display)
+from buoycalib import (sat, buoy, atmo, radiance, modtran, settings, download, display, error_bar)
 
 import numpy
 import cv2
 
 
 def modis(scene_id, atmo_source='merra', verbose=False, bands=[31, 32]):
+    image = display.modis_preview(scene_id)
+    
+    cv2.imshow('MODIS Preview', image)
+    cv2.waitKey(50)
+    cv2.imwrite('preview_{0}.jpg'.format(scene_id), image)
+
     overpass_date, directory, metadata, [granule_filepath, geo_ref_filepath] = sat.modis.download(scene_id)
     rsrs = {b:settings.RSR_MODIS[b] for b in bands}
 
@@ -40,7 +46,7 @@ def modis(scene_id, atmo_source='merra', verbose=False, bands=[31, 32]):
         # MODTRAN
         #print('Running MODTRAN:')
         modtran_directory = '{0}/{1}_{2}'.format(settings.MODTRAN_DIR, scene_id, buoy_id)
-        wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, modtran_directory)
+        wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, modtran_directory, skin_temp)
 
         # LTOA calcs
         #print('Ltoa Spectral Calculations:')
@@ -53,7 +59,9 @@ def modis(scene_id, atmo_source='merra', verbose=False, bands=[31, 32]):
             RSR_wavelengths, RSR = sat.modis.load_rsr(rsrs[b])
             mod_ltoa[b] = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, RSR_wavelengths, RSR)
 
-        data[buoy_id] = (buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, overpass_date)
+        error = error_bar.error_bar(scene_id, buoy_id, skin_temp, 0.35, overpass_date, buoy_lat, buoy_lon, rsrs, bands)
+
+        data[buoy_id] = (buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, error, img_ltoa, overpass_date)
     
     return data
 
@@ -99,7 +107,7 @@ def landsat8(scene_id, atmo_source='merra', verbose=False, bands=[10, 11]):
 
         # MODTRAN
         modtran_directory = '{0}/{1}_{2}'.format(settings.MODTRAN_DIR, scene_id, buoy_id)
-        wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, modtran_directory)
+        wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmosphere, buoy_lat, buoy_lon, overpass_date, modtran_directory, skin_temp)
 
         # LTOA calcs
         mod_ltoa_spectral = radiance.calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_temp)
@@ -115,7 +123,9 @@ def landsat8(scene_id, atmo_source='merra', verbose=False, bands=[10, 11]):
             warnings.warn(str(e), RuntimeWarning)
             continue
 
-        data[buoy_id] = (buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, overpass_date)
+        error = error_bar.error_bar(scene_id, buoy_id, skin_temp, 0.305, overpass_date, buoy_lat, buoy_lon, rsrs, bands)
+
+        data[buoy_id] = (buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, error, img_ltoa, overpass_date)
 
     return data
 
@@ -147,12 +157,12 @@ if __name__ == '__main__':
 
     print('Scene_ID, Buoy_ID, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, date')
     for key in ret.keys():
-        buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, date = ret[key]
-        print(args.scene_id, date.strftime('%Y/%m/%d'), buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa)
+        buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, error, img_ltoa, date = ret[key]
+        print(args.scene_id, date.strftime('%Y/%m/%d'), buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, error)
 
     if args.save:
         with open('results.txt', 'w') as f:
             print('# Scene_ID, Date, Buoy_ID, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa', file=f, sep=', ')
             for key in ret.keys():
-                buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, date = ret[key]
-                print(args.scene_id, date.strftime('%Y/%m/%d'), buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, file=f, sep=', ')
+                buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, error, img_ltoa, date = ret[key]
+                print(args.scene_id, date.strftime('%Y/%m/%d'), buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, error, file=f, sep=', ')

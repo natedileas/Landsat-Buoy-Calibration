@@ -3,15 +3,17 @@ import numpy
 from . import (modtran, atmo, sat, radiance, settings)
 from .atmo import merra
 
+
 def error_bar(scene_id, buoy_id, skin_temp, skin_temp_std, overpass_date, buoy_lat, buoy_lon, rsrs, bands):
     atmos = merra.error_bar_atmos(overpass_date, buoy_lat, buoy_lon)
 
     modeled_ltoas = {b:[] for b in bands}
     for temp in [skin_temp+skin_temp_std, skin_temp-skin_temp_std]:
         for i, atmo in enumerate(atmos):
+
             modtran_directory = '{0}/{1}_{2}_{3}_{4}'.format(settings.MODTRAN_DIR, scene_id, buoy_id, temp, i)
             wavelengths, upwell_rad, gnd_reflect, transmission = modtran.process(atmo, buoy_lat, buoy_lon, overpass_date, modtran_directory, temp)
-            mod_ltoa_spectral = radiance.calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_temp)
+            mod_ltoa_spectral = radiance.calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, temp)
 
             for b in bands:
                 if scene_id[0:3] == 'MOD':

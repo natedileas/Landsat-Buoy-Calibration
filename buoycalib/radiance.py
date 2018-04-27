@@ -10,13 +10,16 @@ def calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_
     Args:
         modtran_data: modtran output, Units: [W cm-2 sr-1 um-1]
             upwell_rad, downwell_rad, wavelengths, transmission, gnd_reflect
+        wavelengths: [microns]
         skin_temp: ground truth surface temperature
 
     Returns:
         spectral top of atmosphere radiance: Ltoa(lambda) [W m-2 sr-1 um-1]
     """
-    # calculate temperature array (input units: [m], [K] output units: [W m-2 sr-1 um-1])
-    bb_rad = bb_radiance(wavelengths / 1e6, skin_temp) / 1e6
+    # calculate temperature array (input units: [meters, Kelvin], output units: [W m-2 sr-1 um-1])
+    # input wavelength units [microns -> meters]
+    # output units [W m-2 sr-1 m-1] -> [W cm-2 sr-1 um-1]
+    bb_rad = bb_radiance(wavelengths / 1e6, skin_temp) / (1e4 * 1e6)
 
     # Load Emissivity / Reflectivity
     spec_r_wvlens, spec_r = numpy.loadtxt(water_file, unpack=True, skiprows=3)
@@ -25,8 +28,8 @@ def calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_
 
     # calculate spectral top of atmosphere radiance
     # Ltoa = (Lbb(T) * tau * emis) + (gnd_ref * reflect) + pth_thermal
-    # units: [W m-2 sr-1 um-1]
-    ltoa_spectral = (upwell_rad * 1e4) + (bb_rad * spec_emis * transmission) + (spec_ref * gnd_reflect * 1e4)
+    # units: [W cm-2 sr-1 um-1] --> [W m-2 sr-1 um-1]
+    ltoa_spectral = 1e4 * ((upwell_rad) + (bb_rad * spec_emis * transmission) + (spec_ref * gnd_reflect))
 
     return ltoa_spectral
 
@@ -49,7 +52,7 @@ def calc_ltoa(wavelengths, ltoa, RSR_wavelengths, RSR):
     wvlens = wavelengths[w]
     ltoa_trimmed = ltoa[w]
 
-    # upsample to wavelength range
+    # upsample RSR to wavelength range
     RSR = numpy.interp(wvlens, RSR_wavelengths, RSR)
 
     # calculate observed radiance [ W m-2 sr-1 um-1 ]
@@ -75,9 +78,7 @@ def bb_radiance(wvlen, temp):
     h = 6.626e-34   # [J*s = kg m2 s-1], planck's constant
     k = 1.38064852e-23   # [m2 kg s-2 K-1], boltzmann's constant
 
-    c1 = 2 * (c * c) * h   # units = [kg m4 s-3]
-    c2 = (h * c) / k    # (h * c) / k, units = [m K]
-
-    rad = c1 / ((wvlen**5) * (numpy.e**((c2 / (temp * wvlen))) - 1))
+    rad = (2 * h * c**2) / ((wvlen**5) * (numpy.exp((h * c) / (k * temp * wvlen)) - 1))
+    # units = [W sr−1 m−3], reference: https://en.wikipedia.org/wiki/Planck%27s_law
 
     return rad

@@ -139,7 +139,7 @@ if __name__ == '__main__':
     parser.add_argument('scene_id', help='LANDSAT or MODIS scene ID. Examples: LC08_L1TP_017030_20170703_20170715_01_T1, MOD021KM.A2011154.1650.006.2014224075807.hdf')
     parser.add_argument('-a', '--atmo', default='merra', choices=['merra', 'narr'], help='Choose atmospheric data source, choices:[narr, merra].')
     parser.add_argument('-v', '--verbose', default=False, action='store_true')
-    parser.add_argument('-s', '--save', default=True, action='store_false')
+    parser.add_argument('-s', '--save', default='results.txt')
     parser.add_argument('-d', '--bands', nargs='+')
 
     args = parser.parse_args()
@@ -158,11 +158,13 @@ if __name__ == '__main__':
     print('Scene_ID, Buoy_ID, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, date')
     for key in ret.keys():
         buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, error, img_ltoa, date = ret[key]
-        print(args.scene_id, date.strftime('%Y/%m/%d'), buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, error)
+        print(args.scene_id, date.strftime('%Y/%m/%d'), buoy_id, bulk_temp, skin_temp, buoy_lat, \
+            buoy_lon, *mod_ltoa.values(), *img_ltoa.values(), *error.values())
 
     if args.save:
-        with open('results.txt', 'w') as f:
+        with open(args.save, 'w') as f:
             print('# Scene_ID, Date, Buoy_ID, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa', file=f, sep=', ')
             for key in ret.keys():
                 buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, error, img_ltoa, date = ret[key]
-                print(args.scene_id, date.strftime('%Y/%m/%d'), buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, img_ltoa, error, file=f, sep=', ')
+                print(args.scene_id, date.strftime('%Y/%m/%d'), buoy_id, bulk_temp, skin_temp, buoy_lat, \
+                    buoy_lon, *mod_ltoa.values(), *img_ltoa.values(), *error.values(), file=f, sep=', ')

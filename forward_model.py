@@ -52,7 +52,7 @@ def modis(scene_id, atmo_source='merra', verbose=False, bands=[31, 32]):
         #print('Ltoa Spectral Calculations:')
         mod_ltoa_spectral = radiance.calc_ltoa_spectral(wavelengths, upwell_rad, gnd_reflect, transmission, skin_temp)
 
-        img_ltoa = sat.modis.calc_ltoa_direct(granule_filepath, geo_ref_filepath, buoy_lat, buoy_lon, bands)
+        img_ltoa, units = sat.modis.calc_ltoa_direct(granule_filepath, geo_ref_filepath, buoy_lat, buoy_lon, bands)
 
         mod_ltoa = {}
         for b in bands:
@@ -60,7 +60,7 @@ def modis(scene_id, atmo_source='merra', verbose=False, bands=[31, 32]):
             mod_ltoa[b] = radiance.calc_ltoa(wavelengths, mod_ltoa_spectral, RSR_wavelengths, RSR)
 
         error = error_bar.error_bar(scene_id, buoy_id, skin_temp, 0.35, overpass_date, buoy_lat, buoy_lon, rsrs, bands)
-
+        print((buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, error, img_ltoa, overpass_date))
         data[buoy_id] = (buoy_id, bulk_temp, skin_temp, buoy_lat, buoy_lon, mod_ltoa, error, img_ltoa, overpass_date)
     
     return data

@@ -140,9 +140,13 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--atmo', default='merra', choices=['merra', 'narr'], help='Choose atmospheric data source, choices:[narr, merra].')
     parser.add_argument('-v', '--verbose', default=False, action='store_true')
     parser.add_argument('-s', '--save', default='results.txt')
+    parser.add_argument('-w', '--warnings', default=False, action='store_true')
     parser.add_argument('-d', '--bands', nargs='+')
 
     args = parser.parse_args()
+
+    if not args.warnings:
+        warnings.filterwarnings("ignore")
 
     if args.scene_id[0:3] in ('LC8', 'LC0'):   # Landsat 8
         bands = [int(b) for b in args.bands] if args.bands is not None else [10, 11]
